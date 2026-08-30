@@ -1,0 +1,96 @@
+DEEP LEARNING: ALGORITHMS AND IMPLEMENTATION
+
+Course Code: EM30008
+
+Credit: 3 L-T-P: 3-0-0
+Prerequisites: Nil
+COURSE OBJECTIVE
+In this course, students will learn the fundamental principles, underlying mathematics, and
+implementation details of deep learning. This includes the concepts and methods used to
+optimize these highly parameterized models (gradient descent and backpropagation, and more
+generally computation graphs), the modules that make them up (linear, convolution, and pooling
+layers, activation functions, etc.), and common neural network architectures (CNN, RNN, etc.).
+Applications ranging from computer vision to natural language processing and generative
+models will be demonstrated. Through in-depth programming assignments, students will learn
+how to implement these fundamental building blocks as well as how to put them together using
+popular deep learning libraries, Keras & PyTorch.
+COURSE OUTCOMES
+After successfully completing the course, the students will be able to
+CO 1: Describe the functional roles of DNN sequential blocks.
+CO 2: Demonstrate skills in selecting deep learning architecture for computer vision tasks.
+CO 3: Develop critical thinking skills to evaluate and analyze generative models for computer
+vision applications
+CO 4: Appraise and apply transfer learning and the concepts of fine-tuning
+CO 5: Implement deep learning techniques on sequential data
+CO 6: Design deep learning techniques to perform efficient analysis for real-world applications
+COURSE DETAILS
+Foundations of Deep Learning
+Overview of ANN, Feed forward, MLP, Gradient descent, back propagation algorithm, evolution
+of DL, Regularization
+Convolution Neural Networks
+CNN Architectures: Convolution, Pooling Layers, Transfer Learning, GAN, Popular CNN
+Model Architectures (Imagenet, LeNet architecture, AlexNet, VGGNet, GoogLeNet, ResNet
+architecture
+Recurrent Neural Network
+RNN architecture, LSTM, GRU, Encoder Decoder architecture
+Applications of Deep Learning
+Applications of Deep Learning to Computer Vision: Image segmentation, Object detection,
+Image Captioning, Medical imaging, Image Classification using Transfer Learning, Applications
+of Deep Learning to NLP.
+Advance Models: Auto-encoders, Generative Adversarial Network
+
+Implementation
+Tensor Flow, PyTorch, Comparing TensorFlow & PyTorch, Configuring and Running Jupyter
+notebooks on an AWS EC2 GPU Instance.
+Textbooks
+1. Ian J. Goodfellow, Yoshua Bengio, Aaron Courville, “Deep Learning”, MIT Press, 2017.
+2. Charu C. Aggarwal. Neural Networks and Deep Learning: A Textbook. Springer. 2019.
+Reference books
+1. Phil Kim, Matlab Deep Learning: With Machine Learning, Neural Networks and Artificial
+Intelligence, Apress, 2017.
+2. Ragav Venkatesan, Baoxin Li, Convolutional Neural Networks in Visual Computing, CRC
+Press, 2018.
+3. Navin Kumar Manaswi, Deep Learning with Applications Using Python, Apress, 2018.
+4. Francois Chollet, Deep Learning with Python, Manning Publications, 2018.
+
+Lesson Plan: DL: Algorithm & Implementation
+Sl. No Topic
+1 (Module-I)
+Foundations of Deep Learning: Introduction to the course 2 Overview of neural network (NN) and deep NN
+3 Feed forward network
+4 Gradient descent
+4 Back-propagation algorithm with examples
+5 Multilayer Perceptron (with example)
+6 Evolution of DL
+7 Regularization
+8 (Module-II)
+Convolution Neural Networks (CNN): Architectures (Convolution, Pooling Layers) 9 CNN Architectures: Convolution, Pooling Layers
+10 CNN problem solving
+11 Transfer Learning
+12 Popular CNN Model Architectures: Architecture of LeNet
+13 Architecture of AlexNet, VGGNet
+14 Architecture of GoogLeNet, ResNet
+15 Assignment-01
+16 Problem solving
+17 Module-III
+Recurrent Neural Network: RNN architecture 18 LSTM
+19 GRU
+20 Encoder-Decoder architecture
+21 Problem solving
+22 Problem solving
+23 Module IV
+Applications of Deep Learning: Applications of Deep Learning to Computer Vision: Image segmentation 24 Object detection
+25 Image Captioning
+26 Medical imaging
+27 Image Classification using Transfer Learning
+28 Applications of Deep Learning to NLP
+29 Applications of Deep Learning to NLP
+28 Module-V
+Advance Models: Auto-encoders 29 Generative Adversarial Network
+30 Recent trends (Presentation)
+31 Recent trends (Presentation)
+32 Recent trends (Presentation)
+33 Recent trends (Presentation)
+34 Revision: Implementation with programming
+35 Class work (Critical Thinking)
+36 Class work (Critical Thinking)

@@ -1,0 +1,153 @@
+// prisma/schema.prisma
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  image         String?
+  hasConsent    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations placeholders
+  academicProfile AcademicProfile?
+  
+  // Google OAuth Tokens
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiry     DateTime?
+
+  // Classroom specific
+  hiddenCourses   HiddenCourse[]
+  attendance      AttendanceRecord[]
+}
+
+model AttendanceRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseCode  String
+  subjectName String?
+  attended    Int
+  total       Int
+  percentage  Float    @default(0)
+  date        DateTime
+
+  @@unique([userId, courseCode, date])
+}
+
+model HiddenCourse {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+
+
+// --- REAL ACADEMIC MODELS ---
+
+model AcademicProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  rollNumber String?
+  program    String?  // e.g. "B.Tech"
+  branch     String?  // e.g. "CSE"
+  section    String?  // e.g. "ECSc3"
+  cgpa       Float    @default(0.0)
+  
+  semesters  SemesterRecord[]
+}
+
+model SemesterRecord {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           AcademicProfile @relation(fields: [profileId], references: [id])
+  semesterNumber    Int      // 1, 2, 3, etc.
+  sgpa              Float
+  creditsRegistered Float
+  creditsEarned     Float
+  remarks           String?  // "PASS", "FAIL"
+  
+  grades            GradeEntry[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Ensure one record per semester per student
+  @@unique([profileId, semesterNumber]) 
+}
+
+model GradeEntry {
+  id          String         @id @default(cuid())
+  semesterId  String
+  semester    SemesterRecord @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  subjectCode String
+  subjectName String
+  credits     Float
+  grade       String         // "O", "E", "A", etc.
+  
+  @@unique([semesterId, subjectCode])
+}
+
+model StudentDirectory {
+  id        String   @id @default(cuid())
+  rollNo    String   @unique
+  name      String
+  section   String
+  program   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CourseSchedule {
+  id        String @id @default(cuid())
+  group     String // e.g. "ECSc1"
+  day       String // "MON", "TUE", etc.
+  startTime String // e.g. "08:00"
+  endTime   String // e.g. "09:00"
+  subject   String // e.g. "AD LAB"
+  room      String?
+  faculty   String?
+  
+  @@index([group, day])
+}
+
+enum OcrStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model OcrQuestion {
+  id             String    @id @default(cuid())
+  imagePath      String    // Path to the cropped image in public/dataset/raw
+  subject        String?
+  year           String?
+  examType       String?
+  sourcePdf      String?
+  pageNumber     Int?
+  rawOcrText     String?   @db.Text
+  correctedText  String?   @db.Text
+  status         OcrStatus @default(PENDING)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([subject, year])
+}

@@ -1,0 +1,107 @@
+Subject,Question,Marks,Year,Topic
+Data Structures,Explain the concept of AVL Trees and perform rotations for the sequence 10-20-30.,10,2022,AVL Trees
+Data Structures,What is the time complexity of Quick Sort in best and worst case?,2,2022,Sorting
+Data Structures,Define a Binary Search Tree. Insert the keys 50 30 70 20 40 60 80 into an empty BST and draw the final tree.,10,2023,Binary Search Trees
+Data Structures,What is the difference between a Stack and a Queue?,2,2023,Linear Data Structures
+Data Structures,Explain Kruskal's algorithm for finding the Minimum Spanning Tree with an example graph of 5 vertices.,15,2022,Graph Algorithms
+Data Structures,Write the algorithm for BFS traversal of a graph. What is its time complexity?,5,2021,Graph Traversal
+Data Structures,Define Big O notation. Give the time complexity of binary search.,2,2021,Algorithm Analysis
+Data Structures,Explain the concept of hashing. Discuss collision resolution techniques with examples.,10,2023,Hashing
+Data Structures,Compare and contrast DFS and BFS traversal techniques.,5,2022,Graph Traversal
+Data Structures,Implement a circular queue using arrays. Show enqueue and dequeue operations.,10,2021,Queue
+Data Structures,What is a priority queue? How is it implemented using a heap?,5,2023,Heap
+Data Structures,Explain Dijkstra's shortest path algorithm with a suitable example.,10,2022,Graph Algorithms
+Data Structures,What is the difference between singly linked list and doubly linked list?,2,2021,Linked Lists
+Data Structures,Write the algorithm for infix to postfix conversion using stack.,10,2023,Stack Applications
+Data Structures,Explain the merge sort algorithm. Derive its time complexity.,10,2021,Sorting
+Data Structures,What is a Red-Black Tree? State its properties.,5,2022,Balanced Trees
+Data Structures,Define Dynamic Programming. Solve the 0/1 Knapsack problem for given weights and values.,15,2023,Dynamic Programming
+Data Structures,Write short notes on B-Trees and their applications in database indexing.,5,2021,Trees
+Microprocessors,Explain the architecture of 8086 microprocessor with a neat block diagram.,15,2021,8086 Architecture
+Microprocessors,Define T-state and Machine Cycle.,2,2021,Timing Diagram
+Microprocessors,Describe the flag register of 8086 microprocessor.,5,2022,8086 Architecture
+Microprocessors,What is the difference between minimum mode and maximum mode of 8086?,5,2021,8086 Modes
+Microprocessors,Explain the concept of memory segmentation in 8086. Calculate physical address from segment and offset.,10,2022,Memory Organization
+Microprocessors,Write an assembly language program to add two 16-bit numbers.,10,2023,Assembly Programming
+Microprocessors,Describe the interrupt structure of 8086 microprocessor.,10,2021,Interrupts
+Microprocessors,Explain the architecture of 8051 microcontroller with a block diagram.,15,2022,8051 Architecture
+Microprocessors,What are the addressing modes of 8086? Give examples of each.,10,2023,Addressing Modes
+Microprocessors,Write a program in 8086 assembly to find the largest number in an array.,10,2021,Assembly Programming
+Microprocessors,Explain DMA and its significance in data transfer.,5,2022,DMA
+Microprocessors,Describe the Pin diagram of 8086 microprocessor.,10,2023,8086 Architecture
+Microprocessors,What is the role of ALE signal in 8086?,2,2021,8086 Signals
+Microprocessors,Explain the instruction set of 8051 with examples for each category.,15,2022,8051 Instructions
+Microprocessors,What is pipelining? Explain instruction pipeline in 8086.,5,2023,Pipelining
+Microprocessors,Compare RISC and CISC architectures with examples.,5,2021,Architecture Comparison
+Microprocessors,Write a subroutine in 8086 assembly to reverse a string stored in memory.,10,2023,Assembly Programming
+Operating Systems,Discuss the Banker's Algorithm for deadlock avoidance with a numerical example.,10,2023,Deadlocks
+Operating Systems,What is the difference between a process and a thread?,2,2023,Process Management
+Operating Systems,Explain the different CPU scheduling algorithms: FCFS SJF and Round Robin.,15,2022,CPU Scheduling
+Operating Systems,What is a semaphore? Explain its use in solving the Producer-Consumer problem.,10,2021,Synchronization
+Operating Systems,Describe the concept of virtual memory. Explain demand paging.,10,2023,Memory Management
+Operating Systems,What is a page fault? How does the OS handle it?,5,2022,Memory Management
+Operating Systems,Explain the different disk scheduling algorithms: FCFS SSTF and SCAN.,10,2021,Disk Scheduling
+Operating Systems,What are the necessary conditions for deadlock? Explain deadlock detection.,10,2022,Deadlocks
+Operating Systems,Describe the different types of operating systems with examples.,5,2023,OS Types
+Operating Systems,Explain the concept of paging and segmentation. Compare them.,10,2021,Memory Management
+Operating Systems,What is process synchronization? Explain the critical section problem.,10,2022,Synchronization
+Operating Systems,Write short notes on the dining philosophers problem.,5,2023,Synchronization
+Operating Systems,Explain the file allocation methods: contiguous linked and indexed.,10,2021,File Systems
+Operating Systems,What is thrashing? How can it be prevented?,5,2022,Memory Management
+Operating Systems,Describe the Readers-Writers problem and its solution using semaphores.,10,2023,Synchronization
+Operating Systems,What is the purpose of system calls? Give examples of different categories.,5,2021,System Calls
+Operating Systems,Explain interprocess communication mechanisms: shared memory and message passing.,10,2022,IPC
+Operating Systems,Define context switching. What is its overhead?,2,2023,Process Management
+Computer Networks,Describe the 7 layers of the OSI model with their functions.,15,2022,OSI Model
+Computer Networks,What is an IP address? Differentiate between IPv4 and IPv6.,5,2022,IP Addressing
+Computer Networks,Explain the TCP three-way handshake mechanism with a diagram.,10,2023,TCP
+Computer Networks,What is the difference between TCP and UDP? When would you use each?,5,2021,Transport Layer
+Computer Networks,Describe the CSMA/CD protocol used in Ethernet.,10,2022,Data Link Layer
+Computer Networks,Explain subnetting with an example. Given IP 192.168.1.0/24 create 4 subnets.,10,2023,Subnetting
+Computer Networks,What is DNS? Explain the DNS resolution process.,5,2021,Application Layer
+Computer Networks,Explain the sliding window protocol for flow control.,10,2022,Data Link Layer
+Computer Networks,Describe the different types of network topologies with their advantages and disadvantages.,10,2023,Network Topology
+Computer Networks,What is ARP? Explain its working mechanism.,5,2021,Network Layer
+Computer Networks,Explain the concept of routing. Compare distance vector and link state routing.,10,2022,Routing
+Computer Networks,What is NAT? Why is it used?,2,2023,Network Layer
+Computer Networks,Describe the HTTP protocol. What are the common HTTP methods?,5,2021,Application Layer
+Computer Networks,Explain the concept of congestion control in TCP.,10,2022,Transport Layer
+Computer Networks,What is DHCP? Explain how it assigns IP addresses.,5,2023,Application Layer
+Computer Networks,Compare circuit switching and packet switching with examples.,5,2021,Switching
+Computer Networks,Explain the working of a firewall. What are its types?,10,2022,Network Security
+Computer Networks,What is the purpose of the data link layer? Explain framing.,5,2023,Data Link Layer
+Digital Electronics,Design a 4-bit binary adder using Full Adders.,10,2021,Combinational Circuits
+Digital Electronics,Simplify the Boolean expression Y = AB + A(B+C) + B(B+C).,2,2021,Boolean Algebra
+Digital Electronics,Design a 4-to-1 multiplexer using basic gates.,10,2022,Combinational Circuits
+Digital Electronics,Convert the decimal number 156 to binary octal and hexadecimal.,2,2022,Number Systems
+Digital Electronics,Explain the working of JK flip-flop with its truth table and timing diagram.,10,2023,Sequential Circuits
+Digital Electronics,What is a Karnaugh Map? Simplify F(ABCD) = sum(0 1 2 5 8 9 10) using K-Map.,10,2021,Boolean Algebra
+Digital Electronics,Design a MOD-10 counter using JK flip-flops.,10,2022,Counters
+Digital Electronics,Explain the difference between combinational and sequential circuits with examples.,5,2023,Circuit Classification
+Digital Electronics,Design a BCD to 7-segment decoder.,15,2021,Combinational Circuits
+Digital Electronics,What are the universal gates? Implement AND OR and NOT using NAND gates only.,10,2022,Logic Gates
+Digital Electronics,Explain the working of SR latch and D flip-flop.,5,2023,Sequential Circuits
+Digital Electronics,Design a 3-bit synchronous up counter using T flip-flops.,10,2021,Counters
+Digital Electronics,What are the different types of ADC? Explain successive approximation ADC.,10,2022,Data Converters
+Digital Electronics,Explain the concept of race condition in sequential circuits and how to avoid it.,5,2023,Sequential Circuits
+Digital Electronics,Implement the function F = AB + CD using only NOR gates.,5,2021,Logic Gates
+Digital Electronics,What is a shift register? Explain its types with applications.,10,2022,Registers
+Digital Electronics,Describe the architecture of a PLA and PAL.,10,2023,Programmable Logic
+Software Engineering,Explain the SDLC Waterfall model with its phases.,10,2023,SDLC
+Software Engineering,What is Black Box testing? Give examples of techniques.,2,2023,Testing
+Software Engineering,Compare Agile and Waterfall methodologies.,5,2022,SDLC
+Software Engineering,Explain the different types of software testing: unit integration system and acceptance.,10,2021,Testing
+Software Engineering,What is UML? Draw a use case diagram for an online shopping system.,10,2023,UML
+Software Engineering,Explain the Spiral model of software development.,10,2022,SDLC
+Software Engineering,What is software requirement specification (SRS)? Describe its components.,10,2021,Requirements Engineering
+Software Engineering,Explain the concept of software configuration management.,5,2023,SCM
+Software Engineering,What are design patterns? Explain the Singleton and Factory patterns.,10,2022,Design Patterns
+Software Engineering,Describe the different levels of software testing with examples.,10,2021,Testing
+Software Engineering,What is coupling and cohesion? Explain their types.,5,2023,Software Design
+Software Engineering,Explain the V-model of software development.,10,2022,SDLC
+Software Engineering,What is COCOMO? Explain the different types of COCOMO models.,10,2021,Software Estimation
+Software Engineering,Describe the Scrum framework and its ceremonies.,10,2023,Agile
+Software Engineering,What is regression testing? When is it performed?,2,2022,Testing
+Software Engineering,Explain risk management in software projects.,5,2021,Project Management
+Software Engineering,What is refactoring? Give examples of common refactoring techniques.,5,2023,Code Quality
+Software Engineering,Draw a class diagram for a Library Management System.,10,2022,UML

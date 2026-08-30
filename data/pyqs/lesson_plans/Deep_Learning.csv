@@ -1,0 +1,6 @@
+CO,Module,Topics
+CO1,Module 1: Foundations of Deep Learning,"Introduction to the course, Overview of neural network (NN) and deep NN, Feed forward network, Gradient descent, Back-propagation algorithm with examples, Multilayer Perceptron (with example), Evolution of DL, Regularization"
+"CO2, CO4",Module 2: Convolution Neural Networks (CNN),"Architectures (Convolution, Pooling Layers), CNN problem solving, Transfer Learning, Popular CNN Model Architectures: Architecture of LeNet, Architecture of AlexNet, VGGNet, Architecture of GoogLeNet, ResNet, Assignment-01, Problem solving"
+CO5,Module 3: Recurrent Neural Network,"RNN architecture, LSTM, GRU, Encoder-Decoder architecture, Problem solving"
+"CO2, CO4, CO6",Module 4: Applications of Deep Learning,"Applications of Deep Learning to Computer Vision: Image segmentation, Object detection, Image Captioning, Medical imaging, Image Classification using Transfer Learning, Applications of Deep Learning to NLP"
+"CO3, CO6",Module 5: Advance Models,"Auto-encoders, Generative Adversarial Network, Recent trends (Presentation), Revision: Implementation with programming, Class work (Critical Thinking)"

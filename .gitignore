@@ -39,3 +39,57 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/lib/generated/prisma
+
+# Python & Machine Learning
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+**/venv/
+**/env/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# LLM Models & Binaries
+models/
+**/models/
+llama_bin/
+**/llama_bin/
+*.gguf
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.onnx
+production.env
+
+# Ignore entire LLM Backend folder
+llm_backend/
+llm_backend/*

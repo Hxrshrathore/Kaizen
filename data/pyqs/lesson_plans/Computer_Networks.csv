@@ -1,0 +1,7 @@
+CO,Module,Topics
+CO1,Module 1: Introduction to Computer Networks,"Network types (LAN WAN MAN), Network topologies, Network models, Internet architecture"
+CO2,Module 2: Physical Layer and Data Link Layer,"Transmission media, Multiplexing, Switching, Error detection, Error correction, Flow control, HDLC, PPP"
+CO3,Module 3: Network Layer,"IP addressing, Subnetting, IPv4, IPv6, Routing algorithms, Distance vector, Link state, OSPF, BGP"
+CO4,Module 4: Transport Layer,"TCP, UDP, Port numbers, Flow control, Congestion control, Three-way handshake, Sliding window"
+CO5,Module 5: Application Layer,"DNS, HTTP, HTTPS, FTP, SMTP, POP3, IMAP, DHCP, SNMP"
+CO6,Module 6: Network Security,"Firewalls, Encryption, SSL/TLS, Digital signatures, Authentication protocols, VPN"

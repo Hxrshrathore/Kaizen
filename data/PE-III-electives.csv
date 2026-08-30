@@ -1,0 +1,11 @@
+Category,Subject,Eligible Branches,GR-A Faculty,GR-B Faculty,Classrooms
+PE-III,Advanced Automative Systems: Traction Vision and Connectivity,"ETC, EEE","Prof. Ganaraj P. S., Prof. L Ali",X,"CL-A-01, CL-A-02"
+PE-III,Cloud Computing,"ETC, ECSC","Prof. T. Kar, Prof. L. Ali","Prof. I. Ali, Prof. T. Kar","CL-A-03, CL-A-02"
+PE-III,Hardware and Software Co-Design of Embedded System,ETC,"Prof. A. Basak, Prof. Vikas Ku Jha",X,"CL-A-04, CL-07"
+PE-III,Wireless Sensor Network,"ETC, ECSC",Prof. M. Behera,X,CL-A-06
+PE-III,Deep Learning: Algorithms and Implementation,"ETC, ECSC, EEE","Prof. Sukanta Sabat, Prof. Vimal Ku Shrivastava",X,"CL-A-07, CL-A-08"
+PE-III,Industrial Automation,ETC,Prof. M. Ramanna,X,CL-06
+PE-III,Data Analytics,"ETC, ECSE, EEE",Prof. Arighna Deb,X,CL-15
+PE-III,Sensor & Actuators,FEE,Prof. D. Mukherjee,X,CL-A-09
+PE-III,ARM and Advanced Processors,"EEE, ECSC",X,Prof. Vimal Ku Shrivastava,CL-A-08
+PE-III,Software Defined Networking,ECSc,Prof. A. Datta,X,CL-A-10
