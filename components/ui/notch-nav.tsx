@@ -170,7 +170,7 @@ export function NotchCornerRightWing({
 }
 
 export interface NotchItemProps
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onSelect"> {
   id: string;
   label: string;
   isActive: boolean;
