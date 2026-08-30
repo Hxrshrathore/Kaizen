@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     const semestersLogged = academic?.semesters.length || 0;
     
     // Calculate Total Credits across all semesters
-    const totalCredits = academic?.semesters.reduce((acc, sem) => acc + sem.creditsEarned, 0) || 0;
+    const totalCredits = academic?.semesters.reduce((acc: any, sem: any) => acc + sem.creditsEarned, 0) || 0;
 
     return NextResponse.json({
       name: user.name || "Student",

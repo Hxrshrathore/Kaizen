@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const semNumber = parseInt(student.currentSemester);
 
     // 3. DATABASE TRANSACTION (With Increased Timeout)
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       
       // A. Create/Update Academic Profile
       const profile = await tx.academicProfile.upsert({
