@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.2-beta.1] - 2026-09-01
+
+### Fixed
+- Replaced the flawed Neon Serverless WebSocket Adapter with the native Prisma TCP Engine in lib/prisma.ts to permanently resolve connection string caching and ufferUtil crashes.
+- Synchronized the live Neon database schema to include the hasConsent user column.
+- Shifted Next.js environment configuration strictly to .env.local to enforce variable prioritization.
+
 ## [v0.1.1-beta.1] - 2026-08-31
 
 ### Changed
