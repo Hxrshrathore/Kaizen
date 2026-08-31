@@ -32,16 +32,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           
-      - name: Generate Changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+      - name: Extract Release Notes from CHANGELOG.md
+        id: extract_notes
+        uses: ffurrer2/extract-release-notes@v2
+        
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{steps.changelog.outputs.changelog}}
-          generate_release_notes: true
+          body: ${{ steps.extract_notes.outputs.release_notes }}
+          # We don't need github's auto generated notes anymore since we have our own changelog!
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
