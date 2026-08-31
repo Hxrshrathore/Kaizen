@@ -265,20 +265,33 @@ export default function LandingPage() {
       </section>
 
       {/* --- FOOTER CTA --- */}
-      <section className="relative z-10 h-[60vh] flex flex-col items-center justify-center group cursor-pointer overflow-hidden" onClick={handleEnter} style={{ background: "linear-gradient(180deg, #0A101D 0%, #162C6D 100%)" }}>
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
+      <section className="relative z-10 h-[60vh] flex flex-col items-center justify-center group cursor-pointer overflow-hidden" onClick={handleEnter} style={{ background: "radial-gradient(circle at center, #162C6D 0%, #0A101D 100%)" }}>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay" />
+        
+        <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl pointer-events-none" />
+
         <MotionDiv 
-          initial={{ scale: 0.9, opacity: 0 }}
-          whileInView={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 text-center pointer-events-none"
+          initial={{ y: 50, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
+          className="relative z-10 text-center flex flex-col items-center gap-8 pointer-events-none"
         >
-          <h2 className="text-[10vw] font-display font-bold leading-none tracking-tighter text-white group-hover:scale-105 transition-transform duration-500 text-silver-matte" style={{ textShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
-            ENTER KAIZEN
-          </h2>
-          <p className="mt-4 font-mono uppercase tracking-widest text-blue-200/60 group-hover:text-blue-200 transition-colors">
-            Tap to access academic tools
-          </p>
+          <div className="relative">
+            <h2 className="text-[8vw] sm:text-[10vw] font-display font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 group-hover:to-blue-400 group-hover:scale-105 transition-all duration-700 ease-out" style={{ filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.8))" }}>
+              ENTER KAIZEN
+            </h2>
+            <div className="absolute -inset-4 bg-blue-500/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 -z-10" />
+          </div>
+          
+          <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-md group-hover:bg-white/10 group-hover:border-white/20 transition-all duration-500 shadow-xl">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+            </span>
+            <p className="font-mono text-sm sm:text-base uppercase tracking-[0.2em] text-blue-200/80 group-hover:text-white transition-colors">
+              Initialize Academic Core
+            </p>
+          </div>
         </MotionDiv>
       </section>
 
