@@ -7,6 +7,7 @@ import {
   Upload, Activity, ArrowUpRight, ShieldAlert, CheckCircle, 
   AlertTriangle, Calendar, Clock, Plus, Trash2, X, Sparkles, ChevronRight, Lock, Loader2, BookOpen, Mail
 } from 'lucide-react';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 
 // --- TYPES ---
 interface UserProfile {
@@ -32,39 +33,48 @@ const MotionDiv = motion.div as any;
 
 // --- SUB-COMPONENTS ---
 
-const StatsCard = ({ title, value, subtext, color }: any) => (
-  <div className="p-6 bg-card border border-border flex flex-col justify-between h-auto min-h-[110px] hover:border-input transition-colors duration-300">
-     <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium font-display mb-1">{title}</h3>
-     <div className={`text-4xl font-display font-medium ${color} tracking-tight`}>{value}</div>
-     <div className="text-xs text-muted-foreground font-mono mt-4">{subtext}</div>
-  </div>
+const StatsCard = ({ title, value, subtext, color, delay = 0 }: any) => (
+  <MotionDiv 
+    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    transition={{ duration: 0.5, delay, type: "spring", bounce: 0.4 }}
+    whileHover={{ y: -4, borderColor: "#444", boxShadow: "0 10px 40px -10px rgba(0,0,0,0.8)" }}
+    className="relative p-6 bg-card border border-border flex flex-col justify-between h-auto min-h-[110px] transition-all duration-300 overflow-hidden group cursor-default"
+  >
+     <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+     <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium font-display mb-1 relative z-10">{title}</h3>
+     <div className={`text-4xl font-display font-medium ${color} tracking-tight relative z-10 group-hover:scale-105 transition-transform origin-left`}>{value}</div>
+     <div className="text-xs text-muted-foreground font-mono mt-4 relative z-10">{subtext}</div>
+  </MotionDiv>
 );
 
-const ActionButton = ({ icon, title, desc, onClick }: any) => (
+const ActionButton = ({ icon, title, desc, onClick, delay = 0 }: any) => (
   <motion.button 
     onClick={onClick}
-    initial="initial"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay, type: "spring" }}
     whileHover="hovered"
     whileTap="tapped"
     variants={{
-      initial: { backgroundColor: "#0e0e11", borderColor: "#222", scale: 1 },
-      hovered: { backgroundColor: "#151518", borderColor: "#ccff00", scale: 1.02 },
+      initial: { backgroundColor: "var(--card)", borderColor: "var(--border)", scale: 1 },
+      hovered: { backgroundColor: "var(--accent)", borderColor: "var(--primary)", scale: 1.02, boxShadow: "0 10px 30px -10px rgba(var(--primary),0.15)" },
       tapped: { scale: 0.98 }
     }}
-    transition={{ duration: 0.2 }}
-    className="group flex flex-col items-start p-6 border transition-all text-left w-full relative overflow-hidden"
+    className="group flex flex-col items-start p-6 bg-card border border-border transition-all text-left w-full relative overflow-hidden"
   >
+    <div className="absolute -inset-24 bg-primary/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none rounded-full" />
     <motion.div 
       variants={{
-        initial: { color: "#888" },
-        hovered: { color: "#ccff00" }
+        initial: { color: "var(--muted-foreground)", scale: 1 },
+        hovered: { color: "var(--primary)", scale: 1.1 }
       }}
-      className="mb-4"
+      className="mb-4 relative z-10"
     >
       {icon}
     </motion.div>
-    <h3 className="text-xl font-display font-bold text-foreground mb-1">{title}</h3>
-    <p className="text-muted-foreground text-sm">{desc}</p>
+    <h3 className="text-xl font-display font-bold text-foreground mb-1 relative z-10 group-hover:text-white transition-colors">{title}</h3>
+    <p className="text-muted-foreground text-sm relative z-10">{desc}</p>
   </motion.button>
 );
 
@@ -183,9 +193,12 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-       <div className="flex h-[80vh] items-center justify-center">
+       <MotionDiv 
+         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+         className="flex h-[80vh] items-center justify-center"
+       >
            <Loader2 className="text-primary animate-spin" size={40} />
-       </div>
+       </MotionDiv>
     );
   }
 
@@ -201,36 +214,57 @@ export default function Dashboard() {
   };
 
   const getPromotionIcon = () => {
-    if (promotion.status === 'PROMOTED') return <CheckCircle size={16} className="text-primary" />;
-    if (promotion.status === 'PROBATION') return <AlertTriangle size={16} className="text-orange-500" />;
-    return <ShieldAlert size={16} className="text-red-500" />;
+    if (promotion.status === 'PROMOTED') return <CheckCircle size={16} className="text-primary animate-pulse" />;
+    if (promotion.status === 'PROBATION') return <AlertTriangle size={16} className="text-orange-500 animate-pulse" />;
+    return <ShieldAlert size={16} className="text-red-500 animate-pulse" />;
   };
 
   return (
     <div className="max-w-7xl mx-auto pt-4 md:pt-8 pb-20 px-4">
       
       {/* Header */}
-      <div className="mb-8 md:mb-12 flex flex-col md:flex-row justify-between md:items-end gap-4">
+      <MotionDiv 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="mb-8 md:mb-12 flex flex-col md:flex-row justify-between md:items-end gap-4"
+      >
         <div>
-          <h1 className="text-3xl md:text-6xl font-display font-medium mb-2 text-foreground">
-            ACADEMIC <span className="text-primary">KAIZEN</span>
+          <h1 className="text-3xl md:text-6xl font-display font-medium mb-2 text-foreground tracking-tight">
+            ACADEMIC <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-green-300">KAIZEN</span>
           </h1>
-          <p className="text-muted-foreground font-mono text-xs md:text-sm">
-            WELCOME BACK, {profile.name.toUpperCase()}
-          </p>
+          <MotionDiv 
+            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
+            className="text-muted-foreground font-mono text-xs md:text-sm"
+          >
+            WELCOME BACK, <span className="text-foreground">{profile.name.toUpperCase()}</span>
+          </MotionDiv>
         </div>
-        <div className="text-right hidden md:block">
-           <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest">SESSION ID</div>
-           <div className="text-xl font-display text-foreground">{profile.rollNumber || 'GUEST'}</div>
+        <div className="text-right hidden md:flex flex-col items-end gap-2">
+           <div>
+             <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest mb-1 text-right">SESSION ID</div>
+             <div className="text-xl font-display text-foreground bg-muted px-4 py-1 rounded border border-border">{profile.rollNumber || 'GUEST'}</div>
+           </div>
+           <AnimatedThemeToggler 
+             variant="square" 
+             className="w-10 h-10 rounded bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+           />
         </div>
-      </div>
+      </MotionDiv>
 
       {/* Top Grid: Timetable + Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 md:mb-12">
         
         {/* --- LIVE SCHEDULE WIDGET --- */}
-        <div className="lg:col-span-2 relative h-full min-h-[300px] bg-card border border-border p-6 overflow-hidden flex flex-col group">
-            <div className="flex justify-between items-center mb-6">
+        <MotionDiv 
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, type: "spring", bounce: 0.3 }}
+          className="lg:col-span-2 relative h-full min-h-[300px] bg-card border border-border p-6 overflow-hidden flex flex-col group hover:border-[#333] transition-colors duration-500 shadow-2xl"
+        >
+            <div className="absolute -inset-32 bg-primary/5 blur-[100px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
+            
+            <div className="flex justify-between items-center mb-6 relative z-10">
                 <div className="flex items-center gap-3">
                     <h3 className="text-xl font-display font-bold text-foreground uppercase tracking-wider">{displaySchedule.title}</h3>
                     {displaySchedule.showNoClassTag && (
@@ -240,24 +274,32 @@ export default function Dashboard() {
                     )}
                 </div>
                 {displaySchedule.badge && (
-                  <span className="text-primary text-xs font-mono border border-primary/30 bg-primary/10 px-2 py-1 rounded-sm">
+                  <span className="text-primary text-xs font-mono border border-primary/30 bg-primary/10 px-3 py-1 rounded shadow-[0_0_15px_rgba(204,255,0,0.2)]">
                       {displaySchedule.badge}
                   </span>
                 )}
             </div>
             
-            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2 relative z-10">
                {displaySchedule.classes.length > 0 ? (
                   displaySchedule.classes.map((cls: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-4 bg-[#151518] border border-input rounded-sm hover:border-primary/50 transition-colors">
-                      <div>
-                        <h4 className="text-foreground font-medium text-sm">{cls.subject}</h4>
-                        <div className="text-xs text-muted-foreground font-mono mt-1">{cls.faculty} • <span className="text-[#aaa]">{cls.room}</span></div>
+                    <MotionDiv 
+                      key={idx}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 + (idx * 0.1), duration: 0.4 }}
+                      whileHover={{ scale: 1.01, backgroundColor: "var(--accent)" }}
+                      className="flex items-center justify-between p-4 bg-muted border border-input rounded-sm hover:border-primary/50 transition-all cursor-default relative overflow-hidden group/item"
+                    >
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover/item:scale-y-100 transition-transform origin-top" />
+                      <div className="pl-2">
+                        <h4 className="text-foreground font-medium text-sm group-hover/item:text-primary transition-colors">{cls.subject}</h4>
+                        <div className="text-xs text-muted-foreground font-mono mt-1">{cls.faculty} • <span className="opacity-70">{cls.room}</span></div>
                       </div>
-                      <div className="text-primary font-mono text-xs text-right shrink-0 bg-card px-2 py-1 border border-input rounded-sm">
+                      <div className="text-primary font-mono text-xs text-right shrink-0 bg-card px-3 py-1.5 border border-input rounded shadow-inner">
                         {cls.startTime} -<br/> {cls.endTime}
                       </div>
-                    </div>
+                    </MotionDiv>
                   ))
                ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-70">
@@ -266,7 +308,7 @@ export default function Dashboard() {
                   </div>
                )}
             </div>
-        </div>
+        </MotionDiv>
 
         {/* Stats Column */}
         <div className="space-y-4 lg:col-span-1 flex flex-col h-full">
@@ -275,39 +317,42 @@ export default function Dashboard() {
              value={profile.currentCGPA.toFixed(2)} 
              subtext="Updated via SGR Upload"
              color="text-foreground"
+             delay={0.1}
            />
            <StatsCard 
              title="Total Credits" 
              value={profile.totalCredits} 
              subtext={`Semesters Logged: ${profile.semestersLogged}`}
              color="text-primary"
+             delay={0.2}
            />
            
            {/* Promotion Status Card */}
            <MotionDiv 
-             initial={{ opacity: 0, y: 20 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 0.5, delay: 0.2, type: "spring" }}
-             whileHover={{ y: -2, borderColor: "#333" }}
-             className="relative p-6 bg-card border border-border overflow-hidden flex-1 flex flex-col justify-center min-h-[180px]"
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             transition={{ duration: 0.5, delay: 0.3, type: "spring" }}
+             whileHover={{ y: -4, borderColor: "#444", boxShadow: "0 10px 40px -10px rgba(0,0,0,0.8)" }}
+             className="relative p-6 bg-card border border-border overflow-hidden flex-1 flex flex-col justify-center min-h-[180px] group"
            >
-              <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium mb-2 font-display">ACADEMIC STANDING</h3>
-              <div className="flex items-end gap-2">
-                <span className={`text-3xl font-bold font-display tracking-tight ${getPromotionColor()}`}>
+              <div className="absolute inset-0 bg-gradient-to-t from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium mb-2 font-display relative z-10">ACADEMIC STANDING</h3>
+              <div className="flex items-end gap-2 relative z-10">
+                <span className={`text-3xl font-bold font-display tracking-tight ${getPromotionColor()} group-hover:scale-105 transition-transform origin-left`}>
                   {promotion.status}
                 </span>
               </div>
-              <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground font-mono leading-relaxed">
+              <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground font-mono leading-relaxed relative z-10">
                 {getPromotionIcon()}
                 {promotion.details}
               </div>
               <MotionDiv 
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 1, delay: 0.5 }}
-                className={`absolute bottom-0 left-0 h-1 w-full origin-left ${
-                  promotion.status === 'PROMOTED' ? 'bg-primary' : 
-                  promotion.status === 'PROBATION' ? 'bg-orange-500' : 'bg-red-500'
+                transition={{ duration: 1, delay: 0.8, ease: "anticipate" }}
+                className={`absolute bottom-0 left-0 h-1.5 w-full origin-left ${
+                  promotion.status === 'PROMOTED' ? 'bg-primary shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 
+                  promotion.status === 'PROBATION' ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
                 }`} 
               />
            </MotionDiv>
@@ -315,27 +360,36 @@ export default function Dashboard() {
       </div>
 
       {/* Upcoming Events Section */}
-      <div className="mb-12">
+      <MotionDiv 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="mb-12"
+      >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium font-display flex items-center gap-2">
             <Calendar size={14} className="text-primary" /> Upcoming Events
           </h3>
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setIsAddingEvent(!isAddingEvent)}
-            className={`text-xs uppercase tracking-wider font-bold px-3 py-1 border transition-all flex items-center gap-2 ${isAddingEvent ? 'bg-muted border-input text-muted-foreground' : 'bg-primary border-primary text-black hover:bg-[#b3e600]'}`}
+            className={`text-xs uppercase tracking-wider font-bold px-4 py-2 rounded-sm border transition-all flex items-center gap-2 shadow-lg ${isAddingEvent ? 'bg-muted border-input text-muted-foreground' : 'bg-primary border-primary text-black hover:bg-[#b3e600] hover:shadow-[0_0_15px_rgba(204,255,0,0.4)]'}`}
           >
             {isAddingEvent ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Event</>}
-          </button>
+          </motion.button>
         </div>
 
         {/* Add Event Form */}
         <AnimatePresence>
           {isAddingEvent && (
             <MotionDiv 
-              initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-              animate={{ height: 'auto', opacity: 1, marginBottom: 24 }}
-              exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-              className="bg-card border border-border overflow-hidden"
+              initial={{ height: 0, opacity: 0, marginBottom: 0, scale: 0.98 }}
+              animate={{ height: 'auto', opacity: 1, marginBottom: 24, scale: 1 }}
+              exit={{ height: 0, opacity: 0, marginBottom: 0, scale: 0.98 }}
+              transition={{ type: "spring", bounce: 0.3 }}
+              className="bg-card border border-border overflow-hidden shadow-2xl"
             >
               <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="md:col-span-2">
@@ -345,7 +399,7 @@ export default function Dashboard() {
                     value={newEvent.title}
                     onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                     placeholder="e.g. Data Structures Mid-Sem"
-                    className="w-full bg-[#050507] border border-input p-2 text-foreground text-sm focus:border-primary outline-none transition-colors"
+                    className="w-full bg-background border border-input p-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -354,7 +408,7 @@ export default function Dashboard() {
                     type="date" 
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                    className="w-full bg-[#050507] border border-input p-2 text-foreground text-sm focus:border-primary outline-none transition-colors"
+                    className="w-full bg-background border border-input p-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -364,14 +418,16 @@ export default function Dashboard() {
                         type="time" 
                         value={newEvent.time}
                         onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                        className="w-full bg-[#050507] border border-input p-2 text-foreground text-sm focus:border-primary outline-none transition-colors"
+                        className="w-full bg-background border border-input p-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all"
                       />
-                      <button 
+                      <motion.button 
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={handleSubmitEvent}
-                        className="bg-primary text-black px-4 flex items-center justify-center hover:bg-[#b3e600] transition-colors"
+                        className="bg-primary text-primary-foreground px-5 rounded-sm flex items-center justify-center hover:opacity-90 transition-colors shadow-lg"
                       >
                         <CheckCircle size={18} />
-                      </button>
+                      </motion.button>
                    </div>
                 </div>
               </div>
@@ -381,123 +437,120 @@ export default function Dashboard() {
 
         {/* Events Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.length > 0 ? (
-            events.map((event, idx) => {
-              const dateObj = new Date(event.date);
-              const day = dateObj.getDate();
-              const month = dateObj.toLocaleString('default', { month: 'short' });
-              
-              return (
-                <MotionDiv
-                  key={event.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  whileHover={{ y: -2, borderColor: "#444" }}
-                  className="flex items-center gap-4 p-4 bg-card border border-border group transition-all relative"
-                >
-                   {/* Delete Button */}
-                   <button 
-                     onClick={() => handleRemoveEvent(event.id)}
-                     className="absolute top-2 right-2 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                   >
-                     <Trash2 size={14} />
-                   </button>
-
-                   <div className="bg-accent border border-input w-14 h-14 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-primary text-sm font-bold leading-none">{day}</span>
-                      <span className="text-muted-foreground text-[10px] uppercase font-mono">{month}</span>
-                   </div>
-                   
-                   <div>
-                     <h4 className="text-sm font-medium text-foreground line-clamp-1">{event.title}</h4>
-                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 font-mono">
-                       <Clock size={10} /> {event.time}
-                       <span className="w-1 h-1 bg-[#444] rounded-full" />
-                       <span className="capitalize">{event.type}</span>
+          <AnimatePresence>
+            {events.length > 0 ? (
+              events.map((event, idx) => {
+                const dateObj = new Date(event.date);
+                const day = dateObj.getDate();
+                const month = dateObj.toLocaleString('default', { month: 'short' });
+                
+                return (
+                  <MotionDiv
+                    key={event.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    transition={{ delay: idx * 0.05, type: "spring" }}
+                    whileHover={{ y: -4, borderColor: "#555", boxShadow: "0 10px 30px -10px rgba(0,0,0,0.7)" }}
+                    className="flex items-center gap-4 p-4 bg-card border border-border group transition-all relative overflow-hidden"
+                  >
+                     <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                     
+                     {/* Delete Button */}
+                     <button 
+                       onClick={() => handleRemoveEvent(event.id)}
+                       className="absolute top-2 right-2 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 p-1 rounded backdrop-blur-sm"
+                     >
+                       <Trash2 size={14} />
+                     </button>
+  
+                     <div className="bg-accent border border-input w-14 h-14 rounded-sm flex flex-col items-center justify-center shrink-0 group-hover:border-primary/50 transition-colors shadow-inner">
+                        <span className="text-primary text-sm font-bold leading-none">{day}</span>
+                        <span className="text-muted-foreground text-[10px] uppercase font-mono mt-0.5">{month}</span>
                      </div>
-                   </div>
-                </MotionDiv>
-              );
-            })
-          ) : (
-             <div className="col-span-full border border-dashed border-border p-8 text-center text-muted-foreground text-sm bg-muted">
-               No upcoming events planned. Click "Add Event" to schedule exams.
-             </div>
-          )}
+                     
+                     <div className="relative z-10">
+                       <h4 className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">{event.title}</h4>
+                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 font-mono">
+                         <Clock size={10} className="group-hover:text-primary transition-colors" /> {event.time}
+                         <span className="w-1 h-1 bg-border rounded-full" />
+                         <span className="capitalize">{event.type}</span>
+                       </div>
+                     </div>
+                  </MotionDiv>
+                );
+              })
+            ) : (
+               <MotionDiv 
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                 className="col-span-full border border-dashed border-border p-8 text-center text-muted-foreground text-sm bg-muted rounded-md"
+               >
+                 No upcoming events planned. Click "Add Event" to schedule exams.
+               </MotionDiv>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      </MotionDiv>
 
       {/* Quick Actions */}
-      <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium mb-6 font-display">OPERATIONAL MODULES</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-12">
-        <ActionButton 
-          icon={<Upload size={20} />} 
-          title="Ingest Grades" 
-          desc="Upload Semester PDFs" 
-          onClick={() => router.push('/dashboard/upload')} 
-        />
-        <ActionButton 
-          icon={<ArrowUpRight size={20} />} 
-          title="Optimizer" 
-          desc="Generate Improvement Plan" 
-          onClick={() => router.push('/dashboard/improvement')} 
-        />
-        <ActionButton 
-          icon={<Activity size={20} />} 
-          title="Cognitive Check" 
-          desc="Log Daily Wellness" 
-          onClick={() => router.push('/dashboard/checkin')} 
-        />
-        <ActionButton 
-          icon={<BookOpen size={20} />} 
-          title="Google Classroom" 
-          desc="View Courses & Handouts" 
-          onClick={() => router.push('/classroom')} 
-        />
-        <ActionButton 
-          icon={<Mail size={20} />} 
-          title="Attendance Sync" 
-          desc="Fetch University Emails" 
-          onClick={() => router.push('/attendance')} 
-        />
-      </div>
+      <MotionDiv 
+        initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+      >
+        <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium mb-6 font-display">OPERATIONAL MODULES</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-12">
+          <ActionButton delay={0.1} icon={<Upload size={20} />} title="Ingest Grades" desc="Upload Semester PDFs" onClick={() => router.push('/dashboard/upload')} />
+          <ActionButton delay={0.2} icon={<ArrowUpRight size={20} />} title="Optimizer" desc="Generate Improvement Plan" onClick={() => router.push('/dashboard/improvement')} />
+          <ActionButton delay={0.3} icon={<Activity size={20} />} title="Cognitive Check" desc="Log Daily Wellness" onClick={() => router.push('/dashboard/checkin')} />
+          <ActionButton delay={0.4} icon={<BookOpen size={20} />} title="Google Classroom" desc="View Courses & Handouts" onClick={() => router.push('/classroom')} />
+          <ActionButton delay={0.5} icon={<Mail size={20} />} title="Attendance Sync" desc="Fetch University Emails" onClick={() => router.push('/attendance')} />
+        </div>
+      </MotionDiv>
 
       {/* System Status / AI Teaser */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-6 bg-card border border-border">
+        <MotionDiv 
+          initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
+          className="p-6 bg-card border border-border hover:border-[#333] transition-colors"
+        >
            <div className="flex items-center gap-2 mb-4 text-green-500 font-mono text-xs uppercase">
-             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+             <div className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+             <div className="w-2 h-2 bg-green-500 rounded-full absolute" />
              System Status
            </div>
            <p className="text-muted-foreground text-sm">Academic database integrity verified. Last sync: Today, {new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}.</p>
-        </div>
+        </MotionDiv>
         
         {/* Updated AI Teaser Card */}
-        <div className="relative p-6 bg-card border border-border overflow-hidden group">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none" />
+        <MotionDiv 
+          initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
+          className="relative p-6 bg-card border border-border overflow-hidden group hover:border-primary/30 transition-all duration-500"
+        >
+           <div className="absolute inset-0 bg-gradient-to-bl from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+           <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-bl-[100px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
            
-           <div className="flex justify-between items-start mb-4">
-             <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase">
-               <Sparkles size={12} />
+           <div className="flex justify-between items-start mb-4 relative z-10">
+             <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase font-bold tracking-wider">
+               <Sparkles size={14} className="animate-pulse" />
                Kaizen Advisor Lite
              </div>
-             <span className="text-[10px] bg-primary text-black px-2 py-0.5 font-bold uppercase tracking-wider rounded-sm">
+             <span className="text-[10px] bg-primary text-black px-2 py-0.5 font-bold uppercase tracking-wider rounded-sm shadow-[0_0_10px_rgba(204,255,0,0.3)]">
                Preview
              </span>
            </div>
            
-           <p className="text-muted-foreground text-sm mb-4">
-             Context-aware chat is now active. <span className="text-foreground">Predictive features remain locked</span> until Phase 2.
+           <p className="text-muted-foreground text-sm mb-4 relative z-10">
+             Context-aware chat is now active. <span className="text-foreground font-medium">Predictive features remain locked</span> until Phase 2.
            </p>
 
-           <button 
+           <motion.button 
+             whileHover={{ x: 5 }}
              onClick={() => router.push('/dashboard/advisor')} 
-             className="flex items-center gap-2 text-xs font-bold text-foreground uppercase tracking-widest hover:text-primary transition-colors"
+             className="flex items-center gap-2 text-xs font-bold text-foreground uppercase tracking-widest hover:text-primary transition-colors relative z-10"
            >
              Launch Advisor <ChevronRight size={14} />
-           </button>
-        </div>
+           </motion.button>
+        </MotionDiv>
       </div>
     </div>
   );
