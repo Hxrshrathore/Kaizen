@@ -1,3 +1,4 @@
+
 import { spawn } from "child_process";
 import path from "path";
 
@@ -45,12 +46,14 @@ export async function ensureBackendRunning(timeoutMs = 15000): Promise<boolean> 
 
     const scriptPath = path.join(projectRoot, "llm_backend", "main.py");
 
-    const child = spawn(pythonPath, ["-u", scriptPath], {
+    const child = spawn(`"${pythonPath}"`, ["-u", `"${scriptPath}"`], {
       cwd: projectRoot,
+      shell: isWindows,
       detached: true,
       stdio: "ignore",
       windowsHide: true,
     });
+    child.on("error", (err) => console.error("[NEXUS OPTIMIZER] Python spawn error:", err));
     child.unref();
 
     // 3. Poll /health until server responds

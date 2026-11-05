@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     await ensureBackendRunning(15000);
     const data = await request.json();
-    const { questionId, bboxX0, bboxY0, bboxX1, bboxY1, updateText = true, forceGemini = false } = data;
+    const { questionId, bboxX0, bboxY0, bboxX1, bboxY1, updateText = true, forceGemini = false, rotation = 0 } = data;
 
     if (!questionId) {
       return NextResponse.json({ error: "Missing questionId" }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
         saveFilename: question.imagePath,
         dpi: 200,
         forceGemini: Boolean(forceGemini),
+        rotation: Number(rotation || 0),
       }),
     });
 

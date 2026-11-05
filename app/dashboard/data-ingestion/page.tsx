@@ -14,6 +14,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  RotateCw,
   Database,
   Eye,
   EyeOff,
@@ -30,6 +31,9 @@ import {
   Check,
   Zap,
   ScanLine,
+  Move,
+  Upload,
+  FileCode,
 } from "lucide-react";
 
 type OcrQuestion = {
@@ -43,7 +47,7 @@ type OcrQuestion = {
   pageNumber: number | null;
   rawOcrText: string | null;
   correctedText: string | null;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | string;
   bboxX0: number | null;
   bboxY0: number | null;
   bboxX1: number | null;
@@ -51,6 +55,7 @@ type OcrQuestion = {
   pageWidth: number | null;
   pageHeight: number | null;
   createdAt: string;
+  contentType?: string;
 };
 
 type PaperMeta = {
@@ -97,11 +102,43 @@ export default function DataIngestionPage() {
   const [subjectsList, setSubjectsList] = useState<SubjectMeta[]>([]);
   const [papersList, setPapersList] = useState<PaperMeta[]>([]);
 
+  // Architecture Tier: Neon DB Production vs Upstash Redis Staging Buffer
+  const [dataSource, setDataSource] = useState<"neon" | "redis">("neon");
+  const [stagingStats, setStagingStats] = useState({
+    stagedPending: 0,
+    totalStagedKeys: 0,
+    neonApprovedTotal: 0,
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
   // View & Tool States
   const [zoom, setZoom] = useState(1);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showRawOcr, setShowRawOcr] = useState(false);
   const [showPageModal, setShowPageModal] = useState(false);
+  const [viewMode, setViewMode] = useState<"zoomed" | "crop">("zoomed");
+
+  // Dragging state for photo-editor style crop
+  const [dragHandle, setDragHandle] = useState<
+    "move" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w" | "draw" | null
+  >(null);
+  const [dragStart, setDragStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    initialBox: { x0: number; y0: number; x1: number; y1: number };
+  }>({
+    mouseX: 0,
+    mouseY: 0,
+    initialBox: { x0: 0, y0: 0, x1: 595, y1: 842 },
+  });
+
+  const cropCanvasRef = useRef<HTMLDivElement>(null);
+  const fullscreenCanvasRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [fullscreenStudio, setFullscreenStudio] = useState(false);
+  const [rotation, setRotation] = useState<number>(0);
   
   // Editable Tags
   const [editSubject, setEditSubject] = useState("");
@@ -117,6 +154,29 @@ export default function DataIngestionPage() {
     y1: 842,
   });
 
+  const handleRotate = (deg = 90) => {
+    const nextRot = (rotation + deg) % 360;
+    setRotation(nextRot);
+    setImageKey(Date.now());
+    showToast(`Rotated image to ${nextRot}°`, "ok");
+  };
+
+  const applyPreset = (preset: "q1" | "q2" | "q3" | "full") => {
+    if (!activeItem) return;
+    const isSideways = rotation % 180 === 90;
+    const pw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
+    const ph = isSideways ? (activeItem.pageWidth || 595.32) : (activeItem.pageHeight || 841.92);
+    if (preset === "q1") {
+      setBoxCoords({ x0: 35, y0: 80, x1: pw - 35, y1: Math.min(ph * 0.35, 280) });
+    } else if (preset === "q2") {
+      setBoxCoords({ x0: 35, y0: ph * 0.32, x1: pw - 35, y1: ph * 0.65 });
+    } else if (preset === "q3") {
+      setBoxCoords({ x0: 35, y0: ph * 0.63, x1: pw - 35, y1: ph - 40 });
+    } else if (preset === "full") {
+      setBoxCoords({ x0: 25, y0: 40, x1: pw - 25, y1: ph - 40 });
+    }
+  };
+
   // Neural OCR Scanning & Smoker Effect State
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("Initializing vector stream...");
@@ -131,11 +191,18 @@ export default function DataIngestionPage() {
   const fetchMetadataStats = useCallback(async () => {
     try {
       const resp = await fetch("/api/ingestion?stats=true");
-      if (!resp.ok) return;
-      const data = await resp.json();
-      if (data.stats) setStats(data.stats);
-      if (data.subjects) setSubjectsList(data.subjects);
-      if (data.papers) setPapersList(data.papers);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.stats) setStats(data.stats);
+        if (data.subjects) setSubjectsList(data.subjects);
+        if (data.papers) setPapersList(data.papers);
+      }
+      // Also fetch Upstash Redis Staging stats
+      const stgResp = await fetch("/api/staging?limit=1");
+      if (stgResp.ok) {
+        const stgData = await stgResp.json();
+        if (stgData.stats) setStagingStats(stgData.stats);
+      }
     } catch (e) {
       console.error("Failed to fetch ingestion stats:", e);
     }
@@ -149,27 +216,63 @@ export default function DataIngestionPage() {
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (examTypeFilter !== "ALL") params.set("examType", examTypeFilter);
-      if (subjectFilter !== "ALL") params.set("subject", subjectFilter);
-      if (paperFilter !== "ALL") params.set("sourcePdf", paperFilter);
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
-      params.set("limit", "150");
+      if (dataSource === "redis") {
+        const resp = await fetch(`/api/staging?status=PENDING_REVIEW&limit=150`);
+        const data = await resp.json();
+        if (data.stats) setStagingStats(data.stats);
 
-      const resp = await fetch(`/api/ingestion?${params.toString()}`);
-      const data = await resp.json();
+        const mapped: OcrQuestion[] = (data.questions || []).map((sq: any) => ({
+          id: sq.id,
+          subject: sq.subject || "General Engineering",
+          subjectCode: sq.subjectCode || "ENG2001",
+          year: sq.year || "2024",
+          examType: sq.examType || "Endsem",
+          sourcePdf: sq.sourceDoc,
+          pageNumber: sq.pageNumber,
+          bboxX0: sq.bbox?.x0 ?? 35,
+          bboxY0: sq.bbox?.y0 ?? 80,
+          bboxX1: sq.bbox?.x1 ?? 560,
+          bboxY1: sq.bbox?.y1 ?? 280,
+          pageWidth: sq.pageWidth || 595.32,
+          pageHeight: sq.pageHeight || 841.92,
+          imagePath: sq.imageUrl || "",
+          rawOcrText: sq.rawOcrText,
+          correctedText: sq.cleanText,
+          status: sq.status,
+          createdAt: sq.createdAt,
+          contentType: sq.contentType,
+        }));
 
-      if (!Array.isArray(data)) {
-        throw new Error(data.error || "Database query failed");
-      }
-
-      setQuestions(data);
-      if (data.length > 0) {
-        handleSelect(data[0], 0);
+        setQuestions(mapped);
+        if (mapped.length > 0) {
+          handleSelect(mapped[0], 0);
+        } else {
+          setActiveItem(null);
+          setEditorText("");
+        }
       } else {
-        setActiveItem(null);
-        setEditorText("");
+        const params = new URLSearchParams();
+        if (statusFilter !== "ALL") params.set("status", statusFilter);
+        if (examTypeFilter !== "ALL") params.set("examType", examTypeFilter);
+        if (subjectFilter !== "ALL") params.set("subject", subjectFilter);
+        if (paperFilter !== "ALL") params.set("sourcePdf", paperFilter);
+        if (searchQuery.trim()) params.set("search", searchQuery.trim());
+        params.set("limit", "150");
+
+        const resp = await fetch(`/api/ingestion?${params.toString()}`);
+        const data = await resp.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error(data.error || "Database query failed");
+        }
+
+        setQuestions(data);
+        if (data.length > 0) {
+          handleSelect(data[0], 0);
+        } else {
+          setActiveItem(null);
+          setEditorText("");
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -177,7 +280,7 @@ export default function DataIngestionPage() {
       setQuestions([]);
     }
     setLoading(false);
-  }, [statusFilter, examTypeFilter, subjectFilter, paperFilter, searchQuery]);
+  }, [dataSource, statusFilter, examTypeFilter, subjectFilter, paperFilter, searchQuery]);
 
   useEffect(() => {
     fetchQuestions();
@@ -198,15 +301,31 @@ export default function DataIngestionPage() {
     setEditYear(q.year || "2024");
     setEditExamType(q.examType || "Endsem");
     setZoom(1);
+    setRotation(0);
     setShowRawOcr(false);
 
     // Initial bounding box coordinates
+    const pw = q.pageWidth || 595.32;
+    const ph = q.pageHeight || 841.92;
+    const isFullScan =
+      q.bboxX0 === null ||
+      (q.bboxY1 ?? ph) - (q.bboxY0 ?? 0) > ph * 0.75 ||
+      (q.rawOcrText && q.rawOcrText.startsWith("Scanned examination paper:"));
+
+    const initX0 = q.bboxX0 !== null && !isFullScan ? q.bboxX0 : 35;
+    const initY0 = q.bboxY0 !== null && !isFullScan ? q.bboxY0 : 80;
+    const initX1 = q.bboxX1 !== null && !isFullScan ? q.bboxX1 : pw - 35;
+    const initY1 = q.bboxY1 !== null && !isFullScan ? q.bboxY1 : 280;
+
     setBoxCoords({
-      x0: q.bboxX0 ?? 50,
-      y0: q.bboxY0 ?? 100,
-      x1: q.bboxX1 ?? 500,
-      y1: q.bboxY1 ?? 600,
+      x0: initX0,
+      y0: initY0,
+      x1: initX1,
+      y1: initY1,
     });
+
+    // Automatically set viewMode: crop if whole unsegmented page, else zoomed
+    setViewMode(isFullScan ? "crop" : "zoomed");
   };
 
   const navigateItem = useCallback(
@@ -221,6 +340,219 @@ export default function DataIngestionPage() {
     },
     [activeIdx, questions]
   );
+
+  // ── Photo-Editor Drag & Resize Mouse Handlers ───────────────
+  const handleMouseDown = (
+    e: React.MouseEvent,
+    handle: "move" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w" | "draw"
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragHandle(handle);
+
+    const canvas = fullscreenStudio ? fullscreenCanvasRef.current : cropCanvasRef.current;
+    if (handle === "draw" && canvas && activeItem) {
+      const rect = canvas.getBoundingClientRect();
+      const isSideways = rotation % 180 === 90;
+      const pw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
+      const ph = isSideways ? (activeItem.pageWidth || 595.32) : (activeItem.pageHeight || 841.92);
+      const clickX = Math.max(0, Math.min(pw, (e.clientX - rect.left) * (pw / rect.width)));
+      const clickY = Math.max(0, Math.min(ph, (e.clientY - rect.top) * (ph / rect.height)));
+      setDragStart({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        initialBox: { x0: clickX, y0: clickY, x1: clickX, y1: clickY },
+      });
+      setBoxCoords({ x0: clickX, y0: clickY, x1: clickX, y1: clickY });
+    } else {
+      setDragStart({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        initialBox: { ...boxCoords },
+      });
+    }
+  };
+
+  useEffect(() => {
+    const canvas = fullscreenStudio ? fullscreenCanvasRef.current : cropCanvasRef.current;
+    if (!dragHandle || !activeItem || !canvas) return;
+
+    const isSideways = rotation % 180 === 90;
+    const pw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
+    const ph = isSideways ? (activeItem.pageWidth || 595.32) : (activeItem.pageHeight || 841.92);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = pw / rect.width;
+      const scaleY = ph / rect.height;
+      const dx = (e.clientX - dragStart.mouseX) * scaleX;
+      const dy = (e.clientY - dragStart.mouseY) * scaleY;
+      const init = dragStart.initialBox;
+
+      if (dragHandle === "move") {
+        const bw = init.x1 - init.x0;
+        const bh = init.y1 - init.y0;
+        const newX0 = Math.max(0, Math.min(pw - bw, init.x0 + dx));
+        const newY0 = Math.max(0, Math.min(ph - bh, init.y0 + dy));
+        setBoxCoords({
+          x0: newX0,
+          y0: newY0,
+          x1: newX0 + bw,
+          y1: newY0 + bh,
+        });
+      } else if (dragHandle === "nw") {
+        setBoxCoords({
+          x0: Math.max(0, Math.min(init.x1 - 20, init.x0 + dx)),
+          y0: Math.max(0, Math.min(init.y1 - 20, init.y0 + dy)),
+          x1: init.x1,
+          y1: init.y1,
+        });
+      } else if (dragHandle === "ne") {
+        setBoxCoords({
+          x0: init.x0,
+          y0: Math.max(0, Math.min(init.y1 - 20, init.y0 + dy)),
+          x1: Math.min(pw, Math.max(init.x0 + 20, init.x1 + dx)),
+          y1: init.y1,
+        });
+      } else if (dragHandle === "se") {
+        setBoxCoords({
+          x0: init.x0,
+          y0: init.y0,
+          x1: Math.min(pw, Math.max(init.x0 + 20, init.x1 + dx)),
+          y1: Math.min(ph, Math.max(init.y0 + 20, init.y1 + dy)),
+        });
+      } else if (dragHandle === "sw") {
+        setBoxCoords({
+          x0: Math.max(0, Math.min(init.x1 - 20, init.x0 + dx)),
+          y0: init.y0,
+          x1: init.x1,
+          y1: Math.min(ph, Math.max(init.y0 + 20, init.y1 + dy)),
+        });
+      } else if (dragHandle === "n") {
+        setBoxCoords((prev) => ({
+          ...prev,
+          y0: Math.max(0, Math.min(init.y1 - 20, init.y0 + dy)),
+        }));
+      } else if (dragHandle === "s") {
+        setBoxCoords((prev) => ({
+          ...prev,
+          y1: Math.min(ph, Math.max(init.y0 + 20, init.y1 + dy)),
+        }));
+      } else if (dragHandle === "w") {
+        setBoxCoords((prev) => ({
+          ...prev,
+          x0: Math.max(0, Math.min(init.x1 - 20, init.x0 + dx)),
+        }));
+      } else if (dragHandle === "e") {
+        setBoxCoords((prev) => ({
+          ...prev,
+          x1: Math.min(pw, Math.max(init.x0 + 20, init.x1 + dx)),
+        }));
+      } else if (dragHandle === "draw") {
+        const curX = Math.max(0, Math.min(pw, (e.clientX - rect.left) * scaleX));
+        const curY = Math.max(0, Math.min(ph, (e.clientY - rect.top) * scaleY));
+        setBoxCoords({
+          x0: Math.min(init.x0, curX),
+          y0: Math.min(init.y0, curY),
+          x1: Math.max(init.x0, curX),
+          y1: Math.max(init.y0, curY),
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDragHandle(null);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragHandle, dragStart, activeItem, fullscreenStudio, rotation]);
+
+  // ── Apply Interactive Crop & Read OCR ───────────────────────
+  const handleApplyAndRecrop = async () => {
+    if (!activeItem || recropping || isScanning) return;
+    setRecropping(true);
+    setIsScanning(true);
+    setScanStatus("Applying crop boundaries & re-scanning PDF vectors...");
+
+    const startTime = Date.now();
+    try {
+      const resp = await fetch("/api/pdf/recrop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: activeItem.id,
+          bboxX0: boxCoords.x0,
+          bboxY0: boxCoords.y0,
+          bboxX1: boxCoords.x1,
+          bboxY1: boxCoords.y1,
+          updateText: true,
+          forceGemini: true,
+          rotation,
+        }),
+      });
+
+      const res = await resp.json();
+      if (!resp.ok) throw new Error(res.error || "Recrop failed");
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 850) {
+        await new Promise((r) => setTimeout(r, 850 - elapsed));
+      }
+
+      setImageKey(Date.now());
+      if (res.extractedText) {
+        setEditorText(res.extractedText);
+        setTextUpdatedPulse(true);
+        setTimeout(() => setTextUpdatedPulse(false), 2500);
+      }
+
+      // Automatically flip to Zoomed mode so the user sees the clean, focused question!
+      setViewMode("zoomed");
+
+      setActiveItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              bboxX0: boxCoords.x0,
+              bboxY0: boxCoords.y0,
+              bboxX1: boxCoords.x1,
+              bboxY1: boxCoords.y1,
+              rawOcrText: res.extractedText || prev.rawOcrText,
+              correctedText: res.extractedText || prev.correctedText,
+            }
+          : null
+      );
+
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === activeItem.id
+            ? {
+                ...q,
+                bboxX0: boxCoords.x0,
+                bboxY0: boxCoords.y0,
+                bboxX1: boxCoords.x1,
+                bboxY1: boxCoords.y1,
+                rawOcrText: res.extractedText || q.rawOcrText,
+                correctedText: res.extractedText || q.correctedText,
+              }
+            : q
+        )
+      );
+
+      showToast(`✓ Question cropped & OCR text extracted (${res.extractedText?.length || 0} chars)`, "ok");
+    } catch (e: any) {
+      showToast(e.message || "Failed to apply crop", "err");
+    } finally {
+      setRecropping(false);
+      setIsScanning(false);
+      setScanStatus("");
+    }
+  };
 
   // ── Quick Uncrop / Expand Margins ───────────────────────────
   const handleQuickUncrop = async (delta: {
@@ -254,6 +586,8 @@ export default function DataIngestionPage() {
           bboxX1: newX1,
           bboxY1: newY1,
           updateText: true,
+          forceGemini: true,
+          rotation,
         }),
       });
 
@@ -273,6 +607,20 @@ export default function DataIngestionPage() {
         setTextUpdatedPulse(true);
         setTimeout(() => setTextUpdatedPulse(false), 2500);
       }
+
+      setActiveItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              bboxX0: newX0,
+              bboxY0: newY0,
+              bboxX1: newX1,
+              bboxY1: newY1,
+              rawOcrText: res.extractedText || prev.rawOcrText,
+              correctedText: res.extractedText || prev.correctedText,
+            }
+          : null
+      );
 
       // Update question in state
       setQuestions((prev) =>
@@ -330,7 +678,8 @@ export default function DataIngestionPage() {
           bboxX1: boxCoords.x1,
           bboxY1: boxCoords.y1,
           updateText: true,
-          forceGemini,
+          forceGemini: true,
+          rotation,
         }),
       });
 
@@ -357,6 +706,16 @@ export default function DataIngestionPage() {
 
       setImageKey(Date.now());
       setOcrMethod(res.method || "pymupdf_vector");
+
+      setActiveItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              rawOcrText: res.extractedText || prev.rawOcrText,
+              correctedText: res.extractedText || prev.correctedText,
+            }
+          : null
+      );
 
       setQuestions((prev) =>
         prev.map((q) =>
@@ -407,6 +766,8 @@ export default function DataIngestionPage() {
           bboxX1: boxCoords.x1,
           bboxY1: boxCoords.y1,
           updateText: true,
+          forceGemini: true,
+          rotation,
         }),
       });
       const res = await resp.json();
@@ -418,6 +779,36 @@ export default function DataIngestionPage() {
         setTextUpdatedPulse(true);
         setTimeout(() => setTextUpdatedPulse(false), 2500);
       }
+
+      setActiveItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              bboxX0: boxCoords.x0,
+              bboxY0: boxCoords.y0,
+              bboxX1: boxCoords.x1,
+              bboxY1: boxCoords.y1,
+              rawOcrText: res.extractedText || prev.rawOcrText,
+              correctedText: res.extractedText || prev.correctedText,
+            }
+          : null
+      );
+
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === activeItem.id
+            ? {
+                ...q,
+                bboxX0: boxCoords.x0,
+                bboxY0: boxCoords.y0,
+                bboxX1: boxCoords.x1,
+                bboxY1: boxCoords.y1,
+                rawOcrText: res.extractedText || q.rawOcrText,
+                correctedText: res.extractedText || q.correctedText,
+              }
+            : q
+        )
+      );
       showToast("✓ Custom bounding box applied & saved to DB!", "ok");
     } catch (e: any) {
       showToast(e.message || "Failed to save crop", "err");
@@ -433,25 +824,49 @@ export default function DataIngestionPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const resp = await fetch("/api/ingestion", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          correctedText: editorText,
-          status,
-          subject: editSubject,
-          subjectCode: editSubjectCode,
-          year: editYear,
-          examType: editExamType,
-        }),
-      });
-      if (!resp.ok) throw new Error("Update failed");
+      if (dataSource === "redis") {
+        const resp = await fetch("/api/staging", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            action: status === "APPROVED" ? "APPROVE" : "REJECT",
+            cleanText: editorText,
+            subject: editSubject,
+            subjectCode: editSubjectCode,
+            year: editYear,
+            examType: editExamType,
+          }),
+        });
+        if (!resp.ok) throw new Error("Staging update failed");
 
-      showToast(
-        status === "APPROVED" ? "✓ Approved (A) & saved to dataset" : "✗ Rejected (R)",
-        status === "APPROVED" ? "ok" : "err"
-      );
+        showToast(
+          status === "APPROVED"
+            ? "✓ Promoted to Neon DB & indexed in Upstash Vector!"
+            : "✗ Rejected in Redis (Neon DB untouched)",
+          status === "APPROVED" ? "ok" : "err"
+        );
+      } else {
+        const resp = await fetch("/api/ingestion", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            correctedText: editorText,
+            status,
+            subject: editSubject,
+            subjectCode: editSubjectCode,
+            year: editYear,
+            examType: editExamType,
+          }),
+        });
+        if (!resp.ok) throw new Error("Update failed");
+
+        showToast(
+          status === "APPROVED" ? "✓ Approved (A) & saved to dataset" : "✗ Rejected (R)",
+          status === "APPROVED" ? "ok" : "err"
+        );
+      }
 
       // Optimistic update: remove from list and auto-advance to next sequential item
       const nextList = questions.filter((q) => q.id !== id);
@@ -469,6 +884,46 @@ export default function DataIngestionPage() {
       showToast("Update failed", "err");
     }
     setSubmitting(false);
+  };
+
+  // ── Multi-Format File Upload & Automated Ingestion ─────────────
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    showToast(`Uploading & slicing ${file.name}...`, "ok");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ingestion/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      showToast(
+        `✓ Ingested ${data.result?.stagedQuestionsCount || 0} questions to Upstash Redis staging buffer!`,
+        "ok"
+      );
+      setDataSource("redis");
+      fetchQuestions();
+      fetchMetadataStats();
+    } catch (err: any) {
+      showToast(err.message || "Upload failed", "err");
+    } finally {
+      setIsUploading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  };
+
+  // ── Fine-Tuning Dataset Exporter ───────────────────────────────
+  const handleFineTuneExport = (format: "alpaca" | "chatml" | "sharegpt" | "csv") => {
+    const a = document.createElement("a");
+    a.href = `/api/dataset/export?format=${format}&source=${dataSource}`;
+    a.download = `kaizen_finetune_${format}_${Date.now()}.${format === "csv" ? "csv" : "jsonl"}`;
+    a.click();
+    showToast(`✓ Exporting ${format.toUpperCase()} dataset for fine-tuning...`, "ok");
+    setShowExportModal(false);
   };
 
   const exportApproved = async () => {
@@ -515,7 +970,16 @@ export default function DataIngestionPage() {
           if (activeItem) updateStatus(activeItem.id, "APPROVED");
           break;
         case "r":
-          if (activeItem) updateStatus(activeItem.id, "REJECTED");
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleRotate(90);
+          } else if (activeItem) {
+            updateStatus(activeItem.id, "REJECTED");
+          }
+          break;
+        case "t":
+          e.preventDefault();
+          handleRotate(90);
           break;
         case "e":
           e.preventDefault();
@@ -524,9 +988,27 @@ export default function DataIngestionPage() {
         case "u":
           setShowPageModal((v) => !v);
           break;
+        case "c":
+          e.preventDefault();
+          setViewMode((v) => (v === "crop" ? "zoomed" : "crop"));
+          break;
+        case "f":
+          e.preventDefault();
+          setFullscreenStudio((v) => !v);
+          break;
+        case "z":
+          e.preventDefault();
+          setViewMode("zoomed");
+          break;
         case "o":
           e.preventDefault();
           handleRerunOcr(false);
+          break;
+        case "enter":
+          if (viewMode === "crop") {
+            e.preventDefault();
+            handleApplyAndRecrop();
+          }
           break;
         case "+":
         case "=":
@@ -622,14 +1104,104 @@ export default function DataIngestionPage() {
         </div>
       )}
 
+      {/* ── Fine-Tuning Dataset Export Modal ── */}
+      {showExportModal && (
+        <div
+          className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          onClick={() => setShowExportModal(false)}
+        >
+          <div
+            className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-emerald-400" />
+                <span>Export Dataset for LLM Fine-Tuning</span>
+              </h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-zinc-400 hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Download structured training data ready for fine-tuning our academic model using Unsloth, HuggingFace, LLaMA-Factory, or Gemini.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                onClick={() => handleFineTuneExport("alpaca")}
+                className="p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-500/50 rounded-xl text-left transition-all"
+              >
+                <div className="font-bold text-xs text-emerald-300">Alpaca / Unsloth</div>
+                <div className="text-[10px] text-zinc-400 font-mono mt-1">instruction / input / output JSONL</div>
+              </button>
+
+              <button
+                onClick={() => handleFineTuneExport("chatml")}
+                className="p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-cyan-500/50 rounded-xl text-left transition-all"
+              >
+                <div className="font-bold text-xs text-cyan-300">ChatML / OpenAI</div>
+                <div className="text-[10px] text-zinc-400 font-mono mt-1">messages role JSONL</div>
+              </button>
+
+              <button
+                onClick={() => handleFineTuneExport("sharegpt")}
+                className="p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-purple-500/50 rounded-xl text-left transition-all"
+              >
+                <div className="font-bold text-xs text-purple-300">ShareGPT</div>
+                <div className="text-[10px] text-zinc-400 font-mono mt-1">conversations JSONL</div>
+              </button>
+
+              <button
+                onClick={() => handleFineTuneExport("csv")}
+                className="p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/50 rounded-xl text-left transition-all"
+              >
+                <div className="font-bold text-xs text-amber-300">Standard CSV</div>
+                <div className="text-[10px] text-zinc-400 font-mono mt-1">Excel & Spreadsheet audit</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── TOP HEADER: Filter Hierarchy Bar ── */}
       <div className="h-14 border-b border-zinc-800/50 flex items-center justify-between px-4 bg-zinc-950/70 backdrop-blur-xl shrink-0 gap-3">
-        {/* Title & Badge */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
-          <h1 className="font-bold text-xs tracking-wider uppercase text-zinc-200 hidden sm:inline">
-            PYQ Ingestion & Crop Engine
-          </h1>
+        {/* Tier Toggle: Redis Staging vs Neon DB Production */}
+        <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5 shrink-0">
+          <button
+            onClick={() => setDataSource("redis")}
+            className={`px-2.5 py-1 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+              dataSource === "redis"
+                ? "bg-gradient-to-r from-red-600 to-amber-600 text-white shadow"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+            title="Upstash Redis Staging Buffer: verify OCR before any Neon DB commits"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span>Redis Staging</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-black/40 text-[9px] font-mono font-bold text-amber-200">
+              {stagingStats.stagedPending}
+            </span>
+          </button>
+          <button
+            onClick={() => setDataSource("neon")}
+            className={`px-2.5 py-1 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+              dataSource === "neon"
+                ? "bg-indigo-600 text-white shadow"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+            title="Neon PostgreSQL Database: approved production questions"
+          >
+            <Database className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Neon DB</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-black/40 text-[9px] font-mono font-bold text-indigo-200">
+              {stats.approved}
+            </span>
+          </button>
         </div>
 
         {/* Hierarchical Filters */}
@@ -656,9 +1228,9 @@ export default function DataIngestionPage() {
             value={subjectFilter}
             onChange={(e) => {
               setSubjectFilter(e.target.value);
-              setPaperFilter("ALL"); // Reset paper filter when subject changes
+              setPaperFilter("ALL");
             }}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[200px] shrink-0"
+            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[180px] shrink-0"
           >
             <option value="ALL">All Subjects ({subjectsList.length})</option>
             {subjectsList.map((s) => (
@@ -672,7 +1244,7 @@ export default function DataIngestionPage() {
           <select
             value={paperFilter}
             onChange={(e) => setPaperFilter(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 flex-1 min-w-[180px] max-w-[280px] truncate"
+            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 flex-1 min-w-[150px] max-w-[220px] truncate"
           >
             <option value="ALL">All Papers ({filteredPapers.length})</option>
             {filteredPapers.map((p) => (
@@ -681,13 +1253,45 @@ export default function DataIngestionPage() {
               </option>
             ))}
           </select>
+
+          {/* Multi-Format Ingest File Uploader */}
+          <input
+            type="file"
+            ref={uploadInputRef}
+            className="hidden"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.pptx"
+            onChange={handleFileUpload}
+          />
+          <button
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-2.5 py-1 bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow shrink-0"
+            title="Upload PDF, Image, PPTX, or DOCX for automated local enhancement, R2 upload & Gemini OCR"
+          >
+            {isUploading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            )}
+            <span>{isUploading ? "Ingesting..." : "Ingest Document"}</span>
+          </button>
+
+          {/* Fine-Tuning Export Modal Trigger */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow shrink-0"
+            title="Export dataset for LLM Fine-Tuning (Alpaca, ChatML, ShareGPT, JSONL)"
+          >
+            <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Fine-Tune Export</span>
+          </button>
         </div>
 
         {/* Global Stats & Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden lg:flex items-center gap-1.5 font-mono text-[11px]">
+          <div className="hidden xl:flex items-center gap-1.5 font-mono text-[11px]">
             <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold">
-              {stats.pending} PENDING
+              {dataSource === "redis" ? `${stagingStats.stagedPending} IN STAGING` : `${stats.pending} PENDING`}
             </span>
             <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold">
               {stats.approved} APPROVED
@@ -799,6 +1403,11 @@ export default function DataIngestionPage() {
                       <span className="text-[10px] font-mono px-1.5 py-0.2 bg-zinc-800 text-zinc-400 rounded">
                         p.{q.pageNumber || 1}
                       </span>
+                      {q.contentType && (
+                        <span className="text-[9px] font-mono px-1 py-0.2 bg-purple-500/20 text-purple-300 rounded border border-purple-500/30 shrink-0">
+                          {q.contentType}
+                        </span>
+                      )}
                       <span className="text-[10px] text-zinc-500 truncate font-mono">
                         {q.subjectCode || "ENG"}
                       </span>
@@ -849,6 +1458,11 @@ export default function DataIngestionPage() {
             {/* Top Info Strip of Active Question */}
             <div className="px-4 py-2 bg-zinc-900/50 border-b border-zinc-800/40 flex items-center justify-between text-xs shrink-0 gap-2">
               <div className="flex items-center gap-2 min-w-0">
+                {activeItem.contentType && (
+                  <span className="px-2 py-0.5 bg-purple-500/15 border border-purple-500/40 text-purple-300 font-mono font-bold rounded text-[11px] shrink-0">
+                    {activeItem.contentType}
+                  </span>
+                )}
                 <span className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-mono font-bold rounded text-[11px]">
                   {activeItem.subjectCode || "ENG2001"}
                 </span>
@@ -878,82 +1492,148 @@ export default function DataIngestionPage() {
             {/* Image Preview & Dynamic Uncrop Controls */}
             <div className="h-[46%] border-b border-zinc-800/40 bg-[#06060a] flex flex-col shrink-0">
               {/* Toolbar */}
-              <div className="flex items-center justify-between px-4 py-1.5 border-b border-zinc-800/30 shrink-0 bg-zinc-950/40">
-                {/* Uncrop / Expand Controls */}
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800/40 shrink-0 bg-zinc-950/70 backdrop-blur-md gap-2">
+                {/* View Mode Toggle: Zoomed Question vs Interactive Photo Crop Tool */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setViewMode("zoomed")}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                        viewMode === "zoomed"
+                          ? "bg-indigo-600 text-foreground shadow"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      title="Zoom directly into the selected question area (Hotkey: Z)"
+                    >
+                      <Maximize2 className="w-3 h-3" />
+                      <span>Zoomed Question (Z)</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode("crop")}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                        viewMode === "crop"
+                          ? "bg-cyan-600 text-foreground shadow"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      title="Interactive Photo Editor Crop tool: drag and resize 8 handles over full page (Hotkey: C)"
+                    >
+                      <Crop className="w-3 h-3" />
+                      <span>Photo Crop Tool (C)</span>
+                    </button>
+                  </div>
+
+                  {/* If in Crop Mode, show the Apply Crop & Read OCR button */}
+                  {viewMode === "crop" && (
+                    <button
+                      onClick={handleApplyAndRecrop}
+                      disabled={recropping || isScanning}
+                      className="px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-foreground text-[11px] font-bold rounded-lg flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all animate-pulse"
+                      title="Apply current dragged crop box and re-scan OCR (Hotkey: Enter)"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Apply Crop & Read OCR (Enter)</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Uncrop Nudge Buttons */}
+                <div className="hidden xl:flex items-center gap-1">
                   <span className="text-[10px] font-mono text-zinc-500 uppercase font-bold mr-1">
-                    Uncrop:
+                    Nudge:
                   </span>
                   <button
                     onClick={() => handleQuickUncrop({ top: 30 })}
                     disabled={recropping}
-                    className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono flex items-center gap-1 hover:border-indigo-500/50 transition-colors"
-                    title="Uncrop Top boundary by 30pt"
+                    className="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono"
+                    title="Uncrop Top +30pt"
                   >
-                    ▲ Top +30pt
+                    ▲ Top +30
                   </button>
                   <button
                     onClick={() => handleQuickUncrop({ bottom: 30 })}
                     disabled={recropping}
-                    className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono flex items-center gap-1 hover:border-indigo-500/50 transition-colors"
-                    title="Uncrop Bottom boundary by 30pt"
+                    className="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono"
+                    title="Uncrop Bottom +30pt"
                   >
-                    ▼ Bottom +30pt
+                    ▼ Bottom +30
                   </button>
                   <button
                     onClick={() => handleQuickUncrop({ left: 20, right: 20 })}
                     disabled={recropping}
-                    className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono flex items-center gap-1 hover:border-indigo-500/50 transition-colors"
-                    title="Uncrop Left & Right by 20pt"
+                    className="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 text-[10px] font-mono"
+                    title="Uncrop Width +40pt"
                   >
-                    ◀▶ Width +40pt
+                    ◀▶ Width +40
                   </button>
-                  <button
-                    onClick={() => setShowPageModal(true)}
-                    className="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded border border-indigo-500/30 text-[10px] font-bold flex items-center gap-1.5 transition-colors"
-                    title="Open full page view to visually resize bounding box"
-                  >
-                    <Sliders className="w-3 h-3" /> Visual Page Cropper (U)
-                  </button>
+                </div>
+
+                {/* Action & Zoom controls */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Rotation Controls */}
+                  <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+                    <button
+                      onClick={() => handleRotate(-90)}
+                      disabled={recropping || isScanning}
+                      className="p-1 text-zinc-400 hover:text-amber-300 rounded hover:bg-zinc-800 flex items-center justify-center transition-colors"
+                      title="Rotate Counter-Clockwise 90° (↺)"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleRotate(90)}
+                      disabled={recropping || isScanning}
+                      className="px-2 py-0.5 text-amber-400 hover:text-amber-300 rounded hover:bg-zinc-800 flex items-center gap-1 text-[11px] font-mono font-bold transition-colors"
+                      title="Rotate Clockwise 90° (↻ - Hotkey: T or Shift+R)"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span>{rotation}°</span>
+                    </button>
+                  </div>
+
                   <button
                     onClick={() => handleRerunOcr(false)}
                     disabled={recropping || isScanning}
-                    className="px-2.5 py-1 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-300 rounded border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(6,182,212,0.15)] hover:shadow-[0_0_18px_rgba(6,182,212,0.35)]"
-                    title="Rerun Neural OCR over current bounding box (Hotkey: O)"
+                    className="px-2.5 py-1 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-300 rounded-lg border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                    title="Rerun Neural OCR (Hotkey: O)"
                   >
                     <Sparkles className={`w-3 h-3 ${isScanning ? "animate-spin text-cyan-400" : "text-cyan-400"}`} />
                     <span>{isScanning ? "Scanning..." : "Rerun OCR (O)"}</span>
                   </button>
-                </div>
 
-                {/* Zoom controls */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
-                    className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
-                  >
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[10px] font-mono text-zinc-400 w-8 text-center">
-                    {Math.round(zoom * 100)}%
-                  </span>
-                  <button
-                    onClick={() => setZoom((z) => Math.min(z + 0.25, 3))}
-                    className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
-                  >
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setZoom(1)}
-                    className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
+                      className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
+                      title="Zoom Out (-)"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[10px] font-mono text-zinc-400 w-9 text-center">
+                      {Math.round(zoom * 100)}%
+                    </span>
+                    <button
+                      onClick={() => setZoom((z) => Math.min(z + 0.25, 3))}
+                      className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
+                      title="Zoom In (+)"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setZoom(1)}
+                      className="px-1.5 py-1 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
+                      title="Reset Zoom to 100%"
+                    >
+                      100%
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Image Viewport */}
-              <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-[#08080c] relative">
+              <div
+                ref={viewportRef}
+                className="flex-1 overflow-auto flex items-center justify-center p-3 bg-[#07070a] relative select-none"
+              >
                 {/* ── HIGH-TECH NEURAL OCR & SMOKER SCANNER OVERLAY ── */}
                 {(isScanning || recropping) && (
                   <div className="absolute inset-0 z-30 bg-black/65 backdrop-blur-[3px] flex flex-col items-center justify-center overflow-hidden pointer-events-none select-none">
@@ -1018,18 +1698,353 @@ export default function DataIngestionPage() {
                     </div>
                   </div>
                 )}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  key={imageKey}
-                  src={`${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`}
-                  alt="Question Crop"
-                  style={{
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "center",
-                    transition: "transform 0.15s ease",
-                  }}
-                  className="max-w-full max-h-full object-contain rounded shadow-2xl border border-zinc-800/40"
-                />
+
+                {/* ── MODE 1: ZOOMED QUESTION FOCUS (The user's Image 1!) ── */}
+                {viewMode === "zoomed" ? (
+                  <div
+                    className="relative flex items-center justify-center w-full h-full p-2 overflow-hidden"
+                    style={{
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "center",
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      key={`${activeItem.id}-${imageKey}-${rotation}`}
+                      src={
+                        activeItem.sourcePdf
+                          ? `/api/pdf/crop?pdf=${encodeURIComponent(
+                              activeItem.sourcePdf
+                            )}&page=${activeItem.pageNumber || 1}&x0=${boxCoords.x0.toFixed(
+                              1
+                            )}&y0=${boxCoords.y0.toFixed(1)}&x1=${boxCoords.x1.toFixed(
+                              1
+                            )}&y1=${boxCoords.y1.toFixed(1)}&dpi=200&rotation=${rotation}&t=${imageKey}`
+                          : `${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`
+                      }
+                      alt="Focused Question Crop"
+                      className="max-w-full max-h-[calc(46vh-55px)] object-contain rounded-lg shadow-2xl border border-zinc-700/80 bg-white"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = `${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`;
+                      }}
+                    />
+
+                    {/* Quick Badge at Bottom Left of Zoomed View */}
+                    <div className="absolute bottom-2 left-3 px-2.5 py-0.5 rounded-full bg-zinc-950/90 border border-zinc-800 text-[10px] font-mono text-zinc-300 backdrop-blur-md flex items-center gap-1.5 shadow">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="font-bold">Focused Question Crop</span>
+                      <span className="text-zinc-600">|</span>
+                      <span className="text-indigo-300">
+                        {Math.round(boxCoords.x1 - boxCoords.x0)} ×{" "}
+                        {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                      </span>
+                      <span className="text-zinc-600">|</span>
+                      <span className="text-emerald-400 font-semibold">200 DPI Vector</span>
+                    </div>
+
+                    {/* Quick Switch to Crop Tool Button at Bottom Right */}
+                    <button
+                      onClick={() => setViewMode("crop")}
+                      className="absolute bottom-2 right-3 px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-mono text-cyan-300 backdrop-blur-md flex items-center gap-1.5 shadow-lg hover:border-cyan-400 transition-colors"
+                      title="Adjust Question Crop (Hotkey: C)"
+                    >
+                      <Crop className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Recrop Question (C)</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* ── MODE 2: DUAL-PANE PHOTO STUDIO & INTERACTIVE CROPPER ── */
+                  <div className="flex w-full h-full overflow-hidden">
+                    {/* LEFT PANE: Full Page Photo Editor Canvas (~46% width) */}
+                    <div className="w-[46%] border-r border-zinc-800/80 flex flex-col bg-[#050508] relative select-none">
+                      {/* Top Header of Left Pane */}
+                      <div className="px-2.5 py-1 bg-zinc-950/90 border-b border-zinc-800/60 flex items-center justify-between text-[10px] font-mono shrink-0">
+                        <span className="text-cyan-400 font-bold flex items-center gap-1">
+                          <Crop className="w-3 h-3" /> Page {activeItem.pageNumber} Canvas
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-zinc-500 font-bold mr-0.5">Presets:</span>
+                          <button
+                            onClick={() => applyPreset("q1")}
+                            className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 hover:border-cyan-500/50 transition-colors"
+                            title="Top 30% of page (Question 1)"
+                          >
+                            Q1
+                          </button>
+                          <button
+                            onClick={() => applyPreset("q2")}
+                            className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 hover:border-cyan-500/50 transition-colors"
+                            title="Middle 30% of page (Question 2)"
+                          >
+                            Q2
+                          </button>
+                          <button
+                            onClick={() => applyPreset("q3")}
+                            className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 hover:border-cyan-500/50 transition-colors"
+                            title="Bottom 30% of page (Question 3)"
+                          >
+                            Q3
+                          </button>
+                          <button
+                            onClick={() => applyPreset("full")}
+                            className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800 hover:border-cyan-500/50 transition-colors"
+                            title="Entire Page Body"
+                          >
+                            Full
+                          </button>
+                          <button
+                            onClick={() => setFullscreenStudio(true)}
+                            className="px-1.5 py-0.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30 flex items-center gap-1 transition-colors ml-1"
+                            title="Fullscreen Studio Modal (Hotkey: F)"
+                          >
+                            <Maximize2 className="w-2.5 h-2.5" /> (F)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Canvas Container */}
+                      <div className="flex-1 overflow-auto flex items-center justify-center p-2 relative bg-[#07070b]">
+                        {(() => {
+                          const isSideways = rotation % 180 === 90;
+                          const effPw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
+                          const effPh = isSideways ? (activeItem.pageWidth || 595.32) : (activeItem.pageHeight || 841.92);
+
+                          return (
+                            <div
+                              ref={cropCanvasRef}
+                              className="relative inline-block select-none shadow-2xl border border-zinc-700 rounded bg-white overflow-hidden cursor-crosshair"
+                              style={{
+                                height: "calc(46vh - 82px)",
+                                aspectRatio: `${effPw} / ${effPh}`,
+                              }}
+                              onMouseDown={(e) => handleMouseDown(e, "draw")}
+                            >
+                              {/* Full Page High-Resolution Background */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                key={`page-bg-${activeItem.id}-${rotation}-${imageKey}`}
+                                src={`/api/pdf/page?pdf=${encodeURIComponent(
+                                  activeItem.sourcePdf || ""
+                                )}&page=${activeItem.pageNumber || 1}&dpi=150&rotation=${rotation}`}
+                                alt="Full PDF Page"
+                                className="w-full h-full object-contain pointer-events-none select-none"
+                              />
+
+                              {/* 4 Dimmed Masks Outside the Crop Box */}
+                              {(() => {
+                                const pw = effPw;
+                                const ph = effPh;
+                                const x0Pct = (boxCoords.x0 / pw) * 100;
+                                const y0Pct = (boxCoords.y0 / ph) * 100;
+                                const x1Pct = (boxCoords.x1 / pw) * 100;
+                                const y1Pct = (boxCoords.y1 / ph) * 100;
+                                const bwPct = ((boxCoords.x1 - boxCoords.x0) / pw) * 100;
+                                const bhPct = ((boxCoords.y1 - boxCoords.y0) / ph) * 100;
+
+                            return (
+                              <>
+                                {/* Top mask */}
+                                <div
+                                  className="absolute left-0 right-0 top-0 bg-black/65 pointer-events-none"
+                                  style={{ height: `${y0Pct}%` }}
+                                />
+                                {/* Bottom mask */}
+                                <div
+                                  className="absolute left-0 right-0 bottom-0 bg-black/65 pointer-events-none"
+                                  style={{ top: `${y1Pct}%` }}
+                                />
+                                {/* Left mask */}
+                                <div
+                                  className="absolute left-0 bg-black/65 pointer-events-none"
+                                  style={{
+                                    top: `${y0Pct}%`,
+                                    width: `${x0Pct}%`,
+                                    height: `${bhPct}%`,
+                                  }}
+                                />
+                                {/* Right mask */}
+                                <div
+                                  className="absolute right-0 bg-black/65 pointer-events-none"
+                                  style={{
+                                    top: `${y0Pct}%`,
+                                    left: `${x1Pct}%`,
+                                    height: `${bhPct}%`,
+                                  }}
+                                />
+
+                                {/* Active Draggable & Resizable Crop Box */}
+                                <div
+                                  className="absolute border-2 border-cyan-400 bg-cyan-400/10 shadow-[0_0_20px_rgba(6,182,212,0.45)] cursor-grab active:cursor-grabbing z-10"
+                                  style={{
+                                    left: `${x0Pct}%`,
+                                    top: `${y0Pct}%`,
+                                    width: `${bwPct}%`,
+                                    height: `${bhPct}%`,
+                                  }}
+                                  onMouseDown={(e) => handleMouseDown(e, "move")}
+                                >
+                                  {/* Rule of Thirds Grid Lines */}
+                                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-b border-cyan-300/30 border-dashed" />
+                                    <div className="border-r border-cyan-300/30 border-dashed" />
+                                    <div className="border-r border-cyan-300/30 border-dashed" />
+                                    <div />
+                                  </div>
+
+                                  {/* Center Drag Badge */}
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded-full bg-zinc-950/90 border border-cyan-500/40 text-[9px] font-mono text-cyan-300 pointer-events-none flex items-center gap-1 shadow">
+                                    <Move className="w-2.5 h-2.5" /> Drag
+                                  </div>
+
+                                  {/* Dimension Tag */}
+                                  <div className="absolute -top-5 left-0 px-1.5 py-0.2 bg-cyan-500 text-black font-mono font-bold text-[9px] rounded shadow-md pointer-events-none">
+                                    {Math.round(boxCoords.x1 - boxCoords.x0)} ×{" "}
+                                    {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                                  </div>
+
+                                  {/* 8 Photo Editor Handles */}
+                                  {/* NW Corner */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "nw")}
+                                    className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nwse-resize hover:scale-125 transition-transform"
+                                    title="Resize Top-Left"
+                                  />
+                                  {/* N Edge */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "n")}
+                                    className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-7 h-2 bg-white border border-cyan-500 rounded-full shadow-md cursor-ns-resize hover:scale-125 transition-transform"
+                                    title="Resize Top"
+                                  />
+                                  {/* NE Corner */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "ne")}
+                                    className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nesw-resize hover:scale-125 transition-transform"
+                                    title="Resize Top-Right"
+                                  />
+                                  {/* E Edge */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "e")}
+                                    className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-7 bg-white border border-cyan-500 rounded-full shadow-md cursor-ew-resize hover:scale-125 transition-transform"
+                                    title="Resize Right"
+                                  />
+                                  {/* SE Corner */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "se")}
+                                    className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nwse-resize hover:scale-125 transition-transform"
+                                    title="Resize Bottom-Right"
+                                  />
+                                  {/* S Edge */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "s")}
+                                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-7 h-2 bg-white border border-cyan-500 rounded-full shadow-md cursor-ns-resize hover:scale-125 transition-transform"
+                                    title="Resize Bottom"
+                                  />
+                                  {/* SW Corner */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "sw")}
+                                    className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nesw-resize hover:scale-125 transition-transform"
+                                    title="Resize Bottom-Left"
+                                  />
+                                  {/* W Edge */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "w")}
+                                    className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-7 bg-white border border-cyan-500 rounded-full shadow-md cursor-ew-resize hover:scale-125 transition-transform"
+                                    title="Resize Left"
+                                  />
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                    {/* RIGHT PANE: LIVE ZOOMED QUESTION PREVIEW (~54% width) - THE USER'S IMAGE 1! */}
+                    <div className="w-[54%] flex flex-col bg-[#060609] relative select-none">
+                      {/* Top Header of Right Pane */}
+                      <div className="px-3 py-1 bg-zinc-950/90 border-b border-zinc-800/60 flex items-center justify-between text-[10px] font-mono shrink-0">
+                        <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                          <Maximize2 className="w-3 h-3 text-emerald-400" /> Live Zoomed Question Preview (200 DPI)
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-indigo-300 font-bold">
+                            {Math.round(boxCoords.x1 - boxCoords.x0)} × {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                          </span>
+                          <button
+                            onClick={handleApplyAndRecrop}
+                            disabled={recropping || isScanning}
+                            className="px-2.5 py-0.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded shadow-md transition-all flex items-center gap-1 hover:scale-105"
+                            title="Apply current crop and re-read OCR (Hotkey: Enter)"
+                          >
+                            <Check className="w-3 h-3" /> Apply Crop (Enter)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Display Area: Shows Question Zoomed In to fill the container! */}
+                      <div className="flex-1 overflow-auto flex items-center justify-center p-3 relative bg-[#08080d]">
+                        {(() => {
+                          const isSideways = rotation % 180 === 90;
+                          const effPw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
+                          const effPh = isSideways ? (activeItem.pageWidth || 595.32) : (activeItem.pageHeight || 841.92);
+
+                          if (dragHandle) {
+                            return (
+                              /* While actively dragging, instant 60 FPS CSS-based zoom with 0 network latency! */
+                              <div
+                                className="relative overflow-hidden bg-white shadow-2xl rounded-lg border border-zinc-700/80"
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  maxHeight: "calc(46vh - 85px)",
+                                }}
+                              >
+                                <div className="relative w-full h-full overflow-hidden">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={`/api/pdf/page?pdf=${encodeURIComponent(
+                                      activeItem.sourcePdf || ""
+                                    )}&page=${activeItem.pageNumber || 1}&dpi=150&rotation=${rotation}`}
+                                    alt="Live Crop Drag"
+                                    className="absolute pointer-events-none select-none max-w-none"
+                                    style={{
+                                      width: `${(effPw / Math.max(1, boxCoords.x1 - boxCoords.x0)) * 100}%`,
+                                      height: `${(effPh / Math.max(1, boxCoords.y1 - boxCoords.y0)) * 100}%`,
+                                      left: `${-(boxCoords.x0 / Math.max(1, boxCoords.x1 - boxCoords.x0)) * 100}%`,
+                                      top: `${-(boxCoords.y0 / Math.max(1, boxCoords.y1 - boxCoords.y0)) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            /* When released or stationary, high-res 200 DPI vector render! */
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              key={`crop-live-${imageKey}-${rotation}-${boxCoords.x0.toFixed(0)}-${boxCoords.y0.toFixed(0)}-${boxCoords.x1.toFixed(0)}-${boxCoords.y1.toFixed(0)}`}
+                              src={`/api/pdf/crop?pdf=${encodeURIComponent(
+                                activeItem.sourcePdf || ""
+                              )}&page=${activeItem.pageNumber || 1}&x0=${boxCoords.x0.toFixed(1)}&y0=${boxCoords.y0.toFixed(1)}&x1=${boxCoords.x1.toFixed(1)}&y1=${boxCoords.y1.toFixed(1)}&dpi=200&rotation=${rotation}&t=${imageKey}`}
+                              alt="Zoomed Question Preview"
+                              className="max-w-full max-h-[calc(46vh-85px)] object-contain rounded-lg shadow-2xl border border-zinc-700/80 bg-white"
+                            />
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1304,6 +2319,289 @@ export default function DataIngestionPage() {
                   )}
                   Save & Apply Crop to Database
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULLSCREEN PHOTO STUDIO WORKSPACE MODAL (F) ── */}
+      {fullscreenStudio && activeItem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col select-none"
+          onClick={() => setFullscreenStudio(false)}
+        >
+          {/* Top Bar */}
+          <div
+            className="px-6 py-2.5 bg-zinc-950/90 border-b border-zinc-800 flex items-center justify-between shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                <Crop className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
+                  <span>Photo Studio Cropper</span>
+                  <span className="text-zinc-500">·</span>
+                  <span className="text-cyan-300 font-mono text-xs">
+                    {activeItem.sourcePdf} (Page {activeItem.pageNumber})
+                  </span>
+                </h3>
+                <p className="text-[11px] text-zinc-400 font-mono">
+                  Drag the cyan box or 8 handles to frame the question. Live preview zooms in on the right.
+                </p>
+              </div>
+            </div>
+
+            {/* Presets and Apply */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+                <span className="text-[10px] font-mono text-zinc-400 font-bold px-1.5">Presets:</span>
+                <button
+                  onClick={() => applyPreset("q1")}
+                  className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono rounded"
+                >
+                  Q1 (Top)
+                </button>
+                <button
+                  onClick={() => applyPreset("q2")}
+                  className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono rounded"
+                >
+                  Q2 (Mid)
+                </button>
+                <button
+                  onClick={() => applyPreset("q3")}
+                  className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono rounded"
+                >
+                  Q3 (Bottom)
+                </button>
+                <button
+                  onClick={() => applyPreset("full")}
+                  className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono rounded"
+                >
+                  Full Page
+                </button>
+              </div>
+
+              {/* Rotation inside Fullscreen Studio */}
+              <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+                <button
+                  onClick={() => handleRotate(-90)}
+                  disabled={recropping || isScanning}
+                  className="p-1 text-zinc-400 hover:text-amber-300 rounded hover:bg-zinc-800"
+                  title="Rotate CCW 90° (↺)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleRotate(90)}
+                  disabled={recropping || isScanning}
+                  className="px-2 py-0.5 text-amber-400 hover:text-amber-300 rounded hover:bg-zinc-800 flex items-center gap-1 text-xs font-mono font-bold"
+                  title="Rotate CW 90° (↻ - Hotkey: T)"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{rotation}°</span>
+                </button>
+              </div>
+
+              <button
+                onClick={async () => {
+                  await handleApplyAndRecrop();
+                  setFullscreenStudio(false);
+                }}
+                disabled={recropping || isScanning}
+                className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+              >
+                <Check className="w-4 h-4" />
+                <span>Apply Crop & Read (Enter)</span>
+              </button>
+
+              <button
+                onClick={() => setFullscreenStudio(false)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 text-sm font-bold"
+                title="Exit Fullscreen Studio (Esc or F)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Main Fullscreen Workspace: Split 50% Canvas / 50% Live Zoom */}
+          <div
+            className="flex-1 flex overflow-hidden p-4 gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left Canvas (Large 80vh PDF Page) */}
+            <div className="flex-1 bg-[#09090e] border border-zinc-800 rounded-2xl flex flex-col overflow-hidden">
+              <div className="px-4 py-2 bg-zinc-950/80 border-b border-zinc-800 text-xs font-mono text-zinc-400 flex items-center justify-between">
+                <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                  <Crop className="w-3.5 h-3.5" /> High-Resolution Page Canvas
+                </span>
+                <span className="text-zinc-500">
+                  {Math.round(boxCoords.x1 - boxCoords.x0)} × {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                </span>
+              </div>
+              <div className="flex-1 overflow-auto flex items-center justify-center p-4 relative">
+                <div
+                  ref={fullscreenCanvasRef}
+                  className="relative select-none shadow-2xl border border-zinc-700 rounded bg-white overflow-hidden cursor-crosshair"
+                  style={{
+                    height: "calc(82vh - 60px)",
+                    aspectRatio: `${activeItem.pageWidth || 595.32} / ${
+                      activeItem.pageHeight || 841.92
+                    }`,
+                  }}
+                  onMouseDown={(e) => handleMouseDown(e, "draw")}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/pdf/page?pdf=${encodeURIComponent(
+                      activeItem.sourcePdf || ""
+                    )}&page=${activeItem.pageNumber || 1}&dpi=150`}
+                    alt="Full PDF Page"
+                    className="w-full h-full object-contain pointer-events-none select-none"
+                  />
+                  {/* Dimmed masks and 8 handles */}
+                  {(() => {
+                    const pw = activeItem.pageWidth || 595.32;
+                    const ph = activeItem.pageHeight || 841.92;
+                    const x0Pct = (boxCoords.x0 / pw) * 100;
+                    const y0Pct = (boxCoords.y0 / ph) * 100;
+                    const x1Pct = (boxCoords.x1 / pw) * 100;
+                    const y1Pct = (boxCoords.y1 / ph) * 100;
+                    const bwPct = ((boxCoords.x1 - boxCoords.x0) / pw) * 100;
+                    const bhPct = ((boxCoords.y1 - boxCoords.y0) / ph) * 100;
+
+                    return (
+                      <>
+                        <div
+                          className="absolute left-0 right-0 top-0 bg-black/65 pointer-events-none"
+                          style={{ height: `${y0Pct}%` }}
+                        />
+                        <div
+                          className="absolute left-0 right-0 bottom-0 bg-black/65 pointer-events-none"
+                          style={{ top: `${y1Pct}%` }}
+                        />
+                        <div
+                          className="absolute left-0 bg-black/65 pointer-events-none"
+                          style={{ top: `${y0Pct}%`, width: `${x0Pct}%`, height: `${bhPct}%` }}
+                        />
+                        <div
+                          className="absolute right-0 bg-black/65 pointer-events-none"
+                          style={{ top: `${y0Pct}%`, left: `${x1Pct}%`, height: `${bhPct}%` }}
+                        />
+
+                        <div
+                          className="absolute border-2 border-cyan-400 bg-cyan-400/10 shadow-[0_0_25px_rgba(6,182,212,0.5)] cursor-grab active:cursor-grabbing z-10"
+                          style={{
+                            left: `${x0Pct}%`,
+                            top: `${y0Pct}%`,
+                            width: `${bwPct}%`,
+                            height: `${bhPct}%`,
+                          }}
+                          onMouseDown={(e) => handleMouseDown(e, "move")}
+                        >
+                          <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                            <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-r border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-b border-cyan-300/30 border-dashed" />
+                            <div className="border-r border-cyan-300/30 border-dashed" />
+                            <div className="border-r border-cyan-300/30 border-dashed" />
+                            <div />
+                          </div>
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full bg-zinc-950/90 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 pointer-events-none flex items-center gap-1 shadow">
+                            <Move className="w-3 h-3" /> Drag
+                          </div>
+                          <div className="absolute -top-6 left-0 px-2 py-0.5 bg-cyan-500 text-black font-mono font-bold text-[10px] rounded shadow-md pointer-events-none">
+                            {Math.round(boxCoords.x1 - boxCoords.x0)} × {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                          </div>
+
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "nw")}
+                            className="absolute -top-3 -left-3 w-6 h-6 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nwse-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "n")}
+                            className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-2.5 bg-white border border-cyan-500 rounded-full shadow-md cursor-ns-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "ne")}
+                            className="absolute -top-3 -right-3 w-6 h-6 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nesw-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "e")}
+                            className="absolute top-1/2 -right-2 -translate-y-1/2 w-2.5 h-8 bg-white border border-cyan-500 rounded-full shadow-md cursor-ew-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "se")}
+                            className="absolute -bottom-3 -right-3 w-6 h-6 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nwse-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "s")}
+                            className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-2.5 bg-white border border-cyan-500 rounded-full shadow-md cursor-ns-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "sw")}
+                            className="absolute -bottom-3 -left-3 w-6 h-6 bg-white border-2 border-cyan-500 rounded-full shadow-lg cursor-nesw-resize hover:scale-125 transition-transform"
+                          />
+                          <div
+                            onMouseDown={(e) => handleMouseDown(e, "w")}
+                            className="absolute top-1/2 -left-2 -translate-y-1/2 w-2.5 h-8 bg-white border border-cyan-500 rounded-full shadow-md cursor-ew-resize hover:scale-125 transition-transform"
+                          />
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Live Zoom View (Large High-Resolution Preview) */}
+            <div className="flex-1 bg-[#09090e] border border-zinc-800 rounded-2xl flex flex-col overflow-hidden">
+              <div className="px-4 py-2 bg-zinc-950/80 border-b border-zinc-800 text-xs font-mono text-zinc-400 flex items-center justify-between">
+                <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <Maximize2 className="w-3.5 h-3.5" /> High-Resolution Question Preview (200 DPI)
+                </span>
+                <span className="text-emerald-400 font-semibold font-mono">Crisp Vector Stream</span>
+              </div>
+              <div className="flex-1 overflow-auto flex items-center justify-center p-4 relative bg-[#07070b]">
+                {dragHandle ? (
+                  <div
+                    className="relative overflow-hidden bg-white shadow-2xl rounded-xl border border-zinc-700/80"
+                    style={{ width: "100%", height: "100%", maxHeight: "calc(82vh - 60px)" }}
+                  >
+                    <div className="relative w-full h-full overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/pdf/page?pdf=${encodeURIComponent(
+                          activeItem.sourcePdf || ""
+                        )}&page=${activeItem.pageNumber || 1}&dpi=150`}
+                        alt="Live Crop Drag"
+                        className="absolute pointer-events-none select-none max-w-none"
+                        style={{
+                          width: `${((activeItem.pageWidth || 595.32) / Math.max(1, boxCoords.x1 - boxCoords.x0)) * 100}%`,
+                          height: `${((activeItem.pageHeight || 841.92) / Math.max(1, boxCoords.y1 - boxCoords.y0)) * 100}%`,
+                          left: `${-(boxCoords.x0 / Math.max(1, boxCoords.x1 - boxCoords.x0)) * 100}%`,
+                          top: `${-(boxCoords.y0 / Math.max(1, boxCoords.y1 - boxCoords.y0)) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={`crop-fs-${imageKey}-${boxCoords.x0.toFixed(0)}-${boxCoords.y0.toFixed(0)}-${boxCoords.x1.toFixed(0)}-${boxCoords.y1.toFixed(0)}`}
+                    src={`/api/pdf/crop?pdf=${encodeURIComponent(
+                      activeItem.sourcePdf || ""
+                    )}&page=${activeItem.pageNumber || 1}&x0=${boxCoords.x0.toFixed(1)}&y0=${boxCoords.y0.toFixed(1)}&x1=${boxCoords.x1.toFixed(1)}&y1=${boxCoords.y1.toFixed(1)}&dpi=200&t=${imageKey}`}
+                    alt="Zoomed Question Preview"
+                    className="max-w-full max-h-[calc(82vh-60px)] object-contain rounded-xl shadow-2xl border border-zinc-700/80 bg-white"
+                  />
+                )}
               </div>
             </div>
           </div>

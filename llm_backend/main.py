@@ -194,9 +194,10 @@ class RecropRequest(BaseModel):
     saveFilename: str | None = None
     dpi: int = 200
     forceGemini: bool = False
+    rotation: int = 0
 
 @app.get("/api/pdf/page")
-async def get_pdf_page(pdf: str, page: int = 1, dpi: int = 150):
+async def get_pdf_page(pdf: str, page: int = 1, dpi: int = 150, rotation: int = 0):
     pdf_path = RAW_DIR / pdf
     if not pdf_path.exists():
         raise HTTPException(status_code=404, detail=f"PDF {pdf} not found")
@@ -204,6 +205,8 @@ async def get_pdf_page(pdf: str, page: int = 1, dpi: int = 150):
         doc = fitz.open(str(pdf_path))
         page_idx = max(0, min(page - 1, len(doc) - 1))
         p = doc[page_idx]
+        if rotation:
+            p.set_rotation((p.rotation + rotation) % 360)
         pix = p.get_pixmap(dpi=dpi)
         img_bytes = pix.tobytes("png")
         doc.close()
@@ -223,7 +226,8 @@ async def get_pdf_crop(
     padBottom: float = 0,
     padLeft: float = 0,
     padRight: float = 0,
-    dpi: int = 200
+    dpi: int = 200,
+    rotation: int = 0
 ):
     pdf_path = RAW_DIR / pdf
     if not pdf_path.exists():
@@ -232,6 +236,8 @@ async def get_pdf_crop(
         doc = fitz.open(str(pdf_path))
         page_idx = max(0, min(page - 1, len(doc) - 1))
         p = doc[page_idx]
+        if rotation:
+            p.set_rotation((p.rotation + rotation) % 360)
         
         final_x0 = max(0.0, float(x0) - float(padLeft))
         final_y0 = max(0.0, float(y0) - float(padTop))
@@ -255,6 +261,8 @@ async def recrop_pdf(req: RecropRequest):
         doc = fitz.open(str(pdf_path))
         page_idx = max(0, min(req.pageNumber - 1, len(doc) - 1))
         p = doc[page_idx]
+        if req.rotation:
+            p.set_rotation((p.rotation + req.rotation) % 360)
         
         final_x0 = max(0.0, float(req.x0))
         final_y0 = max(0.0, float(req.y0))
@@ -268,7 +276,7 @@ async def recrop_pdf(req: RecropRequest):
         method_used = "pymupdf_vector"
 
         # If vector text is sparse/empty (scanned PDF) or forceGemini is requested
-        if req.forceGemini or len(extracted_text) < 15:
+        if req.forceGemini or len(extracted_text) < 25:
             gemini_key = os.environ.get("GEMINI_API_KEY")
             if not gemini_key and (BASE_DIR / ".env").exists():
                 for line in (BASE_DIR / ".env").read_text(encoding="utf-8").split("\n"):
@@ -279,20 +287,28 @@ async def recrop_pdf(req: RecropRequest):
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=gemini_key)
-                    g_model = genai.GenerativeModel("gemini-1.5-flash")
                     img_data = {
                         "mime_type": "image/png",
                         "data": pix.tobytes("png")
                     }
                     prompt = (
-                        "Extract the exact examination question and text from this snippet. "
-                        "Preserve question numbers, full question sentences, code blocks with proper line breaks, "
-                        "and multiple-choice options (a, b, c, d). Output only the raw question text without introductory or markdown conversational commentary."
+                        "You are an expert examination digitizer. "
+                        "Extract the exact question, question number, sub-parts, options, and math/code blocks from this cropped exam snippet. "
+                        "Preserve exact line breaks, formula symbols, and options (a, b, c, d). Output ONLY the raw question text, no conversational preface."
                     )
-                    resp = g_model.generate_content([prompt, img_data])
-                    if resp and resp.text and len(resp.text.strip()) > len(extracted_text):
-                        extracted_text = resp.text.strip()
-                        method_used = "gemini_vision_ocr"
+                    
+                    # Try supported Gemini models in order
+                    for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+                        try:
+                            g_model = genai.GenerativeModel(model_name)
+                            resp = g_model.generate_content([prompt, img_data])
+                            if resp and resp.text and len(resp.text.strip()) > 5:
+                                extracted_text = resp.text.strip()
+                                method_used = f"{model_name}_vision_ocr"
+                                print(f"[OCR] Successfully extracted {len(extracted_text)} chars using {model_name}")
+                                break
+                        except Exception as m_err:
+                            print(f"[OCR] Model {model_name} failed: {m_err}")
                 except Exception as g_err:
                     print(f"Warning: Gemini OCR fallback error: {g_err}")
         
@@ -326,6 +342,23 @@ async def recrop_pdf(req: RecropRequest):
             "pageWidth": pw,
             "pageHeight": ph
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PipelineRequest(BaseModel):
+    filename: str
+
+@app.post("/api/ingest/pipeline")
+async def ingest_pipeline_endpoint(req: PipelineRequest):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from ingest_pipeline import ingest_document
+    file_path = RAW_DIR / req.filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {req.filename} not found in RAW_DIR")
+    try:
+        result = ingest_document(file_path)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

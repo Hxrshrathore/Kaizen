@@ -13,3 +13,7 @@ transformers>=4.44.0
 peft
 torch
 accelerate
+pillow
+python-docx
+python-pptx
+requests

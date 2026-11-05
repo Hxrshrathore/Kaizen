@@ -8,13 +8,14 @@ export async function GET(request: Request) {
     const pdf = url.searchParams.get("pdf");
     const page = url.searchParams.get("page") || "1";
     const dpi = url.searchParams.get("dpi") || "150";
+    const rotation = url.searchParams.get("rotation") || "0";
 
     if (!pdf) {
       return NextResponse.json({ error: "Missing pdf parameter" }, { status: 400 });
     }
 
     const resp = await fetch(
-      `http://localhost:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}`
+      `http://localhost:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}&rotation=${rotation}`
     );
 
     if (!resp.ok) {

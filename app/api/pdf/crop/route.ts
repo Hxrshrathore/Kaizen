@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     const padLeft = url.searchParams.get("padLeft") || "0";
     const padRight = url.searchParams.get("padRight") || "0";
     const dpi = url.searchParams.get("dpi") || "200";
+    const rotation = url.searchParams.get("rotation") || "0";
 
     if (id) {
       const q = await prisma.ocrQuestion.findUnique({ where: { id } });
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
 
     const fastApiUrl = `http://localhost:8000/api/pdf/crop?pdf=${encodeURIComponent(
       pdf
-    )}&page=${page}&x0=${x0 || 0}&y0=${y0 || 0}&x1=${x1 || 595}&y1=${y1 || 842}&padTop=${padTop}&padBottom=${padBottom}&padLeft=${padLeft}&padRight=${padRight}&dpi=${dpi}`;
+    )}&page=${page}&x0=${x0 || 0}&y0=${y0 || 0}&x1=${x1 || 595}&y1=${y1 || 842}&padTop=${padTop}&padBottom=${padBottom}&padLeft=${padLeft}&padRight=${padRight}&dpi=${dpi}&rotation=${rotation}`;
 
     const resp = await fetch(fastApiUrl);
     if (!resp.ok) {

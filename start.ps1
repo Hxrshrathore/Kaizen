@@ -14,6 +14,10 @@ Write-Host "==================================================================" 
 Write-Host "               KAIZEN - ACADEMIC AI SUITE LAUNCHER                " -ForegroundColor Cyan
 Write-Host "==================================================================" -ForegroundColor Cyan
 
+if (Test-Path "C:\nvm4w\nodejs") {
+    $env:Path = "C:\nvm4w\nodejs;" + $env:Path
+}
+
 if (-not (Test-Path ".env")) {
     Write-Warning "No .env found! Running setup.ps1 first..."
     & .\setup.ps1
