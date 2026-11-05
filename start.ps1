@@ -4,12 +4,14 @@
 # Usage:
 #   .\start.ps1                   (Starts production server: npm run start)
 #   .\start.ps1 -Dev              (Starts development server: npm run dev)
+#   .\start.ps1 -Backend          (Starts Python FastAPI LLM & PDF server in foreground)
 #   .\start.ps1 -RegenPipeline    (Runs full high-precision raw PDF ingestion pipeline)
 #   .\start.ps1 -CleanOcr         (Wipes old OCR data, local crops, and Redis staging)
 # ==============================================================================
 
 param (
     [switch]$Dev,
+    [switch]$Backend,
     [switch]$RegenPipeline,
     [switch]$CleanOcr
 )
@@ -33,19 +35,33 @@ if ($CleanOcr) {
     exit 0
 }
 
+if ($Backend) {
+    Write-Host "Starting Python FastAPI Server on http://127.0.0.1:8000 (Interactive Console)..." -ForegroundColor Green
+    .\llm_backend\venv\Scripts\python.exe -u llm_backend\main.py
+    exit 0
+}
+
 if ($RegenPipeline) {
     Write-Host "Launching Kaizen High-Precision OCR & R2 Pipeline on Raw Examination Papers..." -ForegroundColor Green
     .\llm_backend\venv\Scripts\python.exe scripts\regenerate_from_raw_pyqs.py
     exit 0
 }
 
+# Auto-start Python FastAPI in hidden background process if not already responding
+try {
+    $testHealth = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 1 -ErrorAction SilentlyContinue
+    if ($testHealth.status -eq "ok") {
+        Write-Host "✓ Python LLM & PDF backend is already running on http://127.0.0.1:8000" -ForegroundColor DarkGray
+    }
+} catch {
+    Write-Host "Launching Python LLM & PDF backend in background (hidden)..." -ForegroundColor Cyan
+    Start-Process -FilePath "llm_backend\venv\Scripts\python.exe" -ArgumentList "-u", "llm_backend\main.py" -WindowStyle Hidden
+}
+
 if ($Dev) {
     Write-Host "Starting Development Server on http://localhost:3000..." -ForegroundColor Green
-    Write-Host "Python backend will auto-wake on demand and sleep when idle." -ForegroundColor Gray
     npm run dev
 } else {
     Write-Host "Starting Production Server on http://localhost:3000..." -ForegroundColor Green
-    Write-Host "Python backend will auto-wake on demand and sleep when idle." -ForegroundColor Gray
     npm start
 }
-

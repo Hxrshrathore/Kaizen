@@ -1,3 +1,13 @@
+import sys
+from pathlib import Path
+
+# Ensure sys.stdout and sys.stderr exist (prevent crash when spawned via pythonw / windowless)
+if sys.stdout is None:
+    _log_path = Path(__file__).resolve().parent / "backend.log"
+    sys.stdout = open(_log_path, "a", encoding="utf-8", buffering=1)
+if sys.stderr is None:
+    sys.stderr = sys.stdout
+
 import os
 import time
 import csv
@@ -290,35 +300,58 @@ async def recrop_pdf(req: RecropRequest):
                         gemini_key = line.split("=", 1)[1].strip().strip('"').strip("'")
                         break
             if gemini_key:
+                prompt = (
+                    "You are an expert examination digitizer and LaTeX formatter. "
+                    "Transcribe the complete question text, question numbers (e.g. Q1, 1(a)), sub-parts (a, b, c, i, ii), options (A, B, C, D), and marks allocation from this cropped exam snippet. "
+                    "Format all mathematical equations, formulas, variables, and matrices using standard LaTeX (e.g. $E=mc^2$, $\\int_0^\\infty f(x)dx$). "
+                    "Preserve exact code snippets in markdown code blocks. "
+                    "Output ONLY the cleaned transcription, with zero conversational filler or metadata preamble."
+                )
+
+                # 1. Primary: Modern official Google GenAI SDK (google.genai)
                 try:
-                    import google.generativeai as genai
-                    genai.configure(api_key=gemini_key)
-                    img_data = {
-                        "mime_type": "image/png",
-                        "data": pix.tobytes("png")
-                    }
-                    prompt = (
-                        "You are an expert examination digitizer and LaTeX formatter. "
-                        "Transcribe the complete question text, question numbers (e.g. Q1, 1(a)), sub-parts (a, b, c, i, ii), options (A, B, C, D), and marks allocation from this cropped exam snippet. "
-                        "Format all mathematical equations, formulas, variables, and matrices using standard LaTeX (e.g. $E=mc^2$, $\\int_0^\\infty f(x)dx$). "
-                        "Preserve exact code snippets in markdown code blocks. "
-                        "Output ONLY the cleaned transcription, with zero conversational filler or metadata preamble."
-                    )
-                    
-                    # Try supported Gemini models in order
-                    for model_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
+                    from google import genai
+                    from google.genai import types
+                    client = genai.Client(api_key=gemini_key)
+                    part = types.Part.from_bytes(data=pix.tobytes("png"), mime_type="image/png")
+                    for model_name in [
+                        "gemini-2.5-flash-lite",
+                        "gemini-flash-lite-latest",
+                        "gemini-3.8-flash",
+                        "gemini-flash-latest",
+                        "gemini-3.5-flash-lite",
+                        "gemini-3.5-flash",
+                    ]:
                         try:
-                            g_model = genai.GenerativeModel(model_name)
-                            resp = g_model.generate_content([prompt, img_data])
+                            resp = client.models.generate_content(
+                                model=model_name,
+                                contents=[part, prompt]
+                            )
                             if resp and resp.text and len(resp.text.strip()) > 5:
                                 extracted_text = resp.text.strip()
-                                method_used = f"{model_name}_vision_ocr"
-                                print(f"[OCR] Successfully extracted {len(extracted_text)} chars using {model_name}")
+                                method_used = f"{model_name}_genai_vision"
+                                print(f"[OCR] Successfully extracted {len(extracted_text)} chars using google.genai {model_name}")
                                 break
                         except Exception as m_err:
                             print(f"[OCR] Model {model_name} failed: {m_err}")
                 except Exception as g_err:
-                    print(f"Warning: Gemini OCR fallback error: {g_err}")
+                    print(f"Warning: google.genai error: {g_err}. Trying legacy fallback...")
+                    try:
+                        import google.generativeai as leg_genai
+                        leg_genai.configure(api_key=gemini_key)
+                        img_data = {"mime_type": "image/png", "data": pix.tobytes("png")}
+                        for model_name in ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"]:
+                            try:
+                                g_model = leg_genai.GenerativeModel(model_name)
+                                resp = g_model.generate_content([prompt, img_data])
+                                if resp and resp.text and len(resp.text.strip()) > 5:
+                                    extracted_text = resp.text.strip()
+                                    method_used = f"{model_name}_legacy_vision"
+                                    break
+                            except Exception:
+                                pass
+                    except Exception as leg_err:
+                        print(f"Warning: Legacy Gemini OCR also failed: {leg_err}")
         
         saved_path = None
         if req.saveFilename:

@@ -250,29 +250,57 @@ def process_file_into_enhanced_pages(file_path: Path) -> List[Dict[str, Any]]:
 
 # ── GEMINI OCR, CLASSIFICATION & QUESTION ISOLATION ───────────────────────────
 def run_gemini_vision(prompt: str, pil_img: Image.Image) -> str:
-    """Call Google Gemini 2.5 Flash / 2.0 Flash Vision API."""
-    import google.generativeai as genai
-    genai.configure(api_key=GEMINI_KEY)
-
+    """Call Google GenAI (google.genai) official SDK for Vision OCR."""
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG")
-    img_data = {
-        "mime_type": "image/png",
-        "data": buf.getvalue()
-    }
+    img_bytes = buf.getvalue()
 
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    models_to_try = [
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+    ]
     last_err = None
 
-    for m in models_to_try:
-        try:
-            model = genai.GenerativeModel(m)
-            resp = model.generate_content([prompt, img_data])
-            if resp and resp.text:
-                return resp.text.strip()
-        except Exception as e:
-            last_err = e
-            print(f"[Gemini Vision] Model {m} failed: {e}")
+    # 1. Primary: modern google.genai
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=GEMINI_KEY)
+        part = types.Part.from_bytes(data=img_bytes, mime_type="image/png")
+        for m in models_to_try:
+            try:
+                resp = client.models.generate_content(
+                    model=m,
+                    contents=[part, prompt]
+                )
+                if resp and resp.text:
+                    return resp.text.strip()
+            except Exception as e:
+                last_err = e
+                print(f"[Gemini Vision - google.genai] Model {m} failed: {e}")
+    except Exception as g_err:
+        last_err = g_err
+        print(f"[Gemini Vision] google.genai error: {g_err}. Trying legacy fallback...")
+
+    # 2. Fallback: legacy google.generativeai
+    try:
+        import google.generativeai as leg_genai
+        leg_genai.configure(api_key=GEMINI_KEY)
+        img_data = {"mime_type": "image/png", "data": img_bytes}
+        for m in models_to_try:
+            try:
+                model = leg_genai.GenerativeModel(m)
+                resp = model.generate_content([prompt, img_data])
+                if resp and resp.text:
+                    return resp.text.strip()
+            except Exception as e:
+                last_err = e
+    except Exception as leg_err:
+        last_err = leg_err
 
     raise RuntimeError(f"All Gemini models failed: {last_err}")
 

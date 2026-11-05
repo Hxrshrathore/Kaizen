@@ -163,30 +163,52 @@ def upload_bytes_to_r2(img_bytes: bytes, r2_key: str, content_type: str = "image
 def call_gemini_vision(prompt: str, pil_img: Image.Image, max_retries: int = 3) -> str:
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG")
-    img_data = {
-        "mime_type": "image/png",
-        "data": buf.getvalue()
-    }
+    img_bytes = buf.getvalue()
 
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    models_to_try = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-3.5-flash"]
 
-    for attempt in range(max_retries):
-        for m in models_to_try:
-            try:
-                model = genai.GenerativeModel(m)
-                resp = model.generate_content([prompt, img_data])
-                if resp and resp.text:
-                    return resp.text.strip()
-            except Exception as e:
-                err_str = str(e).lower()
-                if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str:
-                    wait_sec = (attempt + 1) * 8
-                    print(f"    [Rate limit 429 on {m}] Sleeping {wait_sec}s before retry...")
-                    time.sleep(wait_sec)
-                else:
-                    # Model not available or temporary glitch, continue to next model
+    # 1. Primary: modern google.genai
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=GEMINI_KEY)
+        part = types.Part.from_bytes(data=img_bytes, mime_type="image/png")
+        for attempt in range(max_retries):
+            for m in models_to_try:
+                try:
+                    resp = client.models.generate_content(
+                        model=m,
+                        contents=[part, prompt]
+                    )
+                    if resp and resp.text:
+                        return resp.text.strip()
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str:
+                        wait_sec = (attempt + 1) * 6
+                        print(f"    [Rate limit 429 on {m}] Sleeping {wait_sec}s before retry...")
+                        time.sleep(wait_sec)
+                    else:
+                        continue
+            time.sleep(2)
+    except Exception as g_err:
+        print(f"    [google.genai error: {g_err}] Trying legacy fallback...")
+
+    # 2. Fallback: legacy google.generativeai
+    try:
+        img_data = {"mime_type": "image/png", "data": img_bytes}
+        for attempt in range(max_retries):
+            for m in models_to_try:
+                try:
+                    model = genai.GenerativeModel(m)
+                    resp = model.generate_content([prompt, img_data])
+                    if resp and resp.text:
+                        return resp.text.strip()
+                except Exception:
                     continue
-        time.sleep(3)
+            time.sleep(2)
+    except Exception:
+        pass
 
     raise RuntimeError("Gemini Vision API quota exceeded or models unavailable across retries.")
 

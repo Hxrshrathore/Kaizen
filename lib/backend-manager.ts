@@ -40,13 +40,14 @@ export async function ensureBackendRunning(timeoutMs = 25000): Promise<boolean> 
   try {
     const projectRoot = process.cwd();
     const isWindows = process.platform === "win32";
+    // On Windows, use pythonw.exe to run completely windowless without any blank conhost popup
     const pythonPath = isWindows
-      ? path.join(projectRoot, "llm_backend", "venv", "Scripts", "python.exe")
+      ? path.join(projectRoot, "llm_backend", "venv", "Scripts", "pythonw.exe")
       : path.join(projectRoot, "llm_backend", "venv", "bin", "python");
 
     const scriptPath = path.join(projectRoot, "llm_backend", "main.py");
 
-    const child = spawn(pythonPath, ["-u", scriptPath], {
+    const child = spawn(pythonPath, [scriptPath], {
       cwd: projectRoot,
       shell: false,
       detached: true,
