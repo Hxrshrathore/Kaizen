@@ -53,7 +53,8 @@ app.add_middleware(
 # Shuts down automatically when idle for 5 minutes to release ~2.5GB RAM
 import threading
 
-IDLE_TIMEOUT_SECONDS = int(os.environ.get("IDLE_TIMEOUT_SECONDS", "300"))
+# Auto-sleep watchdog: default 1800s (30 minutes)
+IDLE_TIMEOUT_SECONDS = int(os.environ.get("IDLE_TIMEOUT_SECONDS", "1800"))
 last_activity_time = time.time()
 
 def touch_activity():
@@ -78,24 +79,28 @@ def idle_watchdog():
 watchdog = threading.Thread(target=idle_watchdog, daemon=True)
 watchdog.start()
 
-print(f"Loading model from {MODEL_PATH}...")
-if not os.path.exists(MODEL_PATH) or Llama is None:
-    print("ERROR: Model file not found or llama_cpp missing!")
-    llm = None
-else:
-    try:
-        # Load with optimal CPU settings for 16GB RAM
-        llm = Llama(
-            model_path=MODEL_PATH,
-            n_ctx=4096,
-            n_threads=10,
-            n_gpu_layers=0,  
-            verbose=False
-        )
-        print("Model loaded successfully on CPU!")
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        llm = None
+llm = None
+_llm_lock = threading.Lock()
+
+def get_llm():
+    global llm
+    if llm is None and os.path.exists(MODEL_PATH) and Llama is not None:
+        with _llm_lock:
+            if llm is None:
+                print(f"[NEXUS] Lazy-loading model from {MODEL_PATH}...")
+                try:
+                    llm = Llama(
+                        model_path=MODEL_PATH,
+                        n_ctx=4096,
+                        n_threads=10,
+                        n_gpu_layers=0,
+                        verbose=False
+                    )
+                    print("[NEXUS] Model loaded successfully on CPU!")
+                except Exception as e:
+                    print(f"[NEXUS] Error loading model: {e}")
+                    llm = None
+    return llm
 
 
 def get_few_shot_examples(subject: str, max_examples: int = 5) -> str:
@@ -132,8 +137,9 @@ class GenerateRequest(BaseModel):
 
 @app.post("/generate")
 async def generate(request: GenerateRequest):
-    if llm is None:
-        raise HTTPException(status_code=503, detail="Model not loaded. Check server logs.")
+    model = get_llm()
+    if model is None:
+        raise HTTPException(status_code=503, detail="Local LLM model not loaded or model file not found.")
     
     try:
         start_time = time.time()
@@ -154,7 +160,7 @@ async def generate(request: GenerateRequest):
                 final_prompt = final_prompt.replace("<|eot_id|><|start_header_id|>assistant<|end_header_id|>", 
                                                     f"{examples_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>")
         
-        output = llm(
+        output = model(
             final_prompt,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -292,13 +298,15 @@ async def recrop_pdf(req: RecropRequest):
                         "data": pix.tobytes("png")
                     }
                     prompt = (
-                        "You are an expert examination digitizer. "
-                        "Extract the exact question, question number, sub-parts, options, and math/code blocks from this cropped exam snippet. "
-                        "Preserve exact line breaks, formula symbols, and options (a, b, c, d). Output ONLY the raw question text, no conversational preface."
+                        "You are an expert examination digitizer and LaTeX formatter. "
+                        "Transcribe the complete question text, question numbers (e.g. Q1, 1(a)), sub-parts (a, b, c, i, ii), options (A, B, C, D), and marks allocation from this cropped exam snippet. "
+                        "Format all mathematical equations, formulas, variables, and matrices using standard LaTeX (e.g. $E=mc^2$, $\\int_0^\\infty f(x)dx$). "
+                        "Preserve exact code snippets in markdown code blocks. "
+                        "Output ONLY the cleaned transcription, with zero conversational filler or metadata preamble."
                     )
                     
                     # Try supported Gemini models in order
-                    for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+                    for model_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
                         try:
                             g_model = genai.GenerativeModel(model_name)
                             resp = g_model.generate_content([prompt, img_data])

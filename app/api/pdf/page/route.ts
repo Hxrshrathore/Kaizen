@@ -3,7 +3,7 @@ import { ensureBackendRunning } from "@/lib/backend-manager";
 
 export async function GET(request: Request) {
   try {
-    await ensureBackendRunning(15000);
+    await ensureBackendRunning(25000);
     const url = new URL(request.url);
     const pdf = url.searchParams.get("pdf");
     const page = url.searchParams.get("page") || "1";
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     }
 
     const resp = await fetch(
-      `http://localhost:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}&rotation=${rotation}`
+      `http://127.0.0.1:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}&rotation=${rotation}`
     );
 
     if (!resp.ok) {
@@ -34,4 +34,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-

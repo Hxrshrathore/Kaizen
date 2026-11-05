@@ -59,6 +59,7 @@ type OcrQuestion = {
   bboxY1: number | null;
   pageWidth: number | null;
   pageHeight: number | null;
+  rotation?: number | null;
   createdAt: string;
   contentType?: string;
 };
@@ -398,6 +399,7 @@ export default function DataIngestionPage() {
           rawOcrText: sq.rawOcrText,
           correctedText: sq.cleanText,
           status: sq.status,
+          rotation: sq.rotation || 0,
           createdAt: sq.createdAt,
           contentType: sq.contentType,
         }));
@@ -460,7 +462,7 @@ export default function DataIngestionPage() {
     setEditYear(q.year || "2024");
     setEditExamType(q.examType || "Endsem");
     setZoom(1);
-    setRotation(0);
+    setRotation(q.rotation || 0);
     setShowRawOcr(false);
 
     // Initial bounding box coordinates
@@ -645,6 +647,8 @@ export default function DataIngestionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionId: activeItem.id,
+          sourcePdf: activeItem.sourcePdf,
+          pageNumber: activeItem.pageNumber || 1,
           bboxX0: boxCoords.x0,
           bboxY0: boxCoords.y0,
           bboxX1: boxCoords.x1,
@@ -664,6 +668,7 @@ export default function DataIngestionPage() {
       }
 
       setImageKey(Date.now());
+      if (res.method) setOcrMethod(res.method);
       if (res.extractedText) {
         setEditorText(res.extractedText);
         setTextUpdatedPulse(true);
@@ -740,6 +745,8 @@ export default function DataIngestionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionId: activeItem.id,
+          sourcePdf: activeItem.sourcePdf,
+          pageNumber: activeItem.pageNumber || 1,
           bboxX0: newX0,
           bboxY0: newY0,
           bboxX1: newX1,
@@ -761,6 +768,7 @@ export default function DataIngestionPage() {
 
       setBoxCoords({ x0: newX0, y0: newY0, x1: newX1, y1: newY1 });
       setImageKey(Date.now());
+      if (res.method) setOcrMethod(res.method);
       if (res.extractedText) {
         setEditorText(res.extractedText);
         setTextUpdatedPulse(true);
@@ -832,6 +840,8 @@ export default function DataIngestionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionId: activeItem.id,
+          sourcePdf: activeItem.sourcePdf,
+          pageNumber: activeItem.pageNumber || 1,
           bboxX0: boxCoords.x0,
           bboxY0: boxCoords.y0,
           bboxX1: boxCoords.x1,
@@ -920,6 +930,8 @@ export default function DataIngestionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionId: activeItem.id,
+          sourcePdf: activeItem.sourcePdf,
+          pageNumber: activeItem.pageNumber || 1,
           bboxX0: boxCoords.x0,
           bboxY0: boxCoords.y0,
           bboxX1: boxCoords.x1,
@@ -933,6 +945,7 @@ export default function DataIngestionPage() {
       if (!resp.ok) throw new Error(res.error || "Recrop failed");
 
       setImageKey(Date.now());
+      if (res.method) setOcrMethod(res.method);
       if (res.extractedText) {
         setEditorText(res.extractedText);
         setTextUpdatedPulse(true);
@@ -2738,6 +2751,52 @@ export default function DataIngestionPage() {
                 </div>
               )}
 
+              {/* Live OCR Result Status Bar */}
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-zinc-900/90 border border-zinc-800/80 rounded-xl mb-2 text-xs shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${
+                      ocrMethod?.includes("gemini")
+                        ? "bg-purple-500/15 border border-purple-500/30 text-purple-300"
+                        : "bg-cyan-500/15 border border-cyan-500/30 text-cyan-300"
+                    }`}
+                  >
+                    <Cpu className="w-3 h-3 text-purple-400" />
+                    <span>{ocrMethod ? (ocrMethod.includes("gemini") ? "Gemini Vision OCR" : "PyMuPDF Vector") : "Neural Vector OCR"}</span>
+                  </div>
+
+                  <span className="text-[11px] font-mono text-zinc-400">
+                    {editorText.length} chars · ~{Math.round(editorText.length / 4)} tokens
+                  </span>
+
+                  {textUpdatedPulse && (
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded animate-pulse flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-400" /> OCR Result Updated!
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleRerunOcr(true)}
+                    disabled={isScanning || recropping}
+                    className="px-2.5 py-1 bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/50 hover:to-indigo-600/50 text-purple-200 border border-purple-500/40 rounded-lg text-[10px] font-bold font-mono flex items-center gap-1 transition-all disabled:opacity-50"
+                    title="Run Gemini Vision OCR on the current cropped bounding box"
+                  >
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    <span>{isScanning ? "Extracting..." : "Run Gemini OCR"}</span>
+                  </button>
+                  <button
+                    onClick={() => handleRerunOcr(false)}
+                    disabled={isScanning || recropping}
+                    className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                    title="Extract embedded vector text from PDF stream"
+                  >
+                    Vector Text
+                  </button>
+                </div>
+              </div>
+
               {/* Textarea or Formula Preview */}
               {showFormulaPreview ? (
                 <div className="flex-1 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 text-zinc-100 font-mono text-xs leading-relaxed overflow-y-auto select-text whitespace-pre-wrap">
@@ -2757,7 +2816,7 @@ export default function DataIngestionPage() {
                       ? "border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.25)] bg-emerald-950/10"
                       : "border-zinc-800 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                   }`}
-                  placeholder="Question text..."
+                  placeholder="Question text transcribed via OCR. Adjust crop box and click 'Apply Crop & Read OCR' or 'Run Gemini OCR' to extract..."
                 />
               )}
 

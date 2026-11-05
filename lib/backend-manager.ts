@@ -8,11 +8,11 @@ let isStarting = false;
  * Ensures the Python LLM & PDF backend (FastAPI) is awake and responding on http://127.0.0.1:8000.
  * If asleep, automatically spawns the process and waits until ready.
  */
-export async function ensureBackendRunning(timeoutMs = 15000): Promise<boolean> {
+export async function ensureBackendRunning(timeoutMs = 25000): Promise<boolean> {
   // 1. Quick probe to see if already running
   try {
     const res = await fetch("http://127.0.0.1:8000/health", {
-      signal: AbortSignal.timeout(600),
+      signal: AbortSignal.timeout(800),
     });
     if (res.ok) return true;
   } catch {
@@ -23,10 +23,10 @@ export async function ensureBackendRunning(timeoutMs = 15000): Promise<boolean> 
   if (isStarting) {
     const startWait = Date.now();
     while (Date.now() - startWait < timeoutMs) {
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 300));
       try {
         const res = await fetch("http://127.0.0.1:8000/health", {
-          signal: AbortSignal.timeout(600),
+          signal: AbortSignal.timeout(800),
         });
         if (res.ok) return true;
       } catch {}
@@ -46,9 +46,9 @@ export async function ensureBackendRunning(timeoutMs = 15000): Promise<boolean> 
 
     const scriptPath = path.join(projectRoot, "llm_backend", "main.py");
 
-    const child = spawn(`"${pythonPath}"`, ["-u", `"${scriptPath}"`], {
+    const child = spawn(pythonPath, ["-u", scriptPath], {
       cwd: projectRoot,
-      shell: isWindows,
+      shell: false,
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -59,13 +59,13 @@ export async function ensureBackendRunning(timeoutMs = 15000): Promise<boolean> 
     // 3. Poll /health until server responds
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 250));
       try {
         const res = await fetch("http://127.0.0.1:8000/health", {
-          signal: AbortSignal.timeout(600),
+          signal: AbortSignal.timeout(800),
         });
         if (res.ok) {
-          console.log("[NEXUS OPTIMIZER] Python backend is awake and ready! (Auto-sleeps after 5m of inactivity)");
+          console.log("[NEXUS OPTIMIZER] Python backend is awake and ready!");
           isStarting = false;
           return true;
         }

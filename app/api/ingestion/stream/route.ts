@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await ensureBackendRunning(15000);
+    await ensureBackendRunning(25000);
     const body = await request.json();
     const { filename, action = "single" } = body;
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     // Call FastAPI pipeline endpoint
-    const fastApiResp = await fetch("http://localhost:8000/api/ingest/pipeline", {
+    const fastApiResp = await fetch("http://127.0.0.1:8000/api/ingest/pipeline", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename }),

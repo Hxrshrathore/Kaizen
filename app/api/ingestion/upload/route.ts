@@ -5,7 +5,7 @@ import { ensureBackendRunning } from "@/lib/backend-manager";
 
 export async function POST(request: Request) {
   try {
-    await ensureBackendRunning(15000);
+    await ensureBackendRunning(25000);
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
     const targetPath = path.join(rawDir, filename);
     await writeFile(targetPath, buffer);
 
-    // Call FastAPI ingestion pipeline endpoint
-    const fastApiResp = await fetch("http://localhost:8000/api/ingest/pipeline", {
+    // Call FastAPI ingestion pipeline endpoint on 127.0.0.1
+    const fastApiResp = await fetch("http://127.0.0.1:8000/api/ingest/pipeline", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename }),

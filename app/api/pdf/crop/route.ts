@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureBackendRunning } from "@/lib/backend-manager";
+import { upstashRedis, StagedQuestion } from "@/lib/upstash";
 
 export async function GET(request: Request) {
   try {
-    await ensureBackendRunning(15000);
+    await ensureBackendRunning(25000);
     const url = new URL(request.url);
     const id = url.searchParams.get("id");
     let pdf = url.searchParams.get("pdf");
@@ -22,7 +23,11 @@ export async function GET(request: Request) {
     const rotation = url.searchParams.get("rotation") || "0";
 
     if (id) {
-      const q = await prisma.ocrQuestion.findUnique({ where: { id } });
+      let q: any = null;
+      try {
+        q = await prisma.ocrQuestion.findUnique({ where: { id } });
+      } catch {}
+
       if (q) {
         pdf = q.sourcePdf || pdf;
         page = String(q.pageNumber || page);
@@ -30,6 +35,19 @@ export async function GET(request: Request) {
         y0 = y0 || String(q.bboxY0 || 0);
         x1 = x1 || String(q.bboxX1 || (q.pageWidth || 595));
         y1 = y1 || String(q.bboxY1 || (q.pageHeight || 842));
+      } else {
+        // Fallback: check Redis staging
+        try {
+          const sq = await upstashRedis.get<StagedQuestion>(`kaizen:staging:item:${id}`);
+          if (sq) {
+            pdf = sq.sourceDoc || pdf;
+            page = String(sq.pageNumber || page);
+            x0 = x0 || String(sq.bbox?.x0 || 0);
+            y0 = y0 || String(sq.bbox?.y0 || 0);
+            x1 = x1 || String(sq.bbox?.x1 || (sq.pageWidth || 595));
+            y1 = y1 || String(sq.bbox?.y1 || (sq.pageHeight || 842));
+          }
+        } catch {}
       }
     }
 
@@ -37,7 +55,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing sourcePdf parameter" }, { status: 400 });
     }
 
-    const fastApiUrl = `http://localhost:8000/api/pdf/crop?pdf=${encodeURIComponent(
+    const fastApiUrl = `http://127.0.0.1:8000/api/pdf/crop?pdf=${encodeURIComponent(
       pdf
     )}&page=${page}&x0=${x0 || 0}&y0=${y0 || 0}&x1=${x1 || 595}&y1=${y1 || 842}&padTop=${padTop}&padBottom=${padBottom}&padLeft=${padLeft}&padRight=${padRight}&dpi=${dpi}&rotation=${rotation}`;
 
@@ -58,4 +76,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const startTime = Date.now();
 
     // Call FastAPI backend recrop endpoint
-    const resp = await fetch("http://localhost:8000/api/pdf/recrop", {
+    const resp = await fetch("http://127.0.0.1:8000/api/pdf/recrop", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
