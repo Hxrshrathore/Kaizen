@@ -44,6 +44,8 @@ except ImportError:
 
 # ── CONFIGURATION & ENVIRONMENT ───────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 ENV_FILE = BASE_DIR / ".env"
 
 def load_env():
@@ -59,20 +61,20 @@ def load_env():
 CONFIG = load_env()
 
 # Cloudflare R2
-R2_ACCOUNT_ID = CONFIG.get("CLOUDFLARE_R2_ACCOUNT_ID", "3288bf4dc7bac5817897bcbd7cbe19d8")
-R2_ACCESS_KEY = CONFIG.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "1d8c7202b9b5738a1915532b5fff6f1c")
-R2_SECRET_KEY = CONFIG.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "191e3a6f3d5d72dd34a36033a1e80990c252a642a4640a2d176cc76c5f97358b")
-R2_BUCKET = CONFIG.get("CLOUDFLARE_R2_BUCKET", "kaizen")
-R2_PUBLIC_URL = CONFIG.get("NEXT_PUBLIC_R2_URL", "https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev").rstrip("/")
+R2_ACCOUNT_ID = CONFIG.get("CLOUDFLARE_R2_ACCOUNT_ID") or os.environ.get("CLOUDFLARE_R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY = CONFIG.get("CLOUDFLARE_R2_ACCESS_KEY_ID") or os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "")
+R2_SECRET_KEY = CONFIG.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY") or os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET = CONFIG.get("CLOUDFLARE_R2_BUCKET") or os.environ.get("CLOUDFLARE_R2_BUCKET", "kaizen")
+R2_PUBLIC_URL = (CONFIG.get("NEXT_PUBLIC_R2_URL") or os.environ.get("NEXT_PUBLIC_R2_URL", "https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev")).rstrip("/")
 
 # Upstash Redis & Vector
-UPSTASH_REDIS_URL = CONFIG.get("UPSTASH_REDIS_REST_URL", "https://creative-bass-185678.upstash.io").rstrip("/")
-UPSTASH_REDIS_TOKEN = CONFIG.get("UPSTASH_REDIS_REST_TOKEN", "gQAAAAAAAtVOAAIgcDJlYTMzMmE1MmE0NDA0YWQ4OTI5NzYwZGNhZGY2YWVlZQ")
-UPSTASH_VECTOR_URL = CONFIG.get("UPSTASH_VECTOR_REST_URL", "https://healthy-gannet-73484-us1-vector.upstash.io").rstrip("/")
-UPSTASH_VECTOR_TOKEN = CONFIG.get("UPSTASH_VECTOR_REST_TOKEN", "ABgFMGhlYWx0aHktZ2FubmV0LTczNDg0LXVzMWFkbWluTVRabVltVXpNVGt0TkRjeFl5MDBNVGsxTFdFNU1tVXRaV0k0WlRZeE5UTmtaRGt4")
+UPSTASH_REDIS_URL = (CONFIG.get("UPSTASH_REDIS_REST_URL") or os.environ.get("UPSTASH_REDIS_REST_URL", "")).rstrip("/")
+UPSTASH_REDIS_TOKEN = CONFIG.get("UPSTASH_REDIS_REST_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+UPSTASH_VECTOR_URL = (CONFIG.get("UPSTASH_VECTOR_REST_URL") or os.environ.get("UPSTASH_VECTOR_REST_URL", "")).rstrip("/")
+UPSTASH_VECTOR_TOKEN = CONFIG.get("UPSTASH_VECTOR_REST_TOKEN") or os.environ.get("UPSTASH_VECTOR_REST_TOKEN", "")
 
 # Gemini
-GEMINI_KEY = CONFIG.get("GEMINI_API_KEY", "AIzaSyCf8aK1AGitB_DZeNTdnGjVQ3O7Jb7mH0U")
+GEMINI_KEY = CONFIG.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
 
 # Init S3 client for R2
 s3_r2 = boto3.client(
@@ -331,41 +333,56 @@ Return ONLY a valid JSON object with NO extra markdown backticks or commentary:
   ]
 }}
 """
-    raw_response = run_gemini_vision(prompt, pil_img)
-
-    # Clean potential markdown wrapping ```json ... ```
-    clean_json = raw_response.strip()
-    if clean_json.startswith("```"):
-        clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
-        clean_json = re.sub(r"\s*```$", "", clean_json)
-
+    raw_response = None
     try:
-        parsed = json.loads(clean_json)
-    except Exception:
-        # Fallback regex extraction if model included conversational prefix
-        match = re.search(r"\{.*\}", clean_json, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group(0))
-        else:
-            parsed = {
-                "content_type": "PYQ",
-                "subject_code": "CS20001",
-                "subject_name": subject_hint,
-                "year": year_hint,
-                "exam_type": exam_type_hint,
-                "questions": [
-                    {
-                        "question_number": "1",
-                        "text": raw_response.strip(),
-                        "marks": "10",
-                        "sub_parts": [],
-                        "options": [],
-                        "bbox": [35, 80, pw - 35, ph * 0.4]
-                    }
-                ]
-            }
+        raw_response = run_gemini_vision(prompt, pil_img)
+    except Exception as g_err:
+        print(f"[Gemini Vision Ingest Notice] {g_err}. Falling back to native PyMuPDF vector OCR extraction.")
 
-    return parsed
+    if raw_response:
+        # Clean potential markdown wrapping ```json ... ```
+        clean_json = raw_response.strip()
+        if clean_json.startswith("```"):
+            clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
+            clean_json = re.sub(r"\s*```$", "", clean_json)
+
+        try:
+            parsed = json.loads(clean_json)
+            return parsed
+        except Exception:
+            # Fallback regex extraction if model included conversational prefix
+            match = re.search(r"\{.*\}", clean_json, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except Exception:
+                    pass
+
+    # ── FALLBACK: NATIVE VECTOR / TYPOGRAPHIC EXTRACTION ───────────────────────
+    # If Gemini Vision is unavailable, extract from page_data or digital vectors
+    extracted_text = page_data.get("extracted_text", "")
+    
+    # Try parsing filename metadata
+    from scripts.regenerate_from_raw_pyqs import resolve_pdf_metadata
+    meta = resolve_pdf_metadata(file_name)
+
+    return {
+        "content_type": "PYQ",
+        "subject_code": meta.get("subjectCode", "ENG2001"),
+        "subject_name": meta.get("subject", subject_hint),
+        "year": meta.get("year", year_hint),
+        "exam_type": meta.get("examType", exam_type_hint),
+        "questions": [
+            {
+                "question_number": "1",
+                "text": extracted_text[:600] if extracted_text else f"{meta.get('subject')} ({meta.get('year')} {meta.get('examType')}) Question Page {page_data.get('page_number', 1)}",
+                "marks": "10",
+                "sub_parts": [],
+                "options": [],
+                "bbox": [35, 80, pw - 35, ph * 0.4]
+            }
+        ]
+    }
 
 # ── STAGE QUESTIONS INTO UPSTASH REDIS ─────────────────────────────────────────
 def stage_questions_in_redis(

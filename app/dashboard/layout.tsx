@@ -9,6 +9,18 @@ import { ThemeToggle } from '@/components/theme-toggle';
 interface UserProfile {
   name: string;
   email: string;
+  userType?: string;
+  officialTag?: string;
+  officialTags?: string[];
+  department?: string | null;
+  designation?: string | null;
+  badge?: {
+    label: string;
+    description: string;
+    color: string;
+    border: string;
+    bg: string;
+  };
 }
 
 export default function DashboardLayout({
@@ -28,7 +40,7 @@ export default function DashboardLayout({
         const res = await fetch('/api/user/profile');
         if (res.ok) {
           const data = await res.json();
-          setUser({ name: data.name, email: data.email });
+          setUser(data);
         }
       } catch (e) {
         console.error("Layout load error", e);

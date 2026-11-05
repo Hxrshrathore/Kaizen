@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import {prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { verifySession } from '@/lib/auth';
+import { getOfficialBadge } from '@/lib/rbac';
 
 export async function GET(req: Request) {
   try {
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
     const userId = await verifySession(token);
     if (!userId) return NextResponse.json({ error: "Invalid Session" }, { status: 401 });
 
-    // Fetch User with Academic Profile and Semesters
+    // Fetch User with Academic Profile, Semesters and RBAC Fields
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -33,9 +34,19 @@ export async function GET(req: Request) {
     // Calculate Total Credits across all semesters
     const totalCredits = academic?.semesters.reduce((acc: any, sem: any) => acc + sem.creditsEarned, 0) || 0;
 
+    const badge = getOfficialBadge(user);
+
     return NextResponse.json({
+      id: user.id,
       name: user.name || "Student",
       email: user.email,
+      userType: user.userType,
+      officialTag: user.officialTag,
+      officialTags: user.officialTags,
+      permissions: user.permissions,
+      department: user.department,
+      designation: user.designation,
+      badge: badge,
       rollNumber: academic?.rollNumber || "N/A",
       program: academic?.program || "N/A",
       section: academic?.section || "N/A",

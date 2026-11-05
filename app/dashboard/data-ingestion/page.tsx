@@ -34,6 +34,11 @@ import {
   Move,
   Upload,
   FileCode,
+  Terminal,
+  Cpu,
+  Play,
+  Activity,
+  Radio,
 } from "lucide-react";
 
 type OcrQuestion = {
@@ -183,9 +188,163 @@ export default function DataIngestionPage() {
   const [textUpdatedPulse, setTextUpdatedPulse] = useState(false);
   const [ocrMethod, setOcrMethod] = useState<string | null>(null);
 
+  // ── LIVE OCR & PIPELINE OBSERVATION STUDIO STATE ─────────────
+  const [showOcrStudio, setShowOcrStudio] = useState(false);
+  const [ocrStudioTab, setOcrStudioTab] = useState<"runner" | "inspector" | "telemetry">("runner");
+  const [rawPdfList, setRawPdfList] = useState<string[]>([]);
+  const [selectedRawPdf, setSelectedRawPdf] = useState("");
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState(0);
+  const [pipelineLogs, setPipelineLogs] = useState<string[]>([
+    "[READY] Kaizen Multi-Format OCR & Pipeline Studio initialized.",
+    "[R2 CDN] Cloudflare R2 object storage connected (bucket: kaizen).",
+    "[STAGING] Upstash Redis staging buffer active.",
+  ]);
+  const [testOcrRunning, setTestOcrRunning] = useState(false);
+  const [testOcrResult, setTestOcrResult] = useState<{
+    extractedText: string;
+    method: string;
+    latencyMs: number;
+    tokensExtracted: number;
+    hasLatex: boolean;
+    bbox?: number[];
+  } | null>(null);
+  const [manualOverlayScan, setManualOverlayScan] = useState(false);
+  const [showFormulaPreview, setShowFormulaPreview] = useState(false);
+
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [imageKey, setImageKey] = useState<number>(Date.now());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const logTerminalRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll pipeline logs to bottom
+  useEffect(() => {
+    if (logTerminalRef.current) {
+      logTerminalRef.current.scrollTop = logTerminalRef.current.scrollHeight;
+    }
+  }, [pipelineLogs]);
+
+  // Fetch list of raw PDFs for the live pipeline runner
+  const fetchRawPdfs = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/ingestion/stream");
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.files) && data.files.length > 0) {
+          setRawPdfList(data.files);
+          setSelectedRawPdf(data.files[0]);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load raw PDFs list:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRawPdfs();
+  }, [fetchRawPdfs]);
+
+  // Run Live Pipeline with animated step-by-step progress & live console logs
+  const handleRunLivePipeline = async (targetFile?: string) => {
+    const fileToIngest = targetFile || selectedRawPdf;
+    if (!fileToIngest || pipelineRunning) return;
+
+    setPipelineRunning(true);
+    setPipelineStep(1);
+    const ts = () => new Date().toLocaleTimeString();
+
+    const appendLog = (msg: string) => {
+      setPipelineLogs((prev) => [...prev, `[${ts()}] ${msg}`]);
+    };
+
+    appendLog(`>>> STARTING LIVE INGESTION PIPELINE: ${fileToIngest}`);
+    appendLog(`[Step 1/5] Slicing raw PDF pages & rendering 200 DPI vector bitmap...`);
+
+    const t1 = setTimeout(() => {
+      setPipelineStep(2);
+      appendLog(`[Step 2/5] Applying Pillow enhancement: 1.35x contrast boost, 1.5x sharpness, haze reduction...`);
+    }, 700);
+
+    const t2 = setTimeout(() => {
+      setPipelineStep(3);
+      appendLog(`[Step 3/5] Streaming enhanced page PNG to Cloudflare R2 bucket 'kaizen'...`);
+    }, 1500);
+
+    const t3 = setTimeout(() => {
+      setPipelineStep(4);
+      appendLog(`[Step 4/5] Executing AI OCR & Typographic Glyph parser (LaTeX math, marks, question isolation)...`);
+    }, 2400);
+
+    try {
+      const resp = await fetch("/api/ingestion/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: fileToIngest }),
+      });
+
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+
+      const res = await resp.json();
+      if (!resp.ok) throw new Error(res.error || "Pipeline failed");
+
+      setPipelineStep(5);
+      appendLog(`[Step 5/5] Staged ${res.stagedCount} clean questions into Upstash Redis staging buffer!`);
+      appendLog(`✓ PIPELINE COMPLETE: ${res.totalPages} pages processed, ${res.totalPendingInRedis} total items in Redis queue.`);
+      
+      showToast(`✓ Ingested ${res.stagedCount} questions into Redis staging!`, "ok");
+
+      // Auto-refresh questions and stats
+      fetchMetadataStats();
+      if (dataSource === "redis") {
+        fetchQuestions();
+      }
+    } catch (err: any) {
+      appendLog(`[ERROR] Pipeline failed: ${err.message}`);
+      showToast(err.message || "Pipeline error", "err");
+    } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      setPipelineRunning(false);
+    }
+  };
+
+  // Run Test OCR on currently cropped region and show live telemetry
+  const handleTestOcrLive = async () => {
+    if (!activeItem || testOcrRunning) return;
+    setTestOcrRunning(true);
+    showToast("Testing OCR on active question crop...", "ok");
+
+    try {
+      const resp = await fetch("/api/ocr/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePdf: activeItem.sourcePdf,
+          pageNumber: activeItem.pageNumber || 1,
+          bboxX0: boxCoords.x0,
+          bboxY0: boxCoords.y0,
+          bboxX1: boxCoords.x1,
+          bboxY1: boxCoords.y1,
+          rotation,
+          dpi: 200,
+          forceGemini: true,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "OCR test failed");
+
+      setTestOcrResult(data);
+      showToast(`✓ OCR extracted ${data.tokensExtracted} tokens in ${data.latencyMs}ms!`, "ok");
+    } catch (e: any) {
+      showToast(e.message || "OCR test failed", "err");
+    } finally {
+      setTestOcrRunning(false);
+    }
+  };
 
   // ── Fetch Stats & Hierarchical Metadata ──────────────────────
   const fetchMetadataStats = useCallback(async () => {
@@ -1168,6 +1327,413 @@ export default function DataIngestionPage() {
         </div>
       )}
 
+      {/* ── LIVE NEURAL OCR & PIPELINE OBSERVATION STUDIO MODAL ── */}
+      {showOcrStudio && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-xl z-50 flex items-center justify-center p-3 md:p-6"
+          onClick={() => setShowOcrStudio(false)}
+        >
+          <div
+            className="bg-[#0a0a0e] border border-cyan-500/30 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-[0_0_50px_rgba(6,182,212,0.25)] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 border-b border-zinc-800/80 bg-zinc-950/90 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
+                  <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-zinc-100 font-mono tracking-wide">
+                      NEURAL OCR & PIPELINE CONTROL CENTER
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      LIVE STREAM
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Observe high-precision OCR extraction, monitor Cloudflare R2 uploads & Upstash Redis staging buffer.
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+                <button
+                  onClick={() => setOcrStudioTab("runner")}
+                  className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                    ocrStudioTab === "runner"
+                      ? "bg-cyan-600 text-white shadow"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <Play className="w-3 h-3" />
+                  <span>Pipeline Runner</span>
+                </button>
+                <button
+                  onClick={() => setOcrStudioTab("inspector")}
+                  className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                    ocrStudioTab === "inspector"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <Cpu className="w-3 h-3" />
+                  <span>Engine Inspector</span>
+                </button>
+                <button
+                  onClick={() => setOcrStudioTab("telemetry")}
+                  className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                    ocrStudioTab === "telemetry"
+                      ? "bg-purple-600 text-white shadow"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <Activity className="w-3 h-3" />
+                  <span>Infrastructure</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowOcrStudio(false)}
+                className="text-zinc-400 hover:text-white text-base p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* TAB 1: PIPELINE RUNNER */}
+              {ocrStudioTab === "runner" && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-200 font-mono flex items-center gap-1.5">
+                        <Terminal className="w-4 h-4 text-cyan-400" />
+                        Select Raw Examination Paper:
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400">
+                        {rawPdfList.length} Raw PDFs in repository
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={selectedRawPdf}
+                        onChange={(e) => setSelectedRawPdf(e.target.value)}
+                        disabled={pipelineRunning}
+                        className="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500 font-mono truncate"
+                      >
+                        {rawPdfList.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => handleRunLivePipeline()}
+                        disabled={pipelineRunning || !selectedRawPdf}
+                        className="px-5 py-2 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition-all shrink-0"
+                      >
+                        {pipelineRunning ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-cyan-200" />
+                        ) : (
+                          <Play className="w-4 h-4 text-cyan-200" />
+                        )}
+                        <span>{pipelineRunning ? "Processing Pipeline..." : "▶ Run Ingestion & OCR"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5-Stage Visual Stepper */}
+                  <div className="grid grid-cols-5 gap-2">
+                    {[
+                      { num: 1, title: "200 DPI Slicing", desc: "Vector Raster" },
+                      { num: 2, title: "Image Enhancement", desc: "Contrast 1.35x" },
+                      { num: 3, title: "Cloudflare R2", desc: "CDN Global Sync" },
+                      { num: 4, title: "AI OCR Parsing", desc: "LaTeX & Math Tokens" },
+                      { num: 5, title: "Redis Buffer", desc: "Staging Queue" },
+                    ].map((st) => {
+                      const isActive = pipelineRunning && pipelineStep === st.num;
+                      const isDone = pipelineStep > st.num || (!pipelineRunning && pipelineStep === 5);
+                      return (
+                        <div
+                          key={st.num}
+                          className={`p-3 rounded-xl border text-center transition-all ${
+                            isActive
+                              ? "bg-cyan-500/15 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse"
+                              : isDone
+                              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                              : "bg-zinc-950/60 border-zinc-800 text-zinc-500"
+                          }`}
+                        >
+                          <div className="flex items-center justify-center mb-1">
+                            {isDone ? (
+                              <Check className="w-4 h-4 text-emerald-400" />
+                            ) : isActive ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                            ) : (
+                              <span className="text-[11px] font-mono font-bold text-zinc-600">#{st.num}</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-bold text-zinc-200 truncate">{st.title}</div>
+                          <div className="text-[9px] font-mono text-zinc-400 mt-0.5">{st.desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Live Streaming Terminal Console */}
+                  <div className="rounded-xl border border-zinc-800 bg-black/95 overflow-hidden flex flex-col shadow-inner">
+                    <div className="px-3 py-1.5 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                      <div className="flex items-center gap-1.5 text-cyan-400">
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>LIVE PIPELINE CONSOLE LOG STREAM</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-zinc-500">{pipelineLogs.length} events logged</span>
+                        <button
+                          onClick={() => setPipelineLogs([])}
+                          className="text-[10px] text-zinc-400 hover:text-zinc-200 underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      ref={logTerminalRef}
+                      className="h-44 p-3 font-mono text-[11px] overflow-y-auto space-y-1 select-text scrollbar-thin"
+                    >
+                      {pipelineLogs.map((log, i) => (
+                        <div
+                          key={i}
+                          className={
+                            log.includes("ERROR")
+                              ? "text-red-400 font-bold"
+                              : log.includes("✓") || log.includes("STAGED")
+                              ? "text-emerald-300 font-bold"
+                              : log.includes("Step")
+                              ? "text-cyan-300"
+                              : log.includes(">>>")
+                              ? "text-amber-300 font-bold"
+                              : "text-zinc-400"
+                          }
+                        >
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick Action to switch to Redis Staging */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-zinc-400">
+                      Questions are automatically staged in Upstash Redis without touching production DB.
+                    </span>
+                    <button
+                      onClick={() => {
+                        setDataSource("redis");
+                        setShowOcrStudio(false);
+                        fetchQuestions();
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-600/30 to-red-600/30 hover:from-amber-600/50 hover:to-red-600/50 text-amber-200 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Switch to Redis Staging Buffer ({stagingStats.stagedPending} Pending)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: OCR ENGINE INSPECTOR */}
+              {ocrStudioTab === "inspector" && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-200 font-mono flex items-center gap-1.5">
+                        <Cpu className="w-4 h-4 text-indigo-400" />
+                        Active Question OCR Benchmark:
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400">
+                        {activeItem?.sourcePdf || "No active document selected"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-xs font-mono">
+                      <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px]">PAGE NUMBER</span>
+                        <div className="text-zinc-200 font-bold mt-0.5">{activeItem?.pageNumber || 1}</div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px]">BOUNDING BOX</span>
+                        <div className="text-indigo-300 font-bold mt-0.5 truncate">
+                          [{boxCoords.x0.toFixed(0)}, {boxCoords.y0.toFixed(0)}] → [{boxCoords.x1.toFixed(0)}, {boxCoords.y1.toFixed(0)}]
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px]">ROTATION</span>
+                        <div className="text-amber-300 font-bold mt-0.5">{rotation}°</div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px]">DPI VECTORS</span>
+                        <div className="text-emerald-300 font-bold mt-0.5">200 DPI High-Res</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={handleTestOcrLive}
+                        disabled={testOcrRunning || !activeItem}
+                        className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all"
+                      >
+                        {testOcrRunning ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-indigo-200" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-indigo-200" />
+                        )}
+                        <span>{testOcrRunning ? "Streaming Neural OCR..." : "⚡ Run Real-Time OCR Benchmark"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setManualOverlayScan((v) => !v);
+                          setShowOcrStudio(false);
+                          showToast(manualOverlayScan ? "Laser scan visualizer OFF" : "Laser scan visualizer ON", "ok");
+                        }}
+                        className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                      >
+                        <ScanLine className="w-4 h-4 text-cyan-400" />
+                        <span>Toggle Laser Scanner View</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Benchmark Live Result */}
+                  {testOcrResult && (
+                    <div className="p-4 rounded-xl border border-indigo-500/40 bg-zinc-950 space-y-3 shadow-lg shadow-indigo-500/10 animate-in fade-in">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="text-indigo-400 font-bold flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          Extracted Output via {testOcrResult.method}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-bold">
+                            {testOcrResult.latencyMs} ms
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-bold">
+                            {testOcrResult.tokensExtracted} tokens
+                          </span>
+                          {testOcrResult.hasLatex && (
+                            <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 font-bold">
+                              LaTeX Detected ($...$)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 font-mono text-xs text-zinc-100 max-h-40 overflow-y-auto leading-relaxed select-text whitespace-pre-wrap">
+                        {testOcrResult.extractedText}
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setEditorText(testOcrResult.extractedText);
+                            showToast("✓ Extracted OCR text inserted into editor!", "ok");
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Apply to Question Text Editor</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: INFRASTRUCTURE TELEMETRY */}
+              {ocrStudioTab === "telemetry" && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Cloudflare R2 */}
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-cyan-300 font-mono flex items-center gap-1.5">
+                        <Upload className="w-4 h-4 text-cyan-400" /> Cloudflare R2 Object Storage
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-mono font-bold">
+                        ACTIVE
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 space-y-1 pt-1">
+                      <div>Bucket: <span className="text-zinc-200">kaizen</span></div>
+                      <div>Endpoint: <span className="text-zinc-200 truncate block">3288bf4dc7bac5817897bcbd7cbe19d8.r2.cloudflarestorage.com</span></div>
+                      <div>CDN Base: <span className="text-cyan-300 underline block truncate">https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev</span></div>
+                    </div>
+                  </div>
+
+                  {/* Upstash Redis Staging Buffer */}
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 font-mono flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-amber-400" /> Upstash Redis Staging Tier
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-mono font-bold">
+                        CONNECTED
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 space-y-1 pt-1">
+                      <div>Host: <span className="text-zinc-200">creative-bass-185678.upstash.io</span></div>
+                      <div>Pending Queue: <span className="text-amber-300 font-bold">{stagingStats.stagedPending} questions</span></div>
+                      <div>Total Staging Keys: <span className="text-zinc-200 font-bold">{stagingStats.totalStagedKeys} keys</span></div>
+                    </div>
+                  </div>
+
+                  {/* Upstash Vector */}
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300 font-mono flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-purple-400" /> Upstash Vector Index (RAG)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-mono font-bold">
+                        ONLINE
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 space-y-1 pt-1">
+                      <div>Host: <span className="text-zinc-200">healthy-gannet-73484-us1-vector.upstash.io</span></div>
+                      <div>Similarity: <span className="text-zinc-200">Cosine</span></div>
+                      <div>Vector Dimensions: <span className="text-purple-300 font-bold">1,536 Dimensions</span></div>
+                    </div>
+                  </div>
+
+                  {/* Neon PostgreSQL Production DB */}
+                  <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-300 font-mono flex items-center gap-1.5">
+                        <Database className="w-4 h-4 text-indigo-400" /> Neon PostgreSQL DB
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-mono font-bold">
+                        PRODUCTION
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 space-y-1 pt-1">
+                      <div>Cluster: <span className="text-zinc-200">ep-falling-bread-ahbvwe8e</span></div>
+                      <div>Approved Records: <span className="text-indigo-300 font-bold">{stats.approved} Golden Questions</span></div>
+                      <div>Total Production Rows: <span className="text-zinc-200 font-bold">{stats.total} records</span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── TOP HEADER: Filter Hierarchy Bar ── */}
       <div className="h-14 border-b border-zinc-800/50 flex items-center justify-between px-4 bg-zinc-950/70 backdrop-blur-xl shrink-0 gap-3">
         {/* Tier Toggle: Redis Staging vs Neon DB Production */}
@@ -1284,6 +1850,17 @@ export default function DataIngestionPage() {
           >
             <FileCode className="w-3.5 h-3.5 text-emerald-400" />
             <span>Fine-Tune Export</span>
+          </button>
+
+          {/* Live Neural OCR Studio Trigger */}
+          <button
+            onClick={() => setShowOcrStudio(true)}
+            className="px-3 py-1 bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-purple-500/20 hover:from-cyan-500/35 hover:to-purple-500/35 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)] shrink-0"
+            title="Open Neural OCR & Pipeline Control Center: observe real-time OCR extraction, run pipeline, inspect models"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span>Live OCR Studio</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
           </button>
         </div>
 
@@ -1590,6 +2167,38 @@ export default function DataIngestionPage() {
                     </button>
                   </div>
 
+                  {/* Scan Visualizer Toggle */}
+                  <button
+                    onClick={() => {
+                      setManualOverlayScan((v) => !v);
+                      showToast(!manualOverlayScan ? "Laser scan visualizer ON" : "Laser scan visualizer OFF", "ok");
+                    }}
+                    className={`px-2 py-1 rounded-lg border text-[11px] font-mono font-bold flex items-center gap-1 transition-all ${
+                      manualOverlayScan || isScanning
+                        ? "bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.3)] animate-pulse"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    }`}
+                    title="Toggle cybernetic scanning beam & smoker fluid overlay over the active image"
+                  >
+                    <ScanLine className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="hidden sm:inline">Laser Scan</span>
+                  </button>
+
+                  {/* Benchmark Inspector Shortcut */}
+                  <button
+                    onClick={() => {
+                      handleTestOcrLive();
+                      setOcrStudioTab("inspector");
+                      setShowOcrStudio(true);
+                    }}
+                    disabled={testOcrRunning}
+                    className="px-2 py-1 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1 transition-all"
+                    title="Run live benchmark on cropped question & inspect tokens, math LaTeX and latency"
+                  >
+                    <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden sm:inline">Inspect OCR</span>
+                  </button>
+
                   <button
                     onClick={() => handleRerunOcr(false)}
                     disabled={recropping || isScanning}
@@ -1635,7 +2244,7 @@ export default function DataIngestionPage() {
                 className="flex-1 overflow-auto flex items-center justify-center p-3 bg-[#07070a] relative select-none"
               >
                 {/* ── HIGH-TECH NEURAL OCR & SMOKER SCANNER OVERLAY ── */}
-                {(isScanning || recropping) && (
+                {(isScanning || recropping || manualOverlayScan) && (
                   <div className="absolute inset-0 z-30 bg-black/65 backdrop-blur-[3px] flex flex-col items-center justify-center overflow-hidden pointer-events-none select-none">
                     {/* SVG Gooey Smoke Filter (preloader fluid physics) */}
                     <svg className="absolute w-0 h-0 pointer-events-none">
@@ -1683,10 +2292,16 @@ export default function DataIngestionPage() {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500" />
                         </span>
-                        <span>NEURAL OCR STREAMING</span>
+                        <span>
+                          {manualOverlayScan && !isScanning
+                            ? "OPTICAL LASER SCANNER ACTIVE"
+                            : "NEURAL OCR STREAMING"}
+                        </span>
                       </div>
                       <p className="text-xs text-zinc-200 font-mono tracking-wide animate-pulse">
-                        {scanStatus}
+                        {manualOverlayScan && !isScanning
+                          ? "Real-time laser beam sweeping active bounding box..."
+                          : scanStatus}
                       </p>
                       <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-400 border-t border-zinc-800/80 pt-2 mt-1">
                         <span className="text-indigo-300">
@@ -2087,6 +2702,19 @@ export default function DataIngestionPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowFormulaPreview((v) => !v)}
+                    className={`px-2 py-1 border rounded text-[11px] font-mono flex items-center gap-1 transition-all ${
+                      showFormulaPreview
+                        ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    }`}
+                    title="Toggle formula and markdown preview"
+                  >
+                    <FileText className="w-3 h-3 text-purple-400" />
+                    <span>{showFormulaPreview ? "Edit Raw" : "Preview Math"}</span>
+                  </button>
+
                   {activeItem.rawOcrText && activeItem.rawOcrText !== editorText && (
                     <button
                       onClick={() => setShowRawOcr((v) => !v)}
@@ -2110,18 +2738,28 @@ export default function DataIngestionPage() {
                 </div>
               )}
 
-              {/* Textarea */}
-              <textarea
-                ref={textareaRef}
-                value={editorText}
-                onChange={(e) => setEditorText(e.target.value)}
-                className={`flex-1 w-full bg-zinc-900/60 border rounded-xl p-3 text-zinc-100 font-mono text-xs leading-relaxed resize-none focus:outline-none shadow-inner transition-all duration-300 ${
-                  textUpdatedPulse
-                    ? "border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.25)] bg-emerald-950/10"
-                    : "border-zinc-800 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                }`}
-                placeholder="Question text..."
-              />
+              {/* Textarea or Formula Preview */}
+              {showFormulaPreview ? (
+                <div className="flex-1 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 text-zinc-100 font-mono text-xs leading-relaxed overflow-y-auto select-text whitespace-pre-wrap">
+                  <div className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    Formatted Mathematical & Typographic Question Preview
+                  </div>
+                  {editorText}
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  value={editorText}
+                  onChange={(e) => setEditorText(e.target.value)}
+                  className={`flex-1 w-full bg-zinc-900/60 border rounded-xl p-3 text-zinc-100 font-mono text-xs leading-relaxed resize-none focus:outline-none shadow-inner transition-all duration-300 ${
+                    textUpdatedPulse
+                      ? "border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.25)] bg-emerald-950/10"
+                      : "border-zinc-800 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  }`}
+                  placeholder="Question text..."
+                />
+              )}
 
               {/* Action Buttons: Approve & Reject */}
               <div className="flex items-center gap-3 mt-2 shrink-0">

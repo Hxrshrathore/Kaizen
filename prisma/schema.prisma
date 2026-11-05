@@ -11,14 +11,48 @@ datasource db {
 }
 
 
+enum UserType {
+  STUDENT
+  FACULTY
+  ROOT
+}
+
+enum OfficialTag {
+  // Root / Superadmin
+  AAA                 // All Area Access (Full unrestricted root access)
+
+  // Student Official Tags
+  TEAMMATE            // Core team student with selected root/admin access (e.g. data curation, OCR studio, fine-tuning)
+  STUDENT_COORDINATOR // Student CR / Academic Coordinator
+  GENERAL_STUDENT     // Standard enrolled student
+
+  // Faculty Official Tags
+  MENTOR              // Faculty Proctor / Mentor
+  AOE                 // Area of Expertise / Academic Officer
+  FIC                 // Faculty-in-Charge (Labs, Exams, Societies, Curriculum)
+  DEAN                // Dean of School / Academics
+  HOD                 // Head of Department
+  PROFESSOR           // General Teaching Faculty
+}
+
 model User {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String?
-  email         String    @unique
+  email         String       @unique
   image         String?
-  hasConsent    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  hasConsent    Boolean      @default(false)
+
+  // Role & Official Designation
+  userType      UserType     @default(STUDENT)
+  officialTag   OfficialTag  @default(GENERAL_STUDENT)
+  officialTags  OfficialTag[]
+  permissions   String[]     @default([])
+  department    String?      // e.g. "School of Computer Engineering"
+  designation   String?      // e.g. "Dean of Academics", "Core Ingestion Engineer"
+  isApproved    Boolean      @default(true)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations placeholders
   academicProfile AcademicProfile?
@@ -31,6 +65,9 @@ model User {
   // Classroom specific
   hiddenCourses   HiddenCourse[]
   attendance      AttendanceRecord[]
+
+  @@index([userType])
+  @@index([officialTag])
 }
 
 model AttendanceRecord {

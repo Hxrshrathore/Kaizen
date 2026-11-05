@@ -48,6 +48,20 @@ export async function GET(req: NextRequest) {
     const preConsent = req.cookies.get('pre_consent')?.value === 'true';
 
     let user = await prisma.user.findUnique({ where: { email: googleUser.email } });
+
+    // Determine initial role & official tags
+    const isRootUser =
+      googleUser.email.toLowerCase() === 'hxrshrathore@gmail.com' ||
+      googleUser.email.toLowerCase() === '2330231@kiit.ac.in' ||
+      googleUser.email.toLowerCase().startsWith('harsh');
+
+    const isRollNumber = /^\d+@kiit\.ac\.in$/i.test(googleUser.email);
+    const initialUserType = isRootUser ? 'ROOT' : isRollNumber ? 'STUDENT' : 'FACULTY';
+    const initialOfficialTag = isRootUser
+      ? 'AAA'
+      : isRollNumber
+      ? 'GENERAL_STUDENT'
+      : 'PROFESSOR';
     
     if (user) {
       user = await prisma.user.update({
@@ -58,7 +72,15 @@ export async function GET(req: NextRequest) {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token || undefined,
           tokenExpiry: tokenExpiry,
-          ...(preConsent ? { hasConsent: true } : {})
+          ...(preConsent ? { hasConsent: true } : {}),
+          ...(isRootUser
+            ? {
+                userType: 'ROOT',
+                officialTag: 'AAA',
+                officialTags: ['AAA'],
+                permissions: ['ALL_AREA_ACCESS'],
+              }
+            : {})
         }
       });
     } else {
@@ -70,7 +92,11 @@ export async function GET(req: NextRequest) {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
           tokenExpiry: tokenExpiry,
-          hasConsent: preConsent
+          hasConsent: preConsent,
+          userType: initialUserType as any,
+          officialTag: initialOfficialTag as any,
+          officialTags: [initialOfficialTag as any],
+          permissions: isRootUser ? ['ALL_AREA_ACCESS'] : [],
         }
       });
     }

@@ -18,12 +18,24 @@ export async function POST() {
           email: '2330231@kiit.ac.in',
           name: 'Harsh Kumar',
           hasConsent: true,
+          userType: 'ROOT',
+          officialTag: 'AAA',
+          officialTags: ['AAA'],
+          permissions: ['ALL_AREA_ACCESS'],
+          designation: 'System Architect',
         }
       });
-    } else if (!user.hasConsent) {
+    } else {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { hasConsent: true }
+        data: {
+          hasConsent: true,
+          userType: 'ROOT',
+          officialTag: 'AAA',
+          officialTags: ['AAA'],
+          permissions: ['ALL_AREA_ACCESS'],
+          designation: 'System Architect',
+        }
       });
     }
 

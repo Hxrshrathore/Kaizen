@@ -7,13 +7,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Upload, Play, TrendingUp, Activity, LogOut, 
   User, PieChart, Sparkles, Zap, BrainCircuit, FileQuestion, 
-  CalendarClock, Mail, ChevronRight, DatabaseZap
+  CalendarClock, Mail, ChevronRight, DatabaseZap, Shield
 } from 'lucide-react';
+import { getOfficialBadge } from '@/lib/rbac';
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  user?: { name: string; email: string };
+  user?: {
+    name: string;
+    email: string;
+    userType?: string;
+    officialTag?: string;
+    officialTags?: string[];
+  };
   loading?: boolean;
 }
 
@@ -22,6 +29,7 @@ export default function Sidebar({ isOpen, onToggle, user, loading }: SidebarProp
   const router = useRouter();
 
   const displayUser = user || { name: 'Guest Student', email: 'Please login' };
+  const badge = getOfficialBadge(displayUser as any);
 
   const handleLogout = async () => {
     try {
@@ -128,14 +136,24 @@ export default function Sidebar({ isOpen, onToggle, user, loading }: SidebarProp
       </div>
 
       {/* User / Logout */}
-      <div className="p-4 border-t border-border bg-muted/50">
-                 <>
-                    <div className="text-xs text-foreground font-medium truncate">{displayUser.name}</div>
-                    <div className="text-[10px] text-muted-foreground truncate" title={displayUser.email}>{displayUser.email}</div>
-                 </>
+      <div className="p-3.5 border-t border-border bg-muted/40 space-y-2.5">
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-foreground font-bold truncate">{displayUser.name}</div>
+            <div className="text-[10px] text-muted-foreground truncate font-mono" title={displayUser.email}>
+              {displayUser.email}
+            </div>
+          </div>
+          <span
+            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 tracking-wider uppercase ${badge.badgeClasses}`}
+            title={badge.description}
+          >
+            {badge.label}
+          </span>
+        </div>
         <button 
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-destructive hover:bg-destructive/10 transition-colors text-[10px] uppercase tracking-widest font-bold"
+          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-destructive hover:bg-destructive/10 transition-colors text-[10px] uppercase tracking-widest font-bold"
         >
           <LogOut size={12} /> End Session
         </button>
