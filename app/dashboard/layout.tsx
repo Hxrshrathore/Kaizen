@@ -29,8 +29,29 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [user, setUser] = useState<UserProfile | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+
+  // Restore sidebar pinned preference
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kaizen_sidebar_pinned');
+      if (saved !== null) {
+        setIsSidebarPinned(saved === 'true');
+      }
+    } catch {}
+  }, []);
+
+  const togglePin = () => {
+    setIsSidebarPinned((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('kaizen_sidebar_pinned', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Fetch user data once at layout level to pass to sidebar
   useEffect(() => {
@@ -54,16 +75,22 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden font-sans">
       
-      {/* Sidebar - Passed user data */}
+      {/* Sidebar - Passed user data & pin controls */}
       <Sidebar 
         isOpen={isSidebarOpen} 
         onToggle={() => setSidebarOpen(!isSidebarOpen)} 
         user={user}
         loading={loading}
+        isPinned={isSidebarPinned}
+        onTogglePin={togglePin}
       />
 
-      {/* Main Content Wrapper */}
-      <div className="flex-1 flex flex-col md:ml-64 h-screen overflow-hidden transition-all duration-300">
+      {/* Main Content Wrapper - Smoothly adapts to pinned vs collapsed hover rail */}
+      <div 
+        className={`flex-1 flex flex-col ${
+          isSidebarPinned ? 'md:ml-64' : 'md:ml-[72px]'
+        } h-screen overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]`}
+      >
         
         {/* Header */}
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-20 sticky top-0">
