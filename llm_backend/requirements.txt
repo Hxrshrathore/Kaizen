@@ -1,0 +1,15 @@
+# NEXUS LLM & Ingestion Pipeline Dependencies
+llama-cpp-python
+fastapi
+uvicorn[standard]
+pydantic
+huggingface-hub
+boto3
+pymupdf
+pandas
+pypdf
+openpyxl
+transformers>=4.44.0
+peft
+torch
+accelerate

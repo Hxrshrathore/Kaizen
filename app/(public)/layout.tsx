@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Layers, Timer, Activity, ArrowRight } from 'lucide-react';
 import { NotchNav } from '@/components/ui/notch-nav';
@@ -12,6 +12,26 @@ import { Logo } from '@/components/ui/logo';
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = () => {
+      if (!document.body.classList.contains('is-scrolling')) {
+        document.body.classList.add('is-scrolling');
+      }
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        document.body.classList.remove('is-scrolling');
+      }, 150);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (scrollTimer) clearTimeout(scrollTimer);
+      document.body.classList.remove('is-scrolling');
+    };
+  }, []);
 
   const handleNavChange = (id: string) => {
     const href = id === 'architecture' ? '#features' : '#roadmap';
@@ -29,13 +49,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   ];
 
   return (
-    <div className="relative flex flex-col min-h-screen bg-white text-slate-900 overflow-x-hidden">
+    <div className={`relative flex flex-col min-h-screen text-slate-900 overflow-x-hidden ${pathname === '/' ? 'bg-background' : 'bg-white'}`}>
       {/* Black Frame Overlay */}
       <div className="hidden md:block fixed inset-[12px] rounded-[20px] shadow-[0_0_0_100vmax_black] z-40 pointer-events-none" />
 
-      {/* Light Mode Navigation */}
+      {/* Navigation */}
       <NotchNav 
-        className="!bg-transparent border-0 z-50 pointer-events-none text-slate-900"
+        className="pointer-events-none z-50"
         items={navItems}
         onActiveChange={handleNavChange}
         logo={
@@ -60,7 +80,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       />
 
       {/* Main Content Area */}
-      <main className="flex-grow pt-24 pb-16">
+      <main className={`flex-grow ${pathname === '/' ? '' : 'pt-24 pb-16'}`}>
         {children}
       </main>
 

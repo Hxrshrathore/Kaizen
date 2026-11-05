@@ -41,6 +41,8 @@ const INJECTED_STYLES = `
       position: absolute; inset: 0; width: 100%; height: 100%;
       pointer-events: none; z-index: 50; opacity: 0.05; mix-blend-mode: overlay;
       background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)"/></svg>');
+      transform: translateZ(0);
+      contain: strict;
   }
 
   .bg-grid-theme {
@@ -225,39 +227,69 @@ export function CinematicHero({
 
   // 1. High-Performance Mouse Interaction Logic (Using requestAnimationFrame)
   useEffect(() => {
+    let cachedCardRect: DOMRect | null = null;
+    let isScrolling = false;
+    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onScroll = () => {
+      isScrolling = true;
+      cachedCardRect = null;
+      if (mockupRef.current && window.scrollY > 20) {
+        gsap.to(mockupRef.current, { rotationX: 0, rotationY: 0, duration: 0.3, overwrite: "auto" });
+      }
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        isScrolling = false;
+      }, 150);
+    };
+
+    const onResize = () => {
+      cachedCardRect = null;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (window.scrollY > window.innerHeight * 2) return;
+      if (isScrolling || window.scrollY > 20) return;
 
       cancelAnimationFrame(requestRef.current);
       
       requestRef.current = requestAnimationFrame(() => {
-        if (mainCardRef.current && mockupRef.current) {
-          const rect = mainCardRef.current.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
-          const mouseY = e.clientY - rect.top;
-          
-          mainCardRef.current.style.setProperty("--mouse-x", `${mouseX}px`);
-          mainCardRef.current.style.setProperty("--mouse-y", `${mouseY}px`);
+        if (!mainCardRef.current || !mockupRef.current) return;
 
-          const xVal = (e.clientX / window.innerWidth - 0.5) * 2;
-          const yVal = (e.clientY / window.innerHeight - 0.5) * 2;
-
-          gsap.to(mockupRef.current, {
-            rotationY: xVal * 12,
-            rotationX: -yVal * 12,
-            ease: "power3.out",
-            duration: 1.2,
-          });
+        if (!cachedCardRect) {
+          cachedCardRect = mainCardRef.current.getBoundingClientRect();
         }
+        const rect = cachedCardRect;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        mainCardRef.current.style.setProperty("--mouse-x", `${mouseX}px`);
+        mainCardRef.current.style.setProperty("--mouse-y", `${mouseY}px`);
+
+        const xVal = (e.clientX / window.innerWidth - 0.5) * 2;
+        const yVal = (e.clientY / window.innerHeight - 0.5) * 2;
+
+        gsap.to(mockupRef.current, {
+          rotationY: xVal * 12,
+          rotationX: -yVal * 12,
+          ease: "power3.out",
+          duration: 1.2,
+          overwrite: "auto",
+        });
       });
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      if (scrollTimer) clearTimeout(scrollTimer);
       cancelAnimationFrame(requestRef.current);
     };
-  },[]);
+  }, []);
 
   // 2. Complex Cinematic Scroll Timeline
   useEffect(() => {
@@ -283,7 +315,7 @@ export function CinematicHero({
           start: "top top",
           end: "+=12000",
           pin: true,
-          scrub: 1,
+          scrub: 0.8,
           anticipatePin: 1,
         },
       });
@@ -347,7 +379,7 @@ export function CinematicHero({
     >
       <style dangerouslySetInnerHTML={{ __html: INJECTED_STYLES }} />
       <div className="film-grain" aria-hidden="true" />
-      <div className="shape-grid-wrapper absolute inset-0 z-0 pointer-events-auto [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" aria-hidden="true">
+      <div className="shape-grid-wrapper absolute inset-0 z-0 pointer-events-none [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" aria-hidden="true">
         <ShapeGrid 
           speed={0.1}
           squareSize={40}
@@ -407,7 +439,7 @@ export function CinematicHero({
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none" style={{ perspective: "1500px" }}>
         <div
           ref={mainCardRef}
-          className="main-card premium-depth-card relative overflow-hidden gsap-reveal flex items-center justify-center pointer-events-auto w-[92vw] md:w-[85vw] h-[92vh] md:h-[85vh] rounded-[32px] md:rounded-[40px]"
+          className="main-card premium-depth-card relative overflow-hidden gsap-reveal flex items-center justify-center pointer-events-auto w-[92vw] md:w-[85vw] h-[92vh] md:h-[85vh] rounded-[32px] md:rounded-[40px] will-change-transform"
         >
           <div className="card-sheen" aria-hidden="true" />
 
@@ -474,7 +506,7 @@ export function CinematicHero({
             </div>
 
             {/* 2. MIDDLE (Mobile) / CENTER (Desktop): IPHONE MOCKUP */}
-            <div className="mockup-scroll-wrapper order-2 lg:order-2 relative w-full h-[380px] lg:h-[600px] flex items-center justify-center z-10" style={{ perspective: "1000px" }}>
+            <div className="mockup-scroll-wrapper order-2 lg:order-2 relative w-full h-[380px] lg:h-[600px] flex items-center justify-center z-10 will-change-transform" style={{ perspective: "1000px" }}>
               
               {/* Inner wrapper for safe CSS scaling that doesn't conflict with GSAP */}
               <div className="relative w-full h-full flex items-center justify-center transform scale-[0.65] md:scale-85 lg:scale-100">
@@ -591,7 +623,7 @@ export function CinematicHero({
 
       {/* FEATURES CARD — separate sibling card, same size, slides in from right */}
       <div 
-        className="features-card absolute z-20 overflow-hidden pointer-events-auto rounded-[32px] md:rounded-[40px] w-[92vw] md:w-[85vw] h-[85vh] md:h-[80vh] flex flex-col justify-center items-center"
+        className="features-card absolute z-20 overflow-hidden pointer-events-auto rounded-[32px] md:rounded-[40px] w-[92vw] md:w-[85vw] h-[85vh] md:h-[80vh] flex flex-col justify-center items-center will-change-transform"
         style={{ 
           background: 'linear-gradient(135deg, #F8F0E3 0%, #EADBC8 30%, #DAC4A8 70%, #C9AD8C 100%)',
           boxShadow: '0 40px 100px -20px rgba(0, 0, 0, 0.9), 0 20px 40px -20px rgba(0, 0, 0, 0.8)',

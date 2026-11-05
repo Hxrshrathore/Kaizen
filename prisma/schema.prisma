@@ -138,10 +138,18 @@ model OcrQuestion {
   id             String    @id @default(cuid())
   imagePath      String    // Path to the cropped image in public/dataset/raw
   subject        String?
+  subjectCode    String?
   year           String?
   examType       String?
   sourcePdf      String?
   pageNumber     Int?
+  // 4 vertices / bounding box coordinates on the PDF page (points)
+  bboxX0         Float?
+  bboxY0         Float?
+  bboxX1         Float?
+  bboxY1         Float?
+  pageWidth      Float?
+  pageHeight     Float?
   rawOcrText     String?   @db.Text
   correctedText  String?   @db.Text
   status         OcrStatus @default(PENDING)

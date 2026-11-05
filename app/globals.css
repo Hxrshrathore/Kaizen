@@ -168,3 +168,9 @@ body {
     animation: none;
     mix-blend-mode: normal;
 }
+
+/* Disable pointer events during active scroll to ensure 60fps compositor scroll */
+body.is-scrolling,
+body.is-scrolling * {
+  pointer-events: none !important;
+}

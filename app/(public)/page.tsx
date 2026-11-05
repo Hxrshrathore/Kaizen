@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowRight, Zap, Activity, Brain, Eye, Menu, X, 
   ChevronRight, Database, Cpu, HeartPulse, Sparkles, Timer, Layers, Code
 } from 'lucide-react';
 import { CinematicHero } from '@/components/ui/cinematic-landing-hero';
-import { NotchNav } from '@/components/ui/notch-nav';
-import SpecularButton from '@/components/SpecularButton';
+
+
 import { GooeyLoader } from '@/components/ui/gooey-loader';
 
 // --- ANIMATION WRAPPERS ---
@@ -45,25 +45,26 @@ export default function LandingPage() {
     router.push('/join-beta');
   };
 
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"]
-  });
 
-  const smoothScroll = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
-  const yHero = useTransform(smoothScroll, [0, 0.2], [0, -100]);
-  const opacityHero = useTransform(smoothScroll, [0, 0.2], [1, 0]);
 
-  const handleNavChange = (id: string) => {
-    const href = id === 'architecture' ? '#features' : '#roadmap';
-    const element = document.querySelector(href);
-    if (element) element.scrollIntoView({ behavior: 'smooth' });
-  };
 
-  const navItems = [
-    { id: 'architecture', label: 'Architecture', icon: Layers },
-    { id: 'roadmap', label: 'Roadmap', icon: Timer }
-  ];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   return (
     <>

@@ -17,7 +17,7 @@ import {
   RefreshCw
 } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "/api/ai";
 
 // Llama 3.2 Instruct prompt builder
 function buildPrompt(subject: string, examType: string) {

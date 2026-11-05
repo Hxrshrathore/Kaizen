@@ -91,5 +91,14 @@ llama_bin/
 production.env
 
 # Ignore entire LLM Backend folder
-llm_backend/
-llm_backend/*
+llm_backend/venv/
+llm_backend/models/
+llm_backend/llama_bin/
+llm_backend/lora_adapter/
+llm_backend/__pycache__/
+
+# Dataset media & cache (hosted on Cloudflare R2 bucket kaizen)
+public/dataset/raw/*.png
+public/dataset/raw/*.jpg
+public/dataset/raw/*.jpeg
+data/bboxes.json

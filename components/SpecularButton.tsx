@@ -178,13 +178,14 @@ const SpecularButton = ({
     const mesh = new Mesh(gl, { geometry, program });
     fx.appendChild(gl.canvas);
 
+    let cachedRect: DOMRect | null = null;
     const sizeRef = { w: 1, h: 1 };
     const resize = () => {
       // Fractional size + explicit center keep the SDF pinned to the exact
       // CSS border, instead of drifting up to a pixel from offsetWidth rounding.
-      const rect = btn.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
+      cachedRect = btn.getBoundingClientRect();
+      const w = cachedRect.width;
+      const h = cachedRect.height;
       sizeRef.w = w;
       sizeRef.h = h;
       renderer.setSize(w + PAD * 2, h + PAD * 2);
@@ -195,17 +196,31 @@ const SpecularButton = ({
     ro.observe(btn);
     resize();
 
+    const onScrollOrResize = () => {
+      cachedRect = null;
+    };
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+
     // Light angle steers toward the pointer (anywhere on the page) and falls
     // back to a slow sweep when the pointer hasn't moved yet.
     let pointerAngle: number | null = null;
     let proximityT = 0;
     const onPointerMove = (e: PointerEvent) => {
-      const rect = btn.getBoundingClientRect();
+      if (typeof document !== 'undefined' && document.body.classList.contains('is-scrolling')) return;
+      if (!cachedRect) cachedRect = btn.getBoundingClientRect();
+      const rect = cachedRect;
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const dx = Math.max(rect.left - e.clientX, 0, e.clientX - rect.right);
       const dy = Math.max(rect.top - e.clientY, 0, e.clientY - rect.bottom);
       const dist = Math.hypot(dx, dy);
+
+      if (dist > propsRef.current.proximity * 2) {
+        proximityT = 0;
+        return;
+      }
+
       // Over the button itself the light settles on the diagonal (framing the
       // corners) and gently sways with the cursor position within the button.
       if (dist === 0) {
@@ -218,7 +233,7 @@ const SpecularButton = ({
       const t = Math.max(0, 1 - dist / Math.max(propsRef.current.proximity, 1));
       proximityT = t * t * (3 - 2 * t);
     };
-    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     let angle = 2.4;
     let idleAngle = 2.4;
@@ -262,6 +277,8 @@ const SpecularButton = ({
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      window.removeEventListener('scroll', onScrollOrResize);
+      window.removeEventListener('resize', onScrollOrResize);
       window.removeEventListener('pointermove', onPointerMove);
       if (gl.canvas.parentNode === fx) fx.removeChild(gl.canvas);
       gl.getExtension('WEBGL_lose_context')?.loseContext();

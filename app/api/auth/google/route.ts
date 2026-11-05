@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     });
 
     // 3. Create Session
-    const token = await createSession(user.id);
+    const token = await createSession(user.id, user.hasConsent ?? true);
 
     const response = NextResponse.json({ success: true, user });
     

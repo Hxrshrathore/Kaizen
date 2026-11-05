@@ -44,11 +44,13 @@ const ShapeGrid: React.FC<ShapeGridProps> = ({
     const hexHoriz = squareSize * 1.5;
     const hexVert = squareSize * Math.sqrt(3);
 
+    let cachedCanvasRect: DOMRect | null = null;
     const resizeCanvas = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
       numSquaresX.current = Math.ceil(canvas.width / squareSize) + 1;
       numSquaresY.current = Math.ceil(canvas.height / squareSize) + 1;
+      cachedCanvasRect = canvas.getBoundingClientRect();
     };
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -267,9 +269,10 @@ const ShapeGrid: React.FC<ShapeGridProps> = ({
     };
 
     const handleMouseMove = (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
+      if (typeof document !== 'undefined' && document.body.classList.contains('is-scrolling')) return;
+      if (!cachedCanvasRect) cachedCanvasRect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - cachedCanvasRect.left;
+      const mouseY = event.clientY - cachedCanvasRect.top;
 
       if (isHex) {
         const colShift = Math.floor(gridOffset.current.x / hexHoriz);

@@ -6,7 +6,7 @@ async function main() {
   const user = await prisma.user.findFirst({
     where: {
       email: {
-        contains: '@gmail.com'
+        contains: '@kiit.ac.in'
       }
     }
   });
