@@ -49,11 +49,8 @@ export async function GET(req: NextRequest) {
 
     let user = await prisma.user.findUnique({ where: { email: googleUser.email } });
 
-    // Determine initial role & official tags
-    const isRootUser =
-      googleUser.email.toLowerCase() === 'hxrshrathore@gmail.com' ||
-      googleUser.email.toLowerCase() === '2330231@kiit.ac.in' ||
-      googleUser.email.toLowerCase().startsWith('harsh');
+    // Sole Root Access: strictly 2330231@kiit.ac.in
+    const isRootUser = googleUser.email.trim().toLowerCase() === '2330231@kiit.ac.in';
 
     const isRollNumber = /^\d+@kiit\.ac\.in$/i.test(googleUser.email);
     const initialUserType = isRootUser ? 'ROOT' : isRollNumber ? 'STUDENT' : 'FACULTY';
@@ -79,6 +76,15 @@ export async function GET(req: NextRequest) {
                 officialTag: 'AAA',
                 officialTags: ['AAA'],
                 permissions: ['ALL_AREA_ACCESS'],
+                designation: 'System Architect & Root Administrator',
+              }
+            : user.userType === 'ROOT' || user.officialTag === 'AAA'
+            ? {
+                // Strip unauthorized root privileges
+                userType: isRollNumber ? 'STUDENT' : 'FACULTY',
+                officialTag: isRollNumber ? 'GENERAL_STUDENT' : 'PROFESSOR',
+                officialTags: [isRollNumber ? 'GENERAL_STUDENT' : 'PROFESSOR'],
+                permissions: [],
               }
             : {})
         }
@@ -97,6 +103,7 @@ export async function GET(req: NextRequest) {
           officialTag: initialOfficialTag as any,
           officialTags: [initialOfficialTag as any],
           permissions: isRootUser ? ['ALL_AREA_ACCESS'] : [],
+          designation: isRootUser ? 'System Architect & Root Administrator' : null,
         }
       });
     }

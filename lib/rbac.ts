@@ -42,20 +42,19 @@ export interface UserLike {
   permissions?: string[] | null;
 }
 
+// ── THE SOLE ROOT / AAA ADMINISTRATOR ─────────────────────────────────────────
+export const SOLE_ROOT_EMAIL = "2330231@kiit.ac.in";
+
+export function isRootEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase() === SOLE_ROOT_EMAIL.toLowerCase();
+}
+
 // ── CORE ACCESS LEVEL CHECKERS ────────────────────────────────────────────────
 export function hasAAA(user?: UserLike | null): boolean {
-  if (!user) return false;
-  if (user.userType === "ROOT") return true;
-  if (user.officialTag === "AAA") return true;
-  if (Array.isArray(user.officialTags) && user.officialTags.includes("AAA")) return true;
-  // System architect emails
-  if (
-    user.email === "Hxrshrathore@gmail.com" ||
-    user.email === "harsh@kiit.ac.in"
-  ) {
-    return true;
-  }
-  return false;
+  if (!user || !user.email) return false;
+  // 2330231@kiit.ac.in is the ONLY user with ROOT / AAA access
+  return isRootEmail(user.email);
 }
 
 export function isTeammate(user?: UserLike | null): boolean {

@@ -4,25 +4,22 @@ import { createSession } from '@/lib/auth';
 
 export async function POST() {
   try {
-    let user = await prisma.user.findFirst({
-      where: { email: { contains: '2330231@kiit.ac.in' } }
+    const rootEmail = '2330231@kiit.ac.in';
+    let user = await prisma.user.findUnique({
+      where: { email: rootEmail }
     });
-
-    if (!user) {
-      user = await prisma.user.findFirst();
-    }
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email: '2330231@kiit.ac.in',
+          email: rootEmail,
           name: 'Harsh Kumar',
           hasConsent: true,
           userType: 'ROOT',
           officialTag: 'AAA',
           officialTags: ['AAA'],
           permissions: ['ALL_AREA_ACCESS'],
-          designation: 'System Architect',
+          designation: 'System Architect & Root Administrator',
         }
       });
     } else {
@@ -34,7 +31,7 @@ export async function POST() {
           officialTag: 'AAA',
           officialTags: ['AAA'],
           permissions: ['ALL_AREA_ACCESS'],
-          designation: 'System Architect',
+          designation: 'System Architect & Root Administrator',
         }
       });
     }
