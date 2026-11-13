@@ -218,7 +218,7 @@ export async function POST(request: Request) {
             top_p: 0.95,
             max_tokens: effectiveMaxTokens,
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(10000),
         });
 
         if (nimResp.ok) {
