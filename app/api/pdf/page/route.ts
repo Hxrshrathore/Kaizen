@@ -15,11 +15,12 @@ export async function GET(request: Request) {
     }
 
     const resp = await fetch(
-      `http://127.0.0.1:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}&rotation=${rotation}`
-    );
+      `http://127.0.0.1:8000/api/pdf/page?pdf=${encodeURIComponent(pdf)}&page=${page}&dpi=${dpi}&rotation=${rotation}`,
+      { signal: AbortSignal.timeout(8000) }
+    ).catch(() => null);
 
-    if (!resp.ok) {
-      return NextResponse.json({ error: "Failed to render PDF page" }, { status: resp.status });
+    if (!resp || !resp.ok) {
+      return NextResponse.json({ error: "Failed to render PDF page" }, { status: resp ? resp.status : 503 });
     }
 
     const imageBuffer = await resp.arrayBuffer();

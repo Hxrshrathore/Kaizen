@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Upload, Check, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Check, FileText, AlertCircle, Loader2, Database, ArrowRight } from 'lucide-react';
 import { parseGradeReport, ParsedPDFData } from '@/lib/pdfParser';
 
 const MotionDiv = motion.div as any;
+const MotionTr = motion.tr as any;
 
 export default function GradeUploadPage() {
   const router = useRouter();
@@ -58,7 +60,38 @@ export default function GradeUploadPage() {
   };
 
   const updateGrade = (id: string, newGrade: any) => {
-    setLocalGrades(prev => prev.map(g => g.id === id ? { ...g, grade: newGrade } : g));
+    setLocalGrades(prev => {
+      const updated = prev.map(g => g.id === id ? { ...g, grade: newGrade } : g);
+      
+      // Recompute preview metrics dynamically
+      const GRADE_MAP: Record<string, number> = { O: 10, E: 9, A: 8, B: 7, C: 6, D: 5, F: 0 };
+      let pts = 0;
+      let creds = 0;
+      let earned = 0;
+      let hasFail = false;
+
+      updated.forEach(g => {
+        const c = parseFloat(g.credits) || 0;
+        creds += c;
+        pts += c * (GRADE_MAP[g.grade] ?? 0);
+        if (g.grade !== 'F') earned += c;
+        else hasFail = true;
+      });
+
+      if (creds > 0 && parsedData) {
+        setParsedData({
+          ...parsedData,
+          semesterPerformance: {
+            ...parsedData.semesterPerformance,
+            sgpa: parseFloat((pts / creds).toFixed(2)),
+            totalCredits: creds,
+            creditsEarned: earned,
+            remarks: hasFail ? 'FAIL' : 'PASS'
+          }
+        });
+      }
+      return updated;
+    });
   };
 
   // --- NEW: REAL SAVE LOGIC ---
@@ -85,8 +118,8 @@ export default function GradeUploadPage() {
 
       console.log("Successfully Saved:", result);
       
-      // Success Redirect
-      router.push('/dashboard'); 
+      // Success Redirect directly to Academic Ledger in NeonDB
+      router.push('/dashboard/records'); 
       
     } catch (error: any) {
       console.error("Save failed", error);
@@ -102,10 +135,20 @@ export default function GradeUploadPage() {
         <MotionDiv 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-8"
         >
           <h2 className="text-3xl font-display font-medium mb-2 text-foreground">INGEST <span className="text-primary">GRADES</span></h2>
-          <p className="text-muted-foreground">Upload your Semester Grade Report (PDF) for parsing.</p>
+          <p className="text-muted-foreground text-sm">Upload your Semester Grade Report (PDF) to parse and save directly to NeonDB.</p>
+          <div className="mt-3">
+            <Link 
+              href="/dashboard/records"
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-primary hover:underline bg-primary/10 px-3 py-1 rounded-full border border-primary/20 transition-all"
+            >
+              <Database size={12} />
+              <span>Already uploaded? View & Edit Stored Data in Ledger</span>
+              <ArrowRight size={12} />
+            </Link>
+          </div>
         </MotionDiv>
 
         <MotionDiv 
@@ -151,22 +194,30 @@ export default function GradeUploadPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
         <MotionDiv initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-2xl md:text-3xl font-display font-medium mb-2 text-foreground">VERIFY <span className="text-primary">DATA</span></h2>
-          <div className="flex flex-wrap gap-3 text-xs font-mono text-muted-foreground">
-             <span className="px-2 py-1 bg-muted rounded border border-input text-foreground">
-                SEM: <span className="text-primary">{parsedData?.student.currentSemester || "N/A"}</span>
+          <div className="flex flex-wrap gap-2.5 text-xs font-mono text-muted-foreground">
+             <span className="px-2.5 py-1 bg-muted rounded-lg border border-input text-foreground">
+                SEM: <span className="text-primary font-bold">{parsedData?.student.currentSemester || "N/A"}</span>
              </span>
-             <span className="px-2 py-1 bg-muted rounded border border-input text-foreground">
-                ROLL: <span className="text-primary">{parsedData?.student.rollNumber || "N/A"}</span>
+             <span className="px-2.5 py-1 bg-muted rounded-lg border border-input text-foreground">
+                ROLL: <span className="text-primary font-bold">{parsedData?.student.rollNumber || "N/A"}</span>
              </span>
-             <span className="px-2 py-1 bg-muted rounded border border-input text-foreground">
-                SGPA: <span className="text-primary">{parsedData?.semesterPerformance.sgpa || "0.0"}</span>
+             <span className="px-2.5 py-1 bg-muted rounded-lg border border-input text-foreground">
+                CREDITS: <span className="text-foreground font-bold">{parsedData?.semesterPerformance.totalCredits || 0} cr</span>
              </span>
-             <span className={`px-2 py-1 rounded border font-bold ${
+             <span className="px-2.5 py-1 bg-muted rounded-lg border border-input text-foreground">
+                SGPA: <span className="text-primary font-bold">{parsedData?.semesterPerformance.sgpa !== undefined ? parsedData.semesterPerformance.sgpa.toFixed(2) : "0.00"}</span>
+             </span>
+             {parsedData?.semesterPerformance.cgpa && (
+               <span className="px-2.5 py-1 bg-muted rounded-lg border border-input text-foreground">
+                  CGPA: <span className="text-primary font-bold">{parsedData.semesterPerformance.cgpa.toFixed(2)}</span>
+               </span>
+             )}
+             <span className={`px-2.5 py-1 rounded-lg border font-bold ${
                 parsedData?.semesterPerformance.remarks === "FAIL" 
-                ? "bg-red-900/20 border-red-900/50 text-red-500" 
-                : "bg-green-900/20 border-green-900/50 text-green-500"
+                ? "bg-red-500/10 border-red-500/30 text-red-400" 
+                : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
              }`}>
-                {parsedData?.semesterPerformance.remarks || "PENDING"}
+                {parsedData?.semesterPerformance.remarks || "PASS"}
              </span>
           </div>
         </MotionDiv>
@@ -201,12 +252,11 @@ export default function GradeUploadPage() {
             </thead>
             <tbody>
               {localGrades.map((grade, i) => (
-                <MotionDiv 
+                <MotionTr 
                   key={grade.id} 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  as="tr"
                   className="border-b border-border text-sm hover:bg-[#151518] transition-colors group"
                 >
                   <td className="p-4 font-mono text-muted-foreground group-hover:text-foreground transition-colors">{grade.subjectCode}</td>
@@ -227,7 +277,7 @@ export default function GradeUploadPage() {
                         </div>
                     </div>
                   </td>
-                </MotionDiv>
+                </MotionTr>
               ))}
             </tbody>
           </table>

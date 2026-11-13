@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { Menu, Bell, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ModelQuotaBar } from '@/components/ui/model-quota-bar';
 
 // --- TYPES ---
 interface UserProfile {
   name: string;
   email: string;
+  image?: string | null;
   userType?: string;
   officialTag?: string;
   officialTags?: string[];
@@ -102,18 +105,43 @@ export default function DashboardLayout({
               <Menu size={22} />
             </button>
             
-            <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]" />
-              System Operational
-            </div>
+            {/* Real-Time AI Token Quota & Priority Cascade Indicator */}
+            <ModelQuotaBar />
           </div>
 
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <ThemeToggle variant="square" className="w-10 h-10 rounded-xl" />
             <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors group">
               <Bell size={18} />
               <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full ring-2 ring-background group-hover:scale-110 transition-transform" />
             </button>
+            {user && (
+              <Link
+                href="/dashboard/profile"
+                className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border bg-muted/40 hover:bg-muted/80 hover:border-primary/40 transition-all text-xs group"
+                title="View Academic Profile"
+              >
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                  {user.image ? (
+                    <img
+                      src={user.image}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="text-xs font-mono font-bold text-primary">
+                      {user.name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  )}
+                </div>
+                <span className="font-medium text-foreground max-w-[120px] truncate hidden sm:inline group-hover:text-primary transition-colors">
+                  {user.name.split(' ')[0]}
+                </span>
+              </Link>
+            )}
           </div>
         </header>
 

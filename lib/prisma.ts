@@ -14,8 +14,15 @@ const createPrismaClient = () => {
   });
 };
 
-export const prisma = globalForPrisma.prisma || createPrismaClient();
+const getPrisma = () => {
+  if (globalForPrisma.prisma && (globalForPrisma.prisma as any).healthMetric) {
+    return globalForPrisma.prisma;
+  }
+  const client = createPrismaClient();
+  if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = client;
+  return client;
+};
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = getPrisma();
 
 export const db = prisma;

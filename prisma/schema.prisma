@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 
@@ -65,6 +66,7 @@ model User {
   // Classroom specific
   hiddenCourses   HiddenCourse[]
   attendance      AttendanceRecord[]
+  healthMetrics   HealthMetric[]
 
   @@index([userType])
   @@index([officialTag])
@@ -195,4 +197,42 @@ model OcrQuestion {
 
   @@index([status])
   @@index([subject, year])
+}
+
+model HealthMetric {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            DateTime
+
+  // Sleep Tracking & Recovery
+  sleepHours      Float    // e.g. 5.5
+  deepSleepMin    Int?     // Deep/REM sleep in minutes
+  sleepQuality    Int?     // 1 - 100 score
+  bedTime         DateTime?
+  wakeTime        DateTime?
+
+  // Biometrics & Daily Vitals
+  restingHeartRate Float?  // Average resting BPM
+  hrv             Float?   // Heart Rate Variability (ms)
+  steps           Int?     @default(0)
+
+  // Self-Reported Cognitive Metrics
+  stressLevel     Int      @default(3) // 1 (Relaxed) - 5 (Overwhelmed)
+  focusLevel      Int      @default(3) // 1 (Scattered) - 5 (Deep Flow)
+  energyLevel     Int      @default(3) // 1 (Exhausted) - 5 (Charged)
+
+  // Calculated Burnout Predictor
+  burnoutScore    Float    @default(0) // 0 (Optimal) - 100 (Critical Burnout)
+  burnoutRisk     String   @default("LOW") // LOW, MODERATE, HIGH, CRITICAL
+  cognitiveCap    Float    @default(100) // % estimated daily capacity
+  recoveryAdvice  String?  @db.Text
+
+  source          String   @default("manual") // "apple_shortcut", "google_fit", "terra", "manual"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([burnoutRisk])
 }

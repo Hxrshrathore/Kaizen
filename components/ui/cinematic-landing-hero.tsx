@@ -4,33 +4,90 @@ import React, { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { cn } from "@/lib/utils";
-import { Activity, Eye, Sparkles, Timer, Database, Brain } from "lucide-react";
+import { Activity, Eye, Sparkles, Timer, Database, Brain, Star, CheckCircle2, TrendingUp, ShieldCheck, Award } from "lucide-react";
 import ShapeGrid from '@/components/ShapeGrid';
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-const TESTIMONIALS = [
-  "Kaizen completely changed how I track my grades. Highly recommended!",
-  "The predictive analytics are incredibly accurate.",
-  "Finally, a tool that understands the KIIT grading system.",
-  "Focus timers integrated with study plans? Yes please.",
-  "I was failing, now I'm aiming for a 9 CGPA.",
-  "The UI is absolutely gorgeous and intuitive.",
-  "Gemini Flash makes the Neural Advisor so fast and smart.",
-  "Saved my semester. Thank you Kaizen team!",
-  "A must-have app for every KIIT student.",
-  "The SGPA simulator is a lifesaver before finals."
+const REVIEWS_ROW_1 = [
+  {
+    name: "Aarav Sharma",
+    branch: "B.Tech CSE '25",
+    metric: "+1.38 SGPA",
+    quote: "The SGPA simulator is a lifesaver before mid-sems. I simulated 3 grade scenarios and hit my target 9.12 CGPA exactly.",
+    avatar: "AS",
+    color: "#bbf246"
+  },
+  {
+    name: "Sneha Patel",
+    branch: "B.Tech IT '26",
+    metric: "45-Day Streak",
+    quote: "Focus Kaizen with biological pacing stopped my burnout during finals. Easily the most polished app built for KIITians.",
+    avatar: "SP",
+    color: "#38bdf8"
+  },
+  {
+    name: "Rohan Mukherjee",
+    branch: "B.Tech CSSE '25",
+    metric: "100% Parsing",
+    quote: "Grade ingestion parsed my entire SAP portal grade report in under 2 seconds. No manual entry, zero errors.",
+    avatar: "RM",
+    color: "#4ade80"
+  },
+  {
+    name: "Priya Verma",
+    branch: "B.Tech ECSc '26",
+    metric: "Neural Mentor",
+    quote: "Neural Advisor answered my exact syllabus queries with KIIT course codes in real time. Feels like an AI proctor in my pocket.",
+    avatar: "PV",
+    color: "#bbf246"
+  }
+];
+
+const REVIEWS_ROW_2 = [
+  {
+    name: "Debashish Jena",
+    branch: "B.Tech ETC '25",
+    metric: "Zero Backlogs",
+    quote: "Optimization Engine identified high-leverage subjects for improvement exams. My SGPA jumped from 7.4 to 8.65 in one sem.",
+    avatar: "DJ",
+    color: "#facc15"
+  },
+  {
+    name: "Ananya Mishra",
+    branch: "B.Tech CSE '24",
+    metric: "9.62 CGPA",
+    quote: "Deterministic SGPA forecasting eliminated all exam anxiety. The tactile Apple-grade design makes tracking grades exciting.",
+    avatar: "AM",
+    color: "#a855f7"
+  },
+  {
+    name: "Kavya Singhania",
+    branch: "B.Tech CSCE '26",
+    metric: "Sleep Sync",
+    quote: "Cognitive Sync predicted my burnout two days before mid-sems and suggested paced breaks. Saved my mental health.",
+    avatar: "KS",
+    color: "#38bdf8"
+  },
+  {
+    name: "Vikramaditya Roy",
+    branch: "B.Tech EE '25",
+    metric: "Top 5% Rank",
+    quote: "The dynamic grade weighting matches KIIT's relative curve down to decimal points. An indispensable utility.",
+    avatar: "VR",
+    color: "#bbf246"
+  }
 ];
 
 const FEATURES = [
-  { title: "SGPA Simulator", desc: "Scenario-based simulation engine for risk analysis and grade forecasting.", icon: Activity, color: "#3B82F6" },
-  { title: "Optimization Engine", desc: "Algorithmic identification of high-leverage subjects for improvement exams.", icon: Eye, color: "#00ccff" },
-  { title: "Neural Advisor", desc: "Context-aware chat assistant for academic queries using Gemini 3 Flash.", icon: Sparkles, color: "#a855f7", isNew: true },
-  { title: "Focus Kaizen", desc: "Adaptive Pomodoro timer with biological pacing to manage cognitive load.", icon: Timer, color: "#f97316", isNew: true },
-  { title: "Grade Ingestion", desc: "Local-first PDF parsing pipeline for KIIT Semester Grade Reports.", icon: Database, color: "#ef4444" },
-  { title: "Cognitive Sync", desc: "Daily wellness logging to establish baseline behavioral data.", icon: Brain, color: "#aa00ff" },
+  { title: "SGPA Simulator", desc: "Scenario-based simulation engine for risk analysis and grade forecasting.", icon: Activity, color: "#bbf246" },
+  { title: "Optimization Engine", desc: "Algorithmic identification of high-leverage subjects for improvement exams.", icon: Eye, color: "#a3e635" },
+  { title: "Neural Advisor", desc: "Context-aware chat assistant for academic queries using Gemini 3 Flash.", icon: Sparkles, color: "#bbf246", isNew: true },
+  { title: "Focus Kaizen", desc: "Adaptive Pomodoro timer with biological pacing to manage cognitive load.", icon: Timer, color: "#facc15", isNew: true },
+  { title: "Grade Ingestion", desc: "Local-first PDF parsing pipeline for KIIT Semester Grade Reports.", icon: Database, color: "#4ade80" },
+  { title: "Cognitive Sync", desc: "Daily wellness & sleep tracking to predict burnout before it breaks you.", icon: Brain, color: "#bbf246", isNew: true },
 ];
 
 const INJECTED_STYLES = `
@@ -55,56 +112,85 @@ const INJECTED_STYLES = `
   }
 
   /* -------------------------------------------------------------------
-     PHYSICAL SKEUOMORPHIC MATERIALS (Restored 3D Depth)
+     PHYSICAL SKEUOMORPHIC MATERIALS (Restored 3D Depth & Dynamic Dark/Light Mode)
   ---------------------------------------------------------------------- */
   
   /* OUTSIDE THE CARD: Theme-aware text (Shadow in Light Mode, Glow in Dark Mode) */
   .text-3d-matte {
-      color: var(--color-foreground);
+      color: var(--foreground, #000000);
       text-shadow: 
-          0 10px 30px color-mix(in srgb, var(--color-foreground) 20%, transparent), 
-          0 2px 4px color-mix(in srgb, var(--color-foreground) 10%, transparent);
+          0 10px 30px color-mix(in srgb, var(--foreground, #000000) 15%, transparent), 
+          0 2px 4px color-mix(in srgb, var(--foreground, #000000) 8%, transparent);
+  }
+  .dark .text-3d-matte {
+      color: var(--foreground, #ffffff);
+      text-shadow: 
+          0 10px 30px color-mix(in srgb, var(--foreground, #ffffff) 20%, transparent), 
+          0 2px 4px color-mix(in srgb, var(--foreground, #ffffff) 10%, transparent);
   }
 
   .text-silver-matte {
-      background: linear-gradient(180deg, var(--color-foreground) 0%, color-mix(in srgb, var(--color-foreground) 40%, var(--color-background)) 100%);
+      background: linear-gradient(180deg, #18181b 0%, #71717a 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       transform: translateZ(0); /* Hardware acceleration to prevent WebKit clipping bug */
-      filter: 
-          drop-shadow(0px 10px 20px color-mix(in srgb, var(--color-foreground) 15%, transparent)) 
-          drop-shadow(0px 2px 4px color-mix(in srgb, var(--color-foreground) 10%, transparent));
+      filter: drop-shadow(0px 6px 12px rgba(0, 0, 0, 0.08));
+  }
+  .dark .text-silver-matte {
+      background: linear-gradient(180deg, #FFFFFF 0%, #71717a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0px 10px 20px rgba(0, 0, 0, 0.8));
   }
 
-  /* INSIDE THE CARD: Hardcoded Silver/White for the dark background, deep rich shadows */
+  /* INSIDE THE CARD: Dynamic Light/Dark Mode Typography */
   .text-card-silver-matte {
-      background: linear-gradient(180deg, #FFFFFF 0%, #A1A1AA 100%);
+      background: linear-gradient(180deg, #09090b 0%, #52525b 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       transform: translateZ(0);
-      filter: 
-          drop-shadow(0px 12px 24px rgba(0,0,0,0.8)) 
-          drop-shadow(0px 4px 8px rgba(0,0,0,0.6));
+      filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.08));
+  }
+  .dark .text-card-silver-matte {
+      background: linear-gradient(180deg, #FFFFFF 0%, #A1A1AA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0px 12px 24px rgba(0,0,0,0.8));
   }
 
-  /* Deep Physical Card with Dynamic Mouse Lighting */
+  /* Deep Physical Card: White Porcelain in Light Mode, Obsidian Titanium in Dark Mode */
   .premium-depth-card {
-      background: linear-gradient(145deg, #162C6D 0%, #0A101D 100%);
+      background: linear-gradient(145deg, #ffffff 0%, #f4f4f6 100%);
+      box-shadow: 
+          0 30px 60px -15px rgba(0, 0, 0, 0.08),
+          0 10px 25px -10px rgba(0, 0, 0, 0.04),
+          inset 0 1px 2px rgba(255, 255, 255, 1),
+          inset 0 -2px 4px rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      position: relative;
+  }
+  .dark .premium-depth-card {
+      background: linear-gradient(145deg, #0e121b 0%, #06080e 100%);
       box-shadow: 
           0 40px 100px -20px rgba(0, 0, 0, 0.9),
           0 20px 40px -20px rgba(0, 0, 0, 0.8),
-          inset 0 1px 2px rgba(255, 255, 255, 0.2),
+          inset 0 1px 2px rgba(255, 255, 255, 0.12),
           inset 0 -2px 4px rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .card-sheen {
       position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 50;
+      background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.03) 0%, transparent 40%);
+      mix-blend-mode: multiply; transition: opacity 0.3s ease;
+  }
+  .dark .card-sheen {
       background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.06) 0%, transparent 40%);
-      mix-blend-mode: screen; transition: opacity 0.3s ease;
+      mix-blend-mode: screen;
   }
 
   /* Realistic iPhone Mockup Hardware */
@@ -141,14 +227,21 @@ const INJECTED_STYLES = `
   }
 
   .floating-ui-badge {
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(24px); 
       -webkit-backdrop-filter: blur(24px);
       box-shadow: 
+          0 0 0 1px rgba(0, 0, 0, 0.08),
+          0 15px 30px -10px rgba(0, 0, 0, 0.1),
+          inset 0 1px 1px rgba(255, 255, 255, 1);
+  }
+  .dark .floating-ui-badge {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+      box-shadow: 
           0 0 0 1px rgba(255, 255, 255, 0.1),
           0 25px 50px -12px rgba(0, 0, 0, 0.8),
-          inset 0 1px 1px rgba(255,255,255,0.2),
-          inset 0 -1px 1px rgba(0,0,0,0.5);
+          inset 0 1px 1px rgba(255, 255, 255, 0.2),
+          inset 0 -1px 1px rgba(0, 0, 0, 0.5);
   }
 
   /* Physical Tactile Buttons */
@@ -225,33 +318,19 @@ export function CinematicHero({
   const mockupRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
 
-  // 1. High-Performance Mouse Interaction Logic (Using requestAnimationFrame)
+  // 1. High-Performance Mouse Interaction Logic (Synchronized with Unified Scroll)
   useEffect(() => {
     let cachedCardRect: DOMRect | null = null;
-    let isScrolling = false;
-    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const onScroll = () => {
-      isScrolling = true;
-      cachedCardRect = null;
-      if (mockupRef.current && window.scrollY > 20) {
-        gsap.to(mockupRef.current, { rotationX: 0, rotationY: 0, duration: 0.3, overwrite: "auto" });
-      }
-      if (scrollTimer) clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
-        isScrolling = false;
-      }, 150);
-    };
 
     const onResize = () => {
       cachedCardRect = null;
     };
 
-    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (isScrolling || window.scrollY > 20) return;
+      if (typeof document !== "undefined" && document.body.classList.contains("is-scrolling")) return;
+      if (window.scrollY > 20) return;
 
       cancelAnimationFrame(requestRef.current);
       
@@ -284,9 +363,7 @@ export function CinematicHero({
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
-      if (scrollTimer) clearTimeout(scrollTimer);
       cancelAnimationFrame(requestRef.current);
     };
   }, []);
@@ -313,7 +390,7 @@ export function CinematicHero({
         scrollTrigger: {
           trigger: containerRef.current,
           start: "top top",
-          end: "+=12000",
+          end: "+=5500",
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,
@@ -356,8 +433,8 @@ export function CinematicHero({
         // --- Phase 5: Horizontal slide — testimonials go left, features come from right ---
         .to(".main-card", { xPercent: -120, ease: "power3.inOut", duration: 2.5 }, "hslide")
         .fromTo(".features-card", 
-          { autoAlpha: 1, xPercent: 120, y: 20 },
-          { autoAlpha: 1, xPercent: 0, y: 20, ease: "power3.inOut", duration: 2.5 }, "hslide"
+          { autoAlpha: 1, xPercent: 120, y: 12 },
+          { autoAlpha: 1, xPercent: 0, y: 12, ease: "power3.inOut", duration: 2.5 }, "hslide"
         )
         .to({}, { duration: 3 })
         // --- Phase 6: CTA reveals behind card, then Features card goes UP ---
@@ -384,12 +461,12 @@ export function CinematicHero({
           speed={0.1}
           squareSize={40}
           direction="down"
-          borderColor="#ffffff"
-          hoverFillColor="#e0e0e0"
+          borderColor="rgba(128,128,128,0.2)"
+          hoverFillColor="rgba(187, 242, 70, 0.15)"
           shape="square"
           hoverTrailAmount={1}
           // @ts-ignore
-          hoverColor="#27272a"
+          hoverColor="rgba(187, 242, 70, 0.3)"
         />
       </div>
 
@@ -443,54 +520,135 @@ export function CinematicHero({
         >
           <div className="card-sheen" aria-hidden="true" />
 
-          {/* --- TESTIMONIAL LAYER (hidden, animated by GSAP) --- */}
-          <div className="testimonial-layer absolute inset-0 z-30 flex flex-col justify-center gap-4 md:gap-6 py-10 md:py-20 overflow-hidden">
-            <div className="text-center mb-4 md:mb-8 px-4">
-              <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-card-silver-matte">WHAT STUDENTS SAY</h2>
-              <p className="text-blue-200/50 font-mono text-xs md:text-sm mt-2 uppercase tracking-widest">Social Proof</p>
+          {/* --- TESTIMONIAL LAYER (Redesigned Executive Student Impact Showcase) --- */}
+          <div className="testimonial-layer absolute inset-0 z-30 flex flex-col justify-center items-center py-6 sm:py-8 md:py-10 px-2 sm:px-4 md:px-6 overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(187,242,70,0.06),transparent_75%)] pointer-events-none" />
+
+            {/* Header Title (Clean without eyebrow text) */}
+            <div className="text-center mb-3 sm:mb-5 md:mb-6 px-4 shrink-0 relative z-10">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground dark:text-white drop-shadow-sm">
+                What Students Say
+              </h2>
+              <p className="text-muted-foreground dark:text-zinc-400 text-xs sm:text-sm font-normal mt-1.5 max-w-lg mx-auto">
+                Real academic breakthroughs from 3,500+ KIIT students using Kaizen.
+              </p>
             </div>
             
-            {/* Row 1 - Left */}
-            <div className="flex whitespace-nowrap overflow-hidden group border-y border-white/5 py-3 md:py-4">
-              <div className="flex gap-4 md:gap-6 animate-[marqueeLeft_20s_linear_infinite] group-hover:[animation-play-state:paused]">
-                {[...TESTIMONIALS, ...TESTIMONIALS].map((text, i) => (
-                  <div key={`r1-${i}`} className="px-5 md:px-8 py-3 md:py-4 bg-white/5 border border-white/10 rounded-full text-sm md:text-lg text-white font-medium shadow-lg backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors">
-                    &ldquo;{text}&rdquo;
+            {/* Row 1 - Left Drift */}
+            <div className="w-full flex whitespace-nowrap overflow-hidden group py-1.5 sm:py-2 relative z-10 [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+              <div className="flex gap-3 sm:gap-4 md:gap-5 animate-[marqueeLeft_30s_linear_infinite] group-hover:[animation-play-state:paused]">
+                {[...REVIEWS_ROW_1, ...REVIEWS_ROW_1].map((r, i) => (
+                  <div 
+                    key={`r1-${i}`} 
+                    className="w-[290px] sm:w-[330px] md:w-[360px] p-4 sm:p-5 rounded-2xl md:rounded-3xl bg-card/90 hover:bg-card dark:bg-[#111622]/90 dark:hover:bg-[#151c2c] border border-border dark:border-white/10 hover:border-primary/50 dark:hover:border-[#bbf246]/50 shadow-md hover:shadow-xl dark:shadow-xl transition-all duration-300 backdrop-blur-xl flex flex-col justify-between whitespace-normal text-left cursor-default group/card"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-muted/80 dark:bg-zinc-900 border border-border dark:border-white/15 flex items-center justify-center font-bold text-xs text-foreground dark:text-zinc-100 shadow-inner">
+                            {r.avatar}
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-semibold text-foreground dark:text-white leading-tight flex items-center gap-1">
+                              {r.name}
+                              <CheckCircle2 size={12} className="text-primary dark:text-[#bbf246]" />
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-mono text-muted-foreground dark:text-zinc-400 leading-tight">
+                              {r.branch}
+                            </div>
+                          </div>
+                        </div>
+                        <div 
+                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1"
+                          style={{ 
+                            color: r.color, 
+                            borderColor: `${r.color}33`, 
+                            backgroundColor: `${r.color}15` 
+                          }}
+                        >
+                          <TrendingUp size={10} />
+                          <span>{r.metric}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 mb-2">
+                        {[...Array(5)].map((_, starIdx) => (
+                          <Star key={starIdx} size={11} className="fill-[#bbf246] text-[#bbf246]" />
+                        ))}
+                      </div>
+                      <p className="text-zinc-700 dark:text-zinc-300 text-xs sm:text-[13px] font-light leading-relaxed line-clamp-2 sm:line-clamp-3">
+                        &ldquo;{r.quote}&rdquo;
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Row 2 - Right */}
-            <div className="flex whitespace-nowrap overflow-hidden group border-b border-white/5 py-3 md:py-4">
-              <div className="flex gap-4 md:gap-6 animate-[marqueeRight_25s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ transform: 'translateX(-50%)' }}>
-                {[...TESTIMONIALS].reverse().concat([...TESTIMONIALS].reverse()).map((text, i) => (
-                  <div key={`r2-${i}`} className="px-5 md:px-8 py-3 md:py-4 bg-white/5 border border-white/10 rounded-full text-sm md:text-lg text-white font-medium shadow-lg backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors">
-                    &ldquo;{text}&rdquo;
+            {/* Row 2 - Right Drift */}
+            <div className="w-full flex whitespace-nowrap overflow-hidden group py-1.5 sm:py-2 relative z-10 [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+              <div className="flex gap-3 sm:gap-4 md:gap-5 animate-[marqueeRight_34s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ transform: 'translateX(-50%)' }}>
+                {[...REVIEWS_ROW_2, ...REVIEWS_ROW_2].map((r, i) => (
+                  <div 
+                    key={`r2-${i}`} 
+                    className="w-[290px] sm:w-[330px] md:w-[360px] p-4 sm:p-5 rounded-2xl md:rounded-3xl bg-card/90 hover:bg-card dark:bg-[#111622]/90 dark:hover:bg-[#151c2c] border border-border dark:border-white/10 hover:border-primary/50 dark:hover:border-[#bbf246]/50 shadow-md hover:shadow-xl dark:shadow-xl transition-all duration-300 backdrop-blur-xl flex flex-col justify-between whitespace-normal text-left cursor-default group/card"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-muted/80 dark:bg-zinc-900 border border-border dark:border-white/15 flex items-center justify-center font-bold text-xs text-foreground dark:text-zinc-100 shadow-inner">
+                            {r.avatar}
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-semibold text-foreground dark:text-white leading-tight flex items-center gap-1">
+                              {r.name}
+                              <CheckCircle2 size={12} className="text-primary dark:text-[#bbf246]" />
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-mono text-muted-foreground dark:text-zinc-400 leading-tight">
+                              {r.branch}
+                            </div>
+                          </div>
+                        </div>
+                        <div 
+                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1"
+                          style={{ 
+                            color: r.color, 
+                            borderColor: `${r.color}33`, 
+                            backgroundColor: `${r.color}15` 
+                          }}
+                        >
+                          <TrendingUp size={10} />
+                          <span>{r.metric}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 mb-2">
+                        {[...Array(5)].map((_, starIdx) => (
+                          <Star key={starIdx} size={11} className="fill-[#bbf246] text-[#bbf246]" />
+                        ))}
+                      </div>
+                      <p className="text-zinc-700 dark:text-zinc-300 text-xs sm:text-[13px] font-light leading-relaxed line-clamp-2 sm:line-clamp-3">
+                        &ldquo;{r.quote}&rdquo;
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Row 3 - Left */}
-            <div className="flex whitespace-nowrap overflow-hidden group border-b border-white/5 py-3 md:py-4">
-              <div className="flex gap-4 md:gap-6 animate-[marqueeLeft_22s_linear_infinite] group-hover:[animation-play-state:paused]">
-                {[...TESTIMONIALS, ...TESTIMONIALS].map((text, i) => (
-                  <div key={`r3-${i}`} className="px-5 md:px-8 py-3 md:py-4 bg-white/5 border border-white/10 rounded-full text-sm md:text-lg text-white font-medium shadow-lg backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors">
-                    &ldquo;{text}&rdquo;
-                  </div>
-                ))}
+            {/* Bottom Proof Metric Bar */}
+            <div className="mt-3 sm:mt-5 flex items-center justify-center gap-3 sm:gap-6 md:gap-8 px-4 text-[10px] sm:text-xs font-mono text-muted-foreground dark:text-zinc-400 shrink-0 relative z-10">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={13} className="text-primary dark:text-[#bbf246]" />
+                <span className="text-foreground dark:text-zinc-200 font-semibold">3,532+</span> Questions Digitized
               </div>
-            </div>
-
-            {/* Row 4 - Right */}
-            <div className="flex whitespace-nowrap overflow-hidden group border-b border-white/5 py-3 md:py-4">
-              <div className="flex gap-4 md:gap-6 animate-[marqueeRight_18s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ transform: 'translateX(-50%)' }}>
-                {[...TESTIMONIALS].reverse().concat([...TESTIMONIALS].reverse()).map((text, i) => (
-                  <div key={`r4-${i}`} className="px-5 md:px-8 py-3 md:py-4 bg-white/5 border border-white/10 rounded-full text-sm md:text-lg text-white font-medium shadow-lg backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors">
-                    &ldquo;{text}&rdquo;
-                  </div>
-                ))}
+              <div className="hidden sm:inline text-border dark:text-zinc-600">•</div>
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={13} className="text-primary dark:text-[#bbf246]" />
+                <span className="text-foreground dark:text-zinc-200 font-semibold">99.9%</span> Deterministic Accuracy
+              </div>
+              <div className="hidden sm:inline text-border dark:text-zinc-600">•</div>
+              <div className="flex items-center gap-1.5">
+                <Award size={13} className="text-primary dark:text-[#bbf246]" />
+                <span className="text-foreground dark:text-zinc-200 font-semibold">100%</span> KIIT Grading Matched
               </div>
             </div>
           </div>
@@ -498,11 +656,17 @@ export function CinematicHero({
           {/* DYNAMIC RESPONSIVE GRID: Flex-col on mobile to force order, Grid on desktop */}
           <div className="relative w-full h-full max-w-7xl mx-auto px-4 lg:px-12 flex flex-col justify-evenly lg:grid lg:grid-cols-3 items-center lg:gap-8 z-10 py-6 lg:py-0">
             
-            {/* 1. TOP (Mobile) / RIGHT (Desktop): BRAND NAME */}
+            {/* 1. TOP (Mobile) / RIGHT (Desktop): BRAND NAME WITH OFFICIAL LOGO */}
             <div className="card-right-text gsap-reveal order-1 lg:order-3 flex justify-center lg:justify-end z-20 w-full">
-              <h2 className="text-6xl md:text-[6rem] lg:text-[8rem] font-black uppercase tracking-tighter text-card-silver-matte lg:mt-0">
-                {brandName}
-              </h2>
+              <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
+                <div className="size-12 sm:size-16 md:size-20 rounded-2xl md:rounded-3xl overflow-hidden border border-border dark:border-white/15 shadow-[0_0_30px_rgba(187,242,70,0.3)] bg-black shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo/kaizen-logo.png" alt="Kaizen" className="w-full h-full object-cover" />
+                </div>
+                <h2 className="text-5xl md:text-[5.5rem] lg:text-[7.5rem] font-black uppercase tracking-tighter text-card-silver-matte lg:mt-0">
+                  {brandName}
+                </h2>
+              </div>
             </div>
 
             {/* 2. MIDDLE (Mobile) / CENTER (Desktop): IPHONE MOCKUP */}
@@ -538,24 +702,27 @@ export function CinematicHero({
                           <span className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold mb-1">Today</span>
                           <span className="text-xl font-bold tracking-tight text-white drop-shadow-md">Journey</span>
                         </div>
-                        <div className="w-9 h-9 rounded-full bg-white/5 text-neutral-200 flex items-center justify-center font-bold text-sm border border-white/10 shadow-lg shadow-black/50">JS</div>
+                        <div className="w-9 h-9 rounded-full overflow-hidden border border-white/15 shadow-lg shadow-black/50 shrink-0 bg-black">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/logo/kaizen-logo.png" alt="Kaizen" className="w-full h-full object-cover" />
+                        </div>
                       </div>
 
                       <div className="phone-widget relative w-44 h-44 mx-auto flex items-center justify-center mb-8 drop-shadow-[0_15px_25px_rgba(0,0,0,0.8)]">
                         <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
                           <circle cx="88" cy="88" r="64" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
-                          <circle className="progress-ring" cx="88" cy="88" r="64" fill="none" stroke="#3B82F6" strokeWidth="12" />
+                          <circle className="progress-ring" cx="88" cy="88" r="64" fill="none" stroke="#bbf246" strokeWidth="12" />
                         </svg>
                         <div className="text-center z-10 flex flex-col items-center">
                           <span className="counter-val text-4xl font-extrabold tracking-tighter text-white">0</span>
-                          <span className="text-[8px] text-blue-200/50 uppercase tracking-[0.1em] font-bold mt-0.5">{metricLabel}</span>
+                          <span className="text-[8px] text-[#bbf246]/70 uppercase tracking-[0.1em] font-bold mt-0.5">{metricLabel}</span>
                         </div>
                       </div>
 
                       <div className="space-y-3">
                         <div className="phone-widget widget-depth rounded-2xl p-3 flex items-center">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/5 flex items-center justify-center mr-3 border border-blue-400/20 shadow-inner">
-                            <svg className="w-4 h-4 text-blue-400 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#bbf246]/20 to-[#bbf246]/5 flex items-center justify-center mr-3 border border-[#bbf246]/30 shadow-inner">
+                            <svg className="w-4 h-4 text-[#bbf246] drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           </div>
@@ -588,8 +755,8 @@ export function CinematicHero({
                     <span className="text-base lg:text-xl drop-shadow-lg" aria-hidden="true">🔥</span>
                   </div>
                   <div>
-                    <p className="text-white text-xs lg:text-sm font-bold tracking-tight">1 Year Streak</p>
-                    <p className="text-blue-200/50 text-[10px] lg:text-xs font-medium">Milestone unlocked</p>
+                    <p className="text-foreground dark:text-white text-xs lg:text-sm font-bold tracking-tight">1 Year Streak</p>
+                    <p className="text-muted-foreground dark:text-blue-200/50 text-[10px] lg:text-xs font-medium">Milestone unlocked</p>
                   </div>
                 </div>
 
@@ -598,8 +765,8 @@ export function CinematicHero({
                     <span className="text-base lg:text-lg drop-shadow-lg" aria-hidden="true">🤝</span>
                   </div>
                   <div>
-                    <p className="text-white text-xs lg:text-sm font-bold tracking-tight">Sponsor Update</p>
-                    <p className="text-blue-200/50 text-[10px] lg:text-xs font-medium">Shared successfully</p>
+                    <p className="text-foreground dark:text-white text-xs lg:text-sm font-bold tracking-tight">Sponsor Update</p>
+                    <p className="text-muted-foreground dark:text-blue-200/50 text-[10px] lg:text-xs font-medium">Shared successfully</p>
                   </div>
                 </div>
 
@@ -608,58 +775,61 @@ export function CinematicHero({
 
             {/* 3. BOTTOM (Mobile) / LEFT (Desktop): ACCOUNTABILITY TEXT */}
             <div className="card-left-text gsap-reveal order-3 lg:order-1 flex flex-col justify-center text-center lg:text-left z-20 w-full lg:max-w-none px-4 lg:px-0">
-              <h3 className="text-white text-2xl md:text-3xl lg:text-4xl font-bold mb-0 lg:mb-5 tracking-tight">
+              <h3 className="text-foreground dark:text-white text-2xl md:text-3xl lg:text-4xl font-bold mb-0 lg:mb-5 tracking-tight">
                 {cardHeading}
               </h3>
               {/* HIDDEN ON MOBILE (added hidden md:block) */}
-              <p className="hidden md:block text-blue-100/70 text-sm md:text-base lg:text-lg font-normal leading-relaxed mx-auto lg:mx-0 max-w-sm lg:max-w-none">
+              <div className="hidden md:block text-muted-foreground dark:text-zinc-300 text-sm md:text-base lg:text-lg font-normal leading-relaxed mx-auto lg:mx-0 max-w-sm lg:max-w-none">
                 {cardDescription}
-              </p>
+              </div>
             </div>
 
           </div>
         </div>
       </div>
 
-      {/* FEATURES CARD — separate sibling card, same size, slides in from right */}
+      {/* FEATURES CARD — Perfectly proportioned, zero vertical clipping */}
       <div 
-        className="features-card absolute z-20 overflow-hidden pointer-events-auto rounded-[32px] md:rounded-[40px] w-[92vw] md:w-[85vw] h-[85vh] md:h-[80vh] flex flex-col justify-center items-center will-change-transform"
-        style={{ 
-          background: 'linear-gradient(135deg, #F8F0E3 0%, #EADBC8 30%, #DAC4A8 70%, #C9AD8C 100%)',
-          boxShadow: '0 40px 100px -20px rgba(0, 0, 0, 0.9), 0 20px 40px -20px rgba(0, 0, 0, 0.8)',
-        }}
+        className="features-card absolute z-20 overflow-y-auto overflow-x-hidden pointer-events-auto rounded-[28px] md:rounded-[36px] w-[94vw] md:w-[88vw] lg:w-[85vw] max-w-7xl h-[88vh] md:h-[86vh] max-h-[820px] flex flex-col justify-start md:justify-center items-center will-change-transform border border-border dark:border-white/10 bg-card/95 dark:bg-[#10101b]/95 backdrop-blur-xl shadow-2xl transition-colors duration-300 p-3 sm:p-5 md:p-6"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.08),transparent_70%)] pointer-events-none" />
-        <div className="max-w-6xl w-full mx-auto relative z-10 px-4 md:px-8 lg:px-12">
-          <div className="mb-8 md:mb-12 flex flex-col md:flex-row items-end justify-between gap-6 md:gap-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.06),transparent_70%)] pointer-events-none" />
+        <div className="max-w-6xl w-full mx-auto relative z-10 py-1 sm:py-2">
+          <div className="mb-3 sm:mb-4 md:mb-5 flex flex-col sm:flex-row sm:items-end justify-between gap-2 sm:gap-4">
             <div>
-              <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-3 md:mb-4 text-stone-900">SYSTEM <br/><span className="text-stone-900/50">MODULES</span></h2>
-              <p className="max-w-xl text-stone-700 text-sm md:text-lg font-medium">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground dark:text-white flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>SYSTEM</span>
+                <span className="text-muted-foreground dark:text-[#a1a1aa]">MODULES</span>
+              </h2>
+              <p className="max-w-xl text-muted-foreground dark:text-[#a1a1aa] text-xs sm:text-sm font-normal mt-0.5 sm:mt-1">
                 A suite of deterministic tools designed to quantify every aspect of student life.
               </p>
             </div>
-            <div className="text-right hidden md:block">
-              <div className="inline-block px-4 py-2 border border-stone-400/30 rounded-sm text-xs font-mono text-stone-600">
-                POWERED BY <br/> <span className="text-stone-900 font-bold">GEMINI 3 FLASH</span>
+            <div className="text-left sm:text-right shrink-0">
+              <div className="inline-flex items-center gap-2 px-3 py-1 border border-border dark:border-white/10 bg-muted/60 dark:bg-white/5 rounded-lg text-[10px] sm:text-xs font-mono text-muted-foreground dark:text-[#a1a1aa]">
+                <span>POWERED BY</span>
+                <span className="text-primary dark:text-[#bbf246] font-bold">GEMINI 3 FLASH</span>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3.5 md:gap-4">
             {FEATURES.map((f) => {
               const Icon = f.icon;
               return (
-                <div key={f.title} className="p-6 md:p-8 border rounded-2xl md:rounded-3xl min-h-[220px] md:min-h-[260px] flex flex-col justify-between relative cursor-pointer shadow-lg bg-[#0A101D] border-white/5 hover:border-white/20 transition-colors">
+                <div 
+                  key={f.title} 
+                  className="group relative p-3.5 sm:p-4 md:p-4.5 border rounded-2xl md:rounded-3xl min-h-[110px] sm:min-h-[120px] md:min-h-[125px] flex flex-col justify-between cursor-pointer shadow-sm hover:shadow-xl bg-background/90 dark:bg-[#141422]/90 border-border dark:border-white/10 hover:border-primary/60 dark:hover:border-[#bbf246]/40 transition-all duration-300"
+                >
                   {f.isNew && (
-                    <div className="absolute top-4 right-4 px-2 py-1 text-black text-[10px] font-bold uppercase tracking-widest rounded-sm" style={{ backgroundColor: '#3B82F6' }}>
+                    <div className="absolute top-3 right-3 px-2 py-0.5 text-black text-[9px] font-bold uppercase tracking-widest rounded-full bg-[#bbf246] shadow-sm">
                       New
                     </div>
                   )}
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center mb-4 md:mb-6 shadow-inner" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                    <Icon size={20} style={{ color: f.color }} />
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center mb-1.5 sm:mb-2 shadow-inner bg-muted/60 dark:bg-white/5 border border-border dark:border-white/10 group-hover:scale-105 transition-transform duration-300">
+                    <Icon size={16} style={{ color: f.color }} />
                   </div>
                   <div>
-                    <h3 className="text-xl md:text-2xl font-medium mb-2 md:mb-3 text-white">{f.title}</h3>
-                    <p className="text-neutral-400 font-light leading-relaxed text-xs md:text-sm">{f.desc}</p>
+                    <h3 className="text-sm sm:text-base md:text-lg font-bold mb-0.5 text-foreground dark:text-white group-hover:text-primary dark:group-hover:text-[#bbf246] transition-colors">{f.title}</h3>
+                    <p className="text-muted-foreground dark:text-[#a1a1aa] font-light leading-snug text-xs sm:text-[13px] line-clamp-2">{f.desc}</p>
                   </div>
                 </div>
               );

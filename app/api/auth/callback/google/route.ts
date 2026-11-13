@@ -37,6 +37,33 @@ export async function GET(req: NextRequest) {
     });
     const googleUser = await userResponse.json();
 
+    // Try fetching extended directory details from Google People API
+    let profilePicture = googleUser.picture ? googleUser.picture.replace(/=s\d+(-c)?$/, '=s400-c') : null;
+    let fetchedDepartment: string | null = null;
+    let fetchedDesignation: string | null = null;
+
+    try {
+      const peopleResp = await fetch(
+        'https://people.googleapis.com/v1/people/me?personFields=photos,organizations,userDefined',
+        { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+      );
+      if (peopleResp.ok) {
+        const peopleData = await peopleResp.json();
+        // High-res photo from People API
+        if (peopleData.photos && peopleData.photos.length > 0 && peopleData.photos[0].url) {
+          profilePicture = peopleData.photos[0].url.replace(/=s\d+(-c)?$/, '=s400-c');
+        }
+        // School / Department / Role from Google Workspace Directory
+        if (peopleData.organizations && peopleData.organizations.length > 0) {
+          const org = peopleData.organizations.find((o: any) => o.current) || peopleData.organizations[0];
+          fetchedDepartment = org.department || org.name || null;
+          fetchedDesignation = org.title || null;
+        }
+      }
+    } catch (peopleErr) {
+      console.warn("Google People API fetch skipped/unavailable:", peopleErr);
+    }
+
     // 3. Domain Restriction Check
     if (!googleUser.email.endsWith('@kiit.ac.in')) {
       // Redirect back to login with a specific error
@@ -47,25 +74,57 @@ export async function GET(req: NextRequest) {
     const tokenExpiry = new Date(Date.now() + tokenData.expires_in * 1000);
     const preConsent = req.cookies.get('pre_consent')?.value === 'true';
 
-    let user = await prisma.user.findUnique({ where: { email: googleUser.email } });
+    let user = await prisma.user.findUnique({ 
+      where: { email: googleUser.email },
+      include: { academicProfile: true }
+    });
 
     // Sole Root Access: strictly 2330231@kiit.ac.in
     const isRootUser = googleUser.email.trim().toLowerCase() === '2330231@kiit.ac.in';
 
-    const isRollNumber = /^\d+@kiit\.ac\.in$/i.test(googleUser.email);
+    const rollMatch = googleUser.email.match(/^(\d+)@kiit\.ac\.in$/i);
+    const rollNumber = rollMatch ? rollMatch[1] : null;
+    const isRollNumber = Boolean(rollNumber);
+
+    // Look up student directory in NeonDB for official KIIT 7th Semester roster
+    let directoryStudent: any = null;
+    if (rollNumber) {
+      try {
+        directoryStudent = await prisma.studentDirectory.findUnique({
+          where: { rollNo: rollNumber }
+        });
+      } catch (dirErr) {
+        console.warn("Could not query StudentDirectory:", dirErr);
+      }
+    }
+
     const initialUserType = isRootUser ? 'ROOT' : isRollNumber ? 'STUDENT' : 'FACULTY';
     const initialOfficialTag = isRootUser
       ? 'AAA'
       : isRollNumber
       ? 'GENERAL_STUDENT'
       : 'PROFESSOR';
+
+    // Resolved Directory Metadata
+    const resolvedName = directoryStudent?.name || googleUser.name;
+    const resolvedSection = directoryStudent?.section || 'ECS GROUP-03';
+    const resolvedProgram = directoryStudent?.program || 'B.Tech in Electronics Engineering (7th Sem)';
+    const resolvedBranch = (directoryStudent as any)?.branch || (resolvedProgram.includes('ETC') ? 'ETC' : resolvedProgram.includes('EEE') ? 'EEE' : 'E&CSc');
+    const resolvedDepartment = fetchedDepartment || 'School of Electronics Engineering';
+    const resolvedDesignation = isRootUser
+      ? 'System Architect & Root Administrator'
+      : (fetchedDesignation || (isRollNumber ? `B.Tech Student (7th Sem, ${resolvedBranch})` : 'Faculty Member'));
     
     if (user) {
       user = await prisma.user.update({
         where: { email: googleUser.email },
         data: {
-          name: googleUser.name,
-          image: googleUser.picture,
+          name: googleUser.name || resolvedName,
+          image: profilePicture || user.image,
+          department: resolvedDepartment || user.department,
+          designation: isRootUser 
+            ? 'System Architect & Root Administrator' 
+            : (fetchedDesignation || user.designation || resolvedDesignation),
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token || undefined,
           tokenExpiry: tokenExpiry,
@@ -87,14 +146,59 @@ export async function GET(req: NextRequest) {
                 permissions: [],
               }
             : {})
-        }
+        },
+        include: { academicProfile: true }
       });
+
+      // Ensure Academic Profile exists with roll number & exact section from directory
+      if (!user.academicProfile && isRollNumber) {
+        await prisma.academicProfile.create({
+          data: {
+            userId: user.id,
+            rollNumber: rollNumber,
+            program: resolvedProgram,
+            section: resolvedSection,
+            branch: resolvedBranch,
+            cgpa: 0.0
+          }
+        });
+      } else if (user.academicProfile && isRollNumber && directoryStudent) {
+        await prisma.academicProfile.update({
+          where: { id: user.academicProfile.id },
+          data: {
+            rollNumber: rollNumber,
+            section: user.academicProfile.section || resolvedSection,
+            branch: user.academicProfile.branch || resolvedBranch,
+            program: user.academicProfile.program || resolvedProgram,
+          }
+        });
+      }
+
+      // Sync elective allotment into AcademicProfile
+      if (directoryStudent?.electiveSection) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "AcademicProfile" 
+             SET "electiveSection" = $1, "electiveSubject" = $2, "electiveFaculty" = $3, "electiveRoom" = $4
+             WHERE "userId" = $5`,
+            directoryStudent.electiveSection,
+            directoryStudent.electiveSubject,
+            directoryStudent.electiveFaculty,
+            directoryStudent.electiveRoom,
+            user.id
+          );
+        } catch (e) {
+          console.warn("Could not sync elective allotment:", e);
+        }
+      }
     } else {
       user = await prisma.user.create({
         data: {
           email: googleUser.email,
-          name: googleUser.name,
-          image: googleUser.picture,
+          name: googleUser.name || resolvedName,
+          image: profilePicture,
+          department: resolvedDepartment,
+          designation: resolvedDesignation,
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
           tokenExpiry: tokenExpiry,
@@ -103,9 +207,35 @@ export async function GET(req: NextRequest) {
           officialTag: initialOfficialTag as any,
           officialTags: [initialOfficialTag as any],
           permissions: isRootUser ? ['ALL_AREA_ACCESS'] : [],
-          designation: isRootUser ? 'System Architect & Root Administrator' : null,
-        }
+          academicProfile: isRollNumber ? {
+            create: {
+              rollNumber: rollNumber,
+              program: resolvedProgram,
+              section: resolvedSection,
+              branch: resolvedBranch,
+              cgpa: 0.0
+            }
+          } : undefined
+        },
+        include: { academicProfile: true }
       });
+
+      if (directoryStudent?.electiveSection) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "AcademicProfile" 
+             SET "electiveSection" = $1, "electiveSubject" = $2, "electiveFaculty" = $3, "electiveRoom" = $4
+             WHERE "userId" = $5`,
+            directoryStudent.electiveSection,
+            directoryStudent.electiveSubject,
+            directoryStudent.electiveFaculty,
+            directoryStudent.electiveRoom,
+            user.id
+          );
+        } catch (e) {
+          console.warn("Could not sync elective allotment on create:", e);
+        }
+      }
     }
 
     // 5. Create Session & Cookie

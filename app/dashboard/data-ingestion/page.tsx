@@ -124,6 +124,64 @@ export default function DataIngestionPage() {
   const [showPageModal, setShowPageModal] = useState(false);
   const [viewMode, setViewMode] = useState<"zoomed" | "crop">("zoomed");
 
+  // Apple-style View & Loading States
+  const [renderMode, setRenderMode] = useState<"fast_cdn" | "live_pdf">("fast_cdn");
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [editorTab, setEditorTab] = useState<"text" | "math" | "meta">("text");
+
+  const handleFixCropLoading = () => {
+    setRenderMode("fast_cdn");
+    setImageError(false);
+    setImageLoading(false);
+    setImageKey(Date.now());
+    setViewMode("zoomed");
+    showToast("✓ Bypassed slow PDF vector render. Restored instant snapshot!", "ok");
+  };
+
+  // Apple-style Intelligence: Clean & Format OCR text
+  const handleAiCleanText = () => {
+    if (!editorText.trim()) return;
+    let cleaned = editorText
+      // Remove repetitive institutional header noise if caught in crop
+      .replace(/^.*KIIT\s*(DEEMED\s*TO\s*BE)?\s*UNIVERSITY.*$/gim, "")
+      .replace(/^.*SCHOOL\s*OF\s*COMPUTER\s*ENGINEERING.*$/gim, "")
+      .replace(/^.*AUTUMN|SPRING\s*END\s*SEMESTER\s*EXAM.*$/gim, "")
+      .replace(/^.*Page\s*\d+\s*(of\s*\d+)?.*$/gim, "")
+      .replace(/^.*(Time|Full\s*Marks)\s*:\s*.*$/gim, "")
+      // Normalize question numbering bullets
+      .replace(/^\s*([0-9]+)\s*[\.)]\s*/gm, "\n$1. ")
+      .replace(/^\s*\(([a-z0-9]+)\)\s*/gm, "\n   ($1) ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    setEditorText(cleaned);
+    setTextUpdatedPulse(true);
+    setTimeout(() => setTextUpdatedPulse(false), 2000);
+    showToast("✨ Question text polished & noise removed", "ok");
+  };
+
+  // Apple-style Intelligence: Format Math / LaTeX
+  const handleFormatLatex = () => {
+    if (!editorText.trim()) return;
+    let formatted = editorText
+      .replace(/\bint\b/g, "\\int")
+      .replace(/\bsum\b/g, "\\sum")
+      .replace(/\btheta\b/g, "\\theta")
+      .replace(/\balpha\b/g, "\\alpha")
+      .replace(/\bbeta\b/g, "\\beta")
+      .replace(/\bpi\b/g, "\\pi")
+      .replace(/\binfinity\b/g, "\\infty")
+      .replace(/<=/g, "\\le")
+      .replace(/>=/g, "\\ge")
+      .replace(/!=/g, "\\ne");
+
+    setEditorText(formatted);
+    setTextUpdatedPulse(true);
+    setTimeout(() => setTextUpdatedPulse(false), 2000);
+    showToast("📐 Math symbols converted to LaTeX notation", "ok");
+  };
+
   // Dragging state for photo-editor style crop
   const [dragHandle, setDragHandle] = useState<
     "move" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w" | "draw" | null
@@ -165,7 +223,7 @@ export default function DataIngestionPage() {
     showToast(`Rotated image to ${nextRot}°`, "ok");
   };
 
-  const applyPreset = (preset: "q1" | "q2" | "q3" | "full") => {
+  const applyPreset = (preset: "q1" | "q2" | "q3" | "full" | "auto") => {
     if (!activeItem) return;
     const isSideways = rotation % 180 === 90;
     const pw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
@@ -178,6 +236,17 @@ export default function DataIngestionPage() {
       setBoxCoords({ x0: 35, y0: ph * 0.63, x1: pw - 35, y1: ph - 40 });
     } else if (preset === "full") {
       setBoxCoords({ x0: 25, y0: 40, x1: pw - 25, y1: ph - 40 });
+    } else if (preset === "auto") {
+      if (activeItem.bboxX0 !== null && activeItem.bboxX1 !== null) {
+        setBoxCoords({
+          x0: activeItem.bboxX0,
+          y0: activeItem.bboxY0 || 40,
+          x1: activeItem.bboxX1,
+          y1: activeItem.bboxY1 || 280,
+        });
+      } else {
+        setBoxCoords({ x0: 35, y0: 80, x1: pw - 35, y1: Math.min(ph * 0.45, 380) });
+      }
     }
   };
 
@@ -1856,14 +1925,14 @@ export default function DataIngestionPage() {
           <div className="flex-1 flex overflow-hidden">
             {/* ── LEFT PANE: QUESTION IMAGE & CROP VIEWPORT (50% width) ── */}
             <div className="w-1/2 border-r border-zinc-800/60 flex flex-col bg-[#07070a] overflow-hidden">
-              {/* Image Viewport Header (40px) */}
-              <div className="h-10 border-b border-zinc-800/60 px-3 bg-[#0a0a0e] flex items-center justify-between gap-2 shrink-0">
+              {/* Image Viewport Header (Apple-style frosted bar) */}
+              <div className="h-11 border-b border-zinc-800/60 px-3 bg-[#0a0a0e]/90 backdrop-blur-md flex items-center justify-between gap-2 shrink-0">
                 {/* View Mode Toggle: Zoomed Crop vs Page Tool */}
-                <div className="flex items-center gap-1.5">
-                  <div className="inline-flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg shadow-sm">
                     <button
                       onClick={() => setViewMode("zoomed")}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all ${
+                      className={`px-3 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
                         viewMode === "zoomed"
                           ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
                           : "text-zinc-400 hover:text-zinc-200"
@@ -1871,40 +1940,51 @@ export default function DataIngestionPage() {
                       title="Focus Crop View (Hotkey: Z)"
                     >
                       <Maximize2 className="w-3 h-3" />
-                      <span>Crop View (Z)</span>
+                      <span>Question View</span>
                     </button>
                     <button
                       onClick={() => setViewMode("crop")}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all ${
+                      className={`px-3 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
                         viewMode === "crop"
-                          ? "bg-cyan-600/30 text-cyan-300 shadow-sm border border-cyan-500/40"
+                          ? "bg-emerald-500/20 text-emerald-300 shadow-sm border border-emerald-500/40"
                           : "text-zinc-400 hover:text-zinc-200"
                       }`}
                       title="Interactive Page Crop Tool (Hotkey: C)"
                     >
-                      <Crop className="w-3 h-3 text-cyan-400" />
-                      <span>Page Tool (C)</span>
+                      <Crop className="w-3 h-3 text-emerald-400" />
+                      <span>Adjust Crop</span>
                     </button>
                   </div>
 
-                  {viewMode === "crop" && (
-                    <div className="flex items-center gap-1">
-                      <div className="hidden xl:flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-md p-0.5 text-[10px] font-mono">
-                        <button onClick={() => applyPreset("q1")} className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 rounded">Q1</button>
-                        <button onClick={() => applyPreset("q2")} className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 rounded">Q2</button>
-                        <button onClick={() => applyPreset("q3")} className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 rounded">Q3</button>
-                        <button onClick={() => applyPreset("full")} className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 rounded">Full</button>
-                      </div>
-                      <button
-                        onClick={handleApplyAndRecrop}
-                        disabled={recropping || isScanning}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-all"
-                        title="Apply crop & extract text (Hotkey: Enter)"
-                      >
-                        <Check className="w-3 h-3" /> Apply (Enter)
-                      </button>
-                    </div>
-                  )}
+                  {/* Render Mode & Fix Loading Pill */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const next = renderMode === "fast_cdn" ? "live_pdf" : "fast_cdn";
+                        setRenderMode(next);
+                        setImageKey(Date.now());
+                        showToast(`Switched to ${next === "fast_cdn" ? "Instant CDN Snapshot" : "Live Vector PDF"}`, "ok");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium flex items-center gap-1 transition-colors border shadow-sm ${
+                        renderMode === "fast_cdn"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                          : "bg-purple-500/10 border-purple-500/30 text-purple-300 hover:bg-purple-500/20"
+                      }`}
+                      title="Toggle between Instant CDN snapshot and Live Vector PDF render"
+                    >
+                      <Zap className="w-2.5 h-2.5" />
+                      <span>{renderMode === "fast_cdn" ? "Fast CDN" : "Vector PDF"}</span>
+                    </button>
+
+                    <button
+                      onClick={handleFixCropLoading}
+                      className="px-2 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-amber-500/30 text-[10px] font-mono text-amber-300 hover:text-amber-200 flex items-center gap-1 transition-colors shadow-sm"
+                      title="One-click fix: Bypasses loading lag and immediately restores instant snapshot"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5 text-amber-400" />
+                      <span>Fix Loading</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Right controls: Rotate, Zoom, Fullscreen */}
@@ -1950,7 +2030,7 @@ export default function DataIngestionPage() {
 
                   <button
                     onClick={() => setFullscreenStudio(true)}
-                    className="p-1 text-zinc-400 hover:text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800"
+                    className="p-1.5 text-zinc-400 hover:text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition-colors"
                     title="Fullscreen Studio (F)"
                   >
                     <Maximize2 className="w-3 h-3" />
@@ -1979,6 +2059,20 @@ export default function DataIngestionPage() {
                   </div>
                 )}
 
+                {/* Loading Delay / Fallback Banner */}
+                {(imageError || (renderMode === "live_pdf" && imageLoading)) && (
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full bg-amber-950/90 border border-amber-500/40 backdrop-blur-md shadow-2xl flex items-center gap-2.5 text-xs text-amber-200">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span>Vector render slow or unavailable</span>
+                    <button
+                      onClick={handleFixCropLoading}
+                      className="px-2 py-0.5 rounded-full bg-amber-400 hover:bg-amber-300 text-black font-bold text-[10px] transition-colors shadow-sm"
+                    >
+                      Switch to Instant Snapshot
+                    </button>
+                  </div>
+                )}
+
                 {/* MODE 1: ZOOMED QUESTION FOCUS */}
                 {viewMode === "zoomed" ? (
                   <div
@@ -1991,10 +2085,10 @@ export default function DataIngestionPage() {
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      key={`${activeItem.id}-${imageKey}-${rotation}`}
+                      key={`${activeItem.id}-${imageKey}-${rotation}-${renderMode}`}
                       src={
-                        activeItem.sourcePdf
-                          ? `/api/pdf/crop?pdf=${encodeURIComponent(
+                        renderMode === "live_pdf" && activeItem.sourcePdf
+                          ? `/api/pdf/crop?id=${activeItem.id}&pdf=${encodeURIComponent(
                               activeItem.sourcePdf
                             )}&page=${activeItem.pageNumber || 1}&x0=${boxCoords.x0.toFixed(
                               1
@@ -2004,30 +2098,84 @@ export default function DataIngestionPage() {
                           : `${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`
                       }
                       alt="Focused Question Crop"
-                      className="max-w-full max-h-[calc(100vh-140px)] object-contain rounded-lg shadow-2xl border border-zinc-800 bg-white"
+                      className="max-w-full max-h-[calc(100vh-140px)] object-contain rounded-xl shadow-2xl border border-zinc-800 bg-white"
+                      onLoad={() => {
+                        setImageLoading(false);
+                        setImageError(false);
+                      }}
                       onError={(e) => {
+                        setImageError(true);
+                        setRenderMode("fast_cdn");
                         const target = e.currentTarget as HTMLImageElement;
                         target.src = `${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`;
                       }}
                     />
 
                     {/* Bottom overlay badge */}
-                    <div className="absolute bottom-2 left-3 px-2 py-0.5 rounded bg-black/80 border border-zinc-800 text-[10px] font-mono text-zinc-400 backdrop-blur-md">
-                      Page {activeItem.pageNumber} · {Math.round(boxCoords.x1 - boxCoords.x0)} × {Math.round(boxCoords.y1 - boxCoords.y0)} pt
+                    <div className="absolute bottom-2 left-3 px-2.5 py-1 rounded-lg bg-black/80 border border-zinc-800 text-[10px] font-mono text-zinc-400 backdrop-blur-md flex items-center gap-2">
+                      <span>Page {activeItem.pageNumber || 1}</span>
+                      <span>·</span>
+                      <span>{Math.round(boxCoords.x1 - boxCoords.x0)} × {Math.round(boxCoords.y1 - boxCoords.y0)} pt</span>
+                      <span>·</span>
+                      <span className="text-emerald-400">{renderMode === "fast_cdn" ? "⚡ CDN Snapshot" : "📄 Vector Render"}</span>
                     </div>
 
                     <button
                       onClick={() => setViewMode("crop")}
-                      className="absolute bottom-2 right-3 px-2.5 py-1 rounded bg-zinc-900/90 hover:bg-zinc-800 border border-cyan-500/40 text-[11px] font-mono text-cyan-300 backdrop-blur-md flex items-center gap-1 shadow transition-colors"
+                      className="absolute bottom-2 right-3 px-3 py-1 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 border border-emerald-500/40 text-[11px] font-mono text-emerald-300 backdrop-blur-md flex items-center gap-1.5 shadow transition-colors"
                       title="Adjust Question Crop (Hotkey: C)"
                     >
-                      <Crop className="w-3 h-3 text-cyan-400" />
+                      <Crop className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Adjust Crop (C)</span>
                     </button>
                   </div>
                 ) : (
-                  /* MODE 2: INTERACTIVE PAGE CROP TOOL */
+                  /* MODE 2: APPLE-GRADE INTERACTIVE PAGE CROP TOOL */
                   <div className="w-full h-full flex items-center justify-center p-2 relative bg-[#07070b]">
+                    {/* Floating Apple-style Crop Toolbar HUD */}
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full bg-zinc-950/85 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-2 select-none">
+                      {/* Presets */}
+                      <div className="flex items-center gap-1 text-[11px] font-medium text-zinc-300">
+                        <button onClick={() => applyPreset("auto")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">Auto-Detect</button>
+                        <button onClick={() => applyPreset("q1")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-zinc-300 hover:text-white transition-colors">Q1 Top</button>
+                        <button onClick={() => applyPreset("q2")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-zinc-300 hover:text-white transition-colors">Q2 Mid</button>
+                        <button onClick={() => applyPreset("q3")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-zinc-300 hover:text-white transition-colors">Q3 Btm</button>
+                        <button onClick={() => applyPreset("full")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-zinc-300 hover:text-white transition-colors">Full Page</button>
+                      </div>
+
+                      <div className="w-px h-4 bg-white/15" />
+
+                      {/* Rotate & Reset */}
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleRotate(90)} className="p-1 rounded-full hover:bg-white/10 text-zinc-300 hover:text-white transition-colors" title="Rotate 90°">
+                          <RotateCw className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => applyPreset("full")} className="px-2 py-0.5 rounded-full hover:bg-white/10 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors">
+                          Reset
+                        </button>
+                      </div>
+
+                      <div className="w-px h-4 bg-white/15" />
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => setViewMode("zoomed")}
+                          className="px-2.5 py-1 rounded-full text-xs text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={handleApplyAndRecrop}
+                          disabled={recropping || isScanning}
+                          className="px-3.5 py-1 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs flex items-center gap-1 shadow-md shadow-emerald-500/20 transition-all disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>{recropping ? "Cropping..." : "Done"}</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {(() => {
                       const isSideways = rotation % 180 === 90;
                       const effPw = isSideways ? (activeItem.pageHeight || 841.92) : (activeItem.pageWidth || 595.32);
@@ -2036,7 +2184,7 @@ export default function DataIngestionPage() {
                       return (
                         <div
                           ref={cropCanvasRef}
-                          className="relative inline-block select-none shadow-2xl border border-zinc-700 rounded bg-white overflow-hidden cursor-crosshair"
+                          className="relative inline-block select-none shadow-2xl border border-zinc-700 rounded-xl bg-white overflow-hidden cursor-crosshair"
                           style={{
                             height: "calc(100vh - 160px)",
                             aspectRatio: `${effPw} / ${effPh}`,
@@ -2051,6 +2199,11 @@ export default function DataIngestionPage() {
                             )}&page=${activeItem.pageNumber || 1}&dpi=150&rotation=${rotation}`}
                             alt="Full PDF Page"
                             className="w-full h-full object-contain pointer-events-none select-none"
+                            onError={(e) => {
+                              // If full PDF page fails, fallback to pre-cropped question image
+                              const target = e.currentTarget as HTMLImageElement;
+                              target.src = `${getMediaUrl(activeItem.imagePath)}?t=${imageKey}`;
+                            }}
                           />
 
                           {(() => {
@@ -2065,13 +2218,15 @@ export default function DataIngestionPage() {
 
                             return (
                               <>
-                                <div className="absolute left-0 right-0 top-0 bg-black/60 pointer-events-none" style={{ height: `${y0Pct}%` }} />
-                                <div className="absolute left-0 right-0 bottom-0 bg-black/60 pointer-events-none" style={{ top: `${y1Pct}%` }} />
-                                <div className="absolute left-0 bg-black/60 pointer-events-none" style={{ top: `${y0Pct}%`, width: `${x0Pct}%`, height: `${bhPct}%` }} />
-                                <div className="absolute right-0 bg-black/60 pointer-events-none" style={{ top: `${y0Pct}%`, left: `${x1Pct}%`, height: `${bhPct}%` }} />
+                                {/* Darkened Frosted Backdrop outside crop selection */}
+                                <div className="absolute left-0 right-0 top-0 bg-black/65 pointer-events-none" style={{ height: `${y0Pct}%` }} />
+                                <div className="absolute left-0 right-0 bottom-0 bg-black/65 pointer-events-none" style={{ top: `${y1Pct}%` }} />
+                                <div className="absolute left-0 bg-black/65 pointer-events-none" style={{ top: `${y0Pct}%`, width: `${x0Pct}%`, height: `${bhPct}%` }} />
+                                <div className="absolute right-0 bg-black/65 pointer-events-none" style={{ top: `${y0Pct}%`, left: `${x1Pct}%`, height: `${bhPct}%` }} />
 
+                                {/* Interactive Apple Crop Selection Box */}
                                 <div
-                                  className="absolute border-2 border-cyan-400 bg-cyan-400/10 shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-grab active:cursor-grabbing z-10"
+                                  className="absolute border-[1.5px] border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(52,211,153,0.3)] cursor-grab active:cursor-grabbing z-10"
                                   style={{
                                     left: `${x0Pct}%`,
                                     top: `${y0Pct}%`,
@@ -2080,31 +2235,102 @@ export default function DataIngestionPage() {
                                   }}
                                   onMouseDown={(e) => handleMouseDown(e, "move")}
                                 >
-                                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
-                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-r border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-b border-cyan-300/30 border-dashed" />
-                                    <div className="border-r border-cyan-300/30 border-dashed" />
-                                    <div className="border-r border-cyan-300/30 border-dashed" />
+                                  {/* Apple Rule of Thirds Grid (illuminates when dragging) */}
+                                  <div className={`absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none transition-opacity duration-200 ${dragHandle ? "opacity-90" : "opacity-30"}`}>
+                                    <div className="border-r border-b border-white/40 border-dashed" />
+                                    <div className="border-r border-b border-white/40 border-dashed" />
+                                    <div className="border-b border-white/40 border-dashed" />
+                                    <div className="border-r border-b border-white/40 border-dashed" />
+                                    <div className="border-r border-b border-white/40 border-dashed" />
+                                    <div className="border-b border-white/40 border-dashed" />
+                                    <div className="border-r border-white/40 border-dashed" />
+                                    <div className="border-r border-white/40 border-dashed" />
                                     <div />
                                   </div>
 
-                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded-full bg-zinc-950/90 border border-cyan-500/40 text-[9px] font-mono text-cyan-300 pointer-events-none flex items-center gap-1 shadow">
-                                    <Move className="w-2.5 h-2.5" /> Drag
+                                  {/* Center Crosshair Pill */}
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-[9px] font-mono text-emerald-300 pointer-events-none flex items-center gap-1.5 shadow-lg backdrop-blur-md">
+                                    <Move className="w-2.5 h-2.5 text-emerald-400" />
+                                    <span>Drag to Move</span>
                                   </div>
 
-                                  {/* 8 Handles */}
-                                  <div onMouseDown={(e) => handleMouseDown(e, "nw")} className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-full cursor-nwse-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "n")} className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-6 h-2 bg-white border border-cyan-500 rounded-full cursor-ns-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "ne")} className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-full cursor-nesw-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "e")} className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-6 bg-white border border-cyan-500 rounded-full cursor-ew-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "se")} className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-full cursor-nwse-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "s")} className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-2 bg-white border border-cyan-500 rounded-full cursor-ns-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "sw")} className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-full cursor-nesw-resize shadow" />
-                                  <div onMouseDown={(e) => handleMouseDown(e, "w")} className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-6 bg-white border border-cyan-500 rounded-full cursor-ew-resize shadow" />
+                                  {/* ── Apple-style Thick Corner Brackets ── */}
+                                  {/* Top-Left (NW) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "nw")}
+                                    className="absolute -top-[3px] -left-[3px] w-6 h-6 cursor-nwse-resize group/h z-20"
+                                    title="Resize Top-Left"
+                                  >
+                                    <div className="absolute top-0 left-0 w-5 h-[3.5px] bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                    <div className="absolute top-0 left-0 w-[3.5px] h-5 bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Top-Right (NE) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "ne")}
+                                    className="absolute -top-[3px] -right-[3px] w-6 h-6 cursor-nesw-resize group/h z-20"
+                                    title="Resize Top-Right"
+                                  >
+                                    <div className="absolute top-0 right-0 w-5 h-[3.5px] bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                    <div className="absolute top-0 right-0 w-[3.5px] h-5 bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Bottom-Right (SE) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "se")}
+                                    className="absolute -bottom-[3px] -right-[3px] w-6 h-6 cursor-nwse-resize group/h z-20"
+                                    title="Resize Bottom-Right"
+                                  >
+                                    <div className="absolute bottom-0 right-0 w-5 h-[3.5px] bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                    <div className="absolute bottom-0 right-0 w-[3.5px] h-5 bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Bottom-Left (SW) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "sw")}
+                                    className="absolute -bottom-[3px] -left-[3px] w-6 h-6 cursor-nesw-resize group/h z-20"
+                                    title="Resize Bottom-Left"
+                                  >
+                                    <div className="absolute bottom-0 left-0 w-5 h-[3.5px] bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                    <div className="absolute bottom-0 left-0 w-[3.5px] h-5 bg-white rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* ── Apple-style Edge Drag Bars ── */}
+                                  {/* Top Bar (N) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "n")}
+                                    className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-8 h-2 cursor-ns-resize flex items-center justify-center group/h z-20"
+                                    title="Resize Top"
+                                  >
+                                    <div className="w-7 h-[3px] bg-white/95 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Bottom Bar (S) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "s")}
+                                    className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-8 h-2 cursor-ns-resize flex items-center justify-center group/h z-20"
+                                    title="Resize Bottom"
+                                  >
+                                    <div className="w-7 h-[3px] bg-white/95 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Left Bar (W) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "w")}
+                                    className="absolute top-1/2 -left-[5px] -translate-y-1/2 w-2 h-8 cursor-ew-resize flex items-center justify-center group/h z-20"
+                                    title="Resize Left"
+                                  >
+                                    <div className="w-[3px] h-7 bg-white/95 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
+
+                                  {/* Right Bar (E) */}
+                                  <div
+                                    onMouseDown={(e) => handleMouseDown(e, "e")}
+                                    className="absolute top-1/2 -right-[5px] -translate-y-1/2 w-2 h-8 cursor-ew-resize flex items-center justify-center group/h z-20"
+                                    title="Resize Right"
+                                  >
+                                    <div className="w-[3px] h-7 bg-white/95 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-hover/h:bg-emerald-400 transition-colors" />
+                                  </div>
                                 </div>
                               </>
                             );
@@ -2117,62 +2343,97 @@ export default function DataIngestionPage() {
               </div>
             </div>
 
-            {/* ── RIGHT PANE: OCR TEXT & VERIFICATION STUDIO (50% width) ── */}
-            <div className="w-1/2 flex flex-col bg-[#08080c] overflow-hidden">
-              {/* Header (40px) */}
-              <div className="h-10 border-b border-zinc-800/60 px-4 bg-[#0a0a0e] flex items-center justify-between gap-2 shrink-0">
+            {/* ── RIGHT PANE: OCR TEXT & QUESTION DIGESTION STUDIO (50% width) ── */}
+            <div className="w-1/2 flex flex-col bg-[#08080c] overflow-hidden border-l border-zinc-800/40">
+              {/* Header (Apple-style frosted inspector header) */}
+              <div className="h-11 border-b border-zinc-800/60 px-4 bg-[#0a0a0e]/90 backdrop-blur-md flex items-center justify-between gap-2 shrink-0">
                 <div className="flex items-center gap-2 min-w-0 text-xs">
-                  <span className="font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                  <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
                     #{activeIdx + 1}
                   </span>
-                  <span className="font-bold text-zinc-200 truncate">
-                    {activeItem.subject || "Question"}
+                  <span className="font-semibold text-zinc-100 truncate max-w-[160px]">
+                    {activeItem.subject || "Question Item"}
                   </span>
-                  <span className="text-zinc-500 font-mono text-[11px]">
+                  <span className="text-zinc-500 font-mono text-[11px] hidden sm:inline">
                     {activeItem.year} {activeItem.examType}
                   </span>
                 </div>
 
-                {/* Model Badge + Actions */}
+                {/* Apple-style Segmented View Tabs */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleRerunOcr(true)}
-                    disabled={isScanning || recropping}
-                    className="px-2.5 py-1 bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/50 hover:to-indigo-600/50 text-purple-200 border border-purple-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-sm"
-                    title="Run Gemini OCR on current cropped area (Hotkey: O)"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    <span>{isScanning ? "Extracting..." : "Run Gemini OCR (O)"}</span>
-                  </button>
-
-                  <div className="inline-flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg">
+                  <div className="inline-flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg shadow-sm">
                     <button
-                      onClick={() => setShowFormulaPreview(false)}
-                      className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all ${
-                        !showFormulaPreview ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                      onClick={() => setEditorTab("text")}
+                      className={`px-3 py-0.5 rounded-md text-[11px] font-semibold transition-all ${
+                        editorTab === "text"
+                          ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                          : "text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
-                      Text
+                      Question Text
                     </button>
                     <button
-                      onClick={() => setShowFormulaPreview(true)}
-                      className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all ${
-                        showFormulaPreview ? "bg-zinc-800 text-purple-300 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                      onClick={() => setEditorTab("math")}
+                      className={`px-3 py-0.5 rounded-md text-[11px] font-semibold transition-all ${
+                        editorTab === "math"
+                          ? "bg-zinc-800 text-emerald-300 shadow-sm border border-zinc-700"
+                          : "text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
-                      Math
+                      Math Preview
+                    </button>
+                    <button
+                      onClick={() => setEditorTab("meta")}
+                      className={`px-3 py-0.5 rounded-md text-[11px] font-semibold transition-all ${
+                        editorTab === "meta"
+                          ? "bg-zinc-800 text-purple-300 shadow-sm border border-zinc-700"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      Metadata
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Editor Body: Full Height Textarea */}
-              <div className="flex-1 flex flex-col p-3.5 overflow-hidden relative">
-                {showFormulaPreview ? (
-                  <div className="flex-1 w-full bg-[#0c0c12] border border-zinc-800/80 rounded-xl p-4 text-zinc-200 font-mono text-sm leading-relaxed overflow-y-auto select-text whitespace-pre-wrap">
-                    {editorText || <span className="text-zinc-600 italic">No text extracted yet...</span>}
-                  </div>
-                ) : (
+              {/* Apple-style Action Toolbar: Clean AI tools */}
+              <div className="px-4 py-2 border-b border-zinc-800/40 bg-zinc-950/40 flex items-center justify-between gap-2 shrink-0 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleAiCleanText}
+                    className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white font-medium text-[11px] flex items-center gap-1.5 transition-all shadow-sm"
+                    title="Clean headers, page numbers, and standardize question stem formatting"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    <span>Clean Noise</span>
+                  </button>
+
+                  <button
+                    onClick={handleFormatLatex}
+                    className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white font-medium text-[11px] flex items-center gap-1.5 transition-all shadow-sm"
+                    title="Auto-format math equations and symbols into LaTeX notation"
+                  >
+                    <FileCode className="w-3 h-3 text-cyan-400" />
+                    <span>Format Math</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleRerunOcr(true)}
+                    disabled={isScanning || recropping}
+                    className="px-3 py-1 bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 hover:from-emerald-600/30 hover:to-cyan-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-sm"
+                    title="Re-run Gemini 1.5 Flash Vision on cropped area (Hotkey: O)"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{isScanning ? "Scanning..." : "Re-scan with Gemini (O)"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Editor Body */}
+              <div className="flex-1 flex flex-col p-4 overflow-hidden relative">
+                {editorTab === "text" && (
                   <textarea
                     ref={textareaRef}
                     value={editorText}
@@ -2180,65 +2441,115 @@ export default function DataIngestionPage() {
                     className={`flex-1 w-full bg-[#0c0c12] border rounded-xl p-4 text-zinc-100 font-mono text-sm leading-relaxed resize-none focus:outline-none transition-all shadow-inner ${
                       textUpdatedPulse
                         ? "border-emerald-500/80 ring-2 ring-emerald-500/30 bg-emerald-950/10"
-                        : "border-zinc-800/80 focus:border-indigo-500/80"
+                        : "border-zinc-800/80 focus:border-emerald-500/60"
                     }`}
-                    placeholder="Question text transcribed via OCR. Click 'Run Gemini OCR' to transcribe, or type your corrections directly here..."
+                    placeholder="Question text transcribed via OCR. Click 'Re-scan with Gemini' to transcribe, or type your edits directly..."
                   />
+                )}
+
+                {editorTab === "math" && (
+                  <div className="flex-1 w-full bg-[#0c0c12] border border-zinc-800/80 rounded-xl p-4 text-zinc-200 font-mono text-sm leading-relaxed overflow-y-auto select-text whitespace-pre-wrap">
+                    {editorText || <span className="text-zinc-600 italic">No equation or text transcribed yet...</span>}
+                  </div>
+                )}
+
+                {editorTab === "meta" && (
+                  <div className="flex-1 w-full bg-[#0c0c12] border border-zinc-800/80 rounded-xl p-5 overflow-y-auto space-y-4">
+                    <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+                      Academic Paper Classification
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-mono text-zinc-400 mb-1">Subject Name</label>
+                        <input
+                          value={editSubject}
+                          onChange={(e) => setEditSubject(e.target.value)}
+                          placeholder="e.g. Computer Networks"
+                          className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-mono text-zinc-400 mb-1">Subject Code</label>
+                        <input
+                          value={editSubjectCode}
+                          onChange={(e) => setEditSubjectCode(e.target.value)}
+                          placeholder="e.g. IT3002"
+                          className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-mono text-zinc-400 mb-1">Examination Year</label>
+                        <input
+                          value={editYear}
+                          onChange={(e) => setEditYear(e.target.value)}
+                          placeholder="e.g. 2024"
+                          className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-mono text-zinc-400 mb-1">Exam Type</label>
+                        <input
+                          value={editExamType}
+                          onChange={(e) => setEditExamType(e.target.value)}
+                          placeholder="e.g. Endsem / Midsem"
+                          className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      <label className="block text-[11px] font-mono text-zinc-400 mb-1">Source Document</label>
+                      <p className="text-xs font-mono text-zinc-500 truncate bg-zinc-950 p-2.5 rounded-lg border border-zinc-900">
+                        {activeItem.sourcePdf || "N/A"}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Bottom Verification & Metadata Bar */}
-              <div className="border-t border-zinc-800/60 p-2.5 px-3.5 bg-[#0a0a0e] flex items-center justify-between gap-3 shrink-0">
-                {/* Compact Metadata Chips */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <input
-                    value={editSubjectCode}
-                    onChange={(e) => setEditSubjectCode(e.target.value)}
-                    placeholder="Code"
-                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs font-mono text-indigo-300 w-24 focus:outline-none focus:border-indigo-500"
-                    title="Subject Code"
-                  />
-                  <input
-                    value={editSubject}
-                    onChange={(e) => setEditSubject(e.target.value)}
-                    placeholder="Subject Name"
-                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs text-zinc-300 w-32 focus:outline-none focus:border-indigo-500"
-                    title="Subject Name"
-                  />
-                  <input
-                    value={editYear}
-                    onChange={(e) => setEditYear(e.target.value)}
-                    placeholder="Year"
-                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs font-mono text-zinc-300 w-16 focus:outline-none focus:border-indigo-500"
-                    title="Year"
-                  />
-                  <input
-                    value={editExamType}
-                    onChange={(e) => setEditExamType(e.target.value)}
-                    placeholder="Exam"
-                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs text-zinc-300 w-20 focus:outline-none focus:border-indigo-500"
-                    title="Exam Type"
-                  />
+              {/* Bottom Verification & Decision Bar (Apple-style clean actions) */}
+              <div className="border-t border-zinc-800/60 p-3 px-4 bg-[#0a0a0e]/95 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+                {/* Stats & Navigation */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigateItem("prev")}
+                    disabled={activeIdx === 0}
+                    className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 disabled:opacity-30 transition-colors"
+                    title="Previous Question (Left Arrow)"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => navigateItem("next")}
+                    disabled={activeIdx >= questions.length - 1}
+                    className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 disabled:opacity-30 transition-colors"
+                    title="Next Question (Right Arrow)"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                   <span className="text-[11px] font-mono text-zinc-500 ml-1">
-                    {editorText.length} chars · ~{Math.round(editorText.length / 4)} tok
+                    {editorText.length} chars · ~{Math.round(editorText.length / 4)} tokens
                   </span>
                 </div>
 
-                {/* Decision Buttons */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Decision Actions: Reject vs Approve */}
+                <div className="flex items-center gap-2.5 shrink-0">
                   <button
                     onClick={() => updateStatus(activeItem.id, "REJECTED")}
                     disabled={submitting}
-                    className="px-3.5 py-1.5 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-40"
+                    className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-40"
+                    title="Reject question crop (R)"
                   >
-                    <XCircle className="w-4 h-4" /> Reject (R)
+                    <XCircle className="w-4 h-4" />
+                    <span>Reject (R)</span>
                   </button>
                   <button
                     onClick={() => updateStatus(activeItem.id, "APPROVED")}
                     disabled={submitting}
-                    className="px-5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40"
+                    className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40"
+                    title="Approve & advance to next question (A / Enter)"
                   >
-                    <CheckCircle className="w-4 h-4" /> Approve & Next (A)
+                    <CheckCircle className="w-4 h-4 stroke-[2.5]" />
+                    <span>Approve & Next (A)</span>
                   </button>
                 </div>
               </div>

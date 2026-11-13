@@ -2,74 +2,286 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const days = ["MON", "TUE", "WED", "THU", "FRI"];
-const timeSlots = [
-  { start: "08:00", end: "09:00" },
-  { start: "09:00", end: "10:00" },
-  { start: "10:00", end: "11:00" },
-  { start: "11:00", end: "12:00" },
-  { start: "12:00", end: "13:00" },
-  { start: "13:00", end: "14:00" },
-  { start: "14:00", end: "15:00" },
-  { start: "15:00", end: "16:00" },
-  { start: "16:00", end: "18:00" },
-];
-
-// Reconstructed from the User's input: ECSc1 Monday exactly
-const sampleECSc1Monday = [
-  "X",              // 8-9
-  "AD LAB",         // 9-10
-  "AD LAB",         // 10-11
-  "PE-III (GrA)",   // 11-12
-  "EECO",           // 12-13
-  "X",              // 13-14
-  "X",              // 14-15
-  "PE-III (GrB)",   // 15-16
-  "SWE"             // 16-18
-];
-
-const facultyMapping: Record<string, string> = {
-  "SWE": "Prof. Deepak Kumar Rout",
-  "VLSIC&S": "Prof. M. Behera",
-  "CN": "Prof. Proshikshya Mukherjee",
-  "EECO": "Prof. R. Prasad",
-  "AD LAB": "Prof. Proshikshya Mukherjee",
-  "VLSID LAB": "Prof. Sruti S. Singh",
-  "CN LAB": "Prof. A. Bakshi",
-  "PE-III (GrA)": "Prof. T. Kar (Cloud/Elective)",
-  "PE-III (GrB)": "Prof. L. Ali (Cloud/Elective)"
+// Group Metadata & Mapping for 7th Semester (School of Electronics Engineering)
+const groupsMeta: Record<string, { enppFaculty: string; enppRoom: string; tpFaculty: string; tpRoom: string }> = {
+  'ECS GROUP-01': {
+    enppFaculty: 'Prof. S. Padhy',
+    enppRoom: 'CL-A-01',
+    tpFaculty: 'Prof. S. Padhy, Prof. Princy Sharma',
+    tpRoom: 'CL-A-01'
+  },
+  'ECS GROUP-02': {
+    enppFaculty: 'Prof. S. Alpna',
+    enppRoom: 'CL-A-02',
+    tpFaculty: 'Prof. S. Alpna, Prof. Deepak Ku. Rout',
+    tpRoom: 'CL-A-02'
+  },
+  'ECS GROUP-03': {
+    enppFaculty: 'Prof. P. Dutta',
+    enppRoom: 'CL-A-03',
+    tpFaculty: 'Prof. P. Dutta, Prof. B Shivlal Patro',
+    tpRoom: 'CL-A-03'
+  },
+  'ECS GROUP-04': {
+    enppFaculty: 'Prof. A. Patnaik',
+    enppRoom: 'CL-A-04',
+    tpFaculty: 'Prof. B. K. Behera, Prof. V. K. Shrivastava',
+    tpRoom: 'CL-A-04'
+  },
+  'ECS GROUP-05': {
+    enppFaculty: 'Prof. S. S. Singh',
+    enppRoom: 'CL-A-05',
+    tpFaculty: 'Prof. Budhadeb Maity, Prof. M. R. Tripathy',
+    tpRoom: 'CL-A-05'
+  },
+  'ECS GROUP-06': {
+    enppFaculty: 'Prof. A. Bakshi',
+    enppRoom: 'CL-A-06',
+    tpFaculty: 'Prof. A. Bakshi, Prof. Suman Roy',
+    tpRoom: 'CL-A-06'
+  },
+  'ECS GROUP-07': {
+    enppFaculty: 'Prof. S. Alpna',
+    enppRoom: 'CL-A-19',
+    tpFaculty: 'Prof. Ganaraj PS, Prof. Sananda Kumar',
+    tpRoom: 'CL-A-19'
+  }
 };
 
+const peFacultyDefault = 'Prof. Suman Roy / Prof. S. Mishra / Prof. Suprava Patnaik';
+const peRoomDefault = 'CL-A-01 / CL-A-05 / CL-A-10 / CL-A-19';
+
 async function main() {
-  console.log("Seeding timetable layout into database...");
-  await prisma.courseSchedule.deleteMany({}); // Clear existing
+  console.log('⚡ Purging obsolete schedule records from NeonDB...');
+  const deleted = await prisma.courseSchedule.deleteMany({});
+  console.log(`🗑️ Deleted ${deleted.count} old routine records.`);
 
-  let count = 0;
-  
-  // Seed Monday for ECSc1
-  for (let i = 0; i < sampleECSc1Monday.length; i++) {
-    const subject = sampleECSc1Monday[i];
-    if (subject === "X") continue; // No class
+  console.log('🌱 Seeding official 7th Semester Timetable (School of Electronics Engineering, ECS)...');
 
-    await prisma.courseSchedule.create({
-      data: {
-        group: "ECS GROUP-01", // matching the user's student.xlsx "Section" group mapping
-        day: "MON",
-        startTime: timeSlots[i].start,
-        endTime: timeSlots[i].end,
-        subject: subject,
-        faculty: facultyMapping[subject] || "TBA",
-        room: "CL-A-01" // Based on ECSc1 mapping
-      }
+  const slotsToInsert: any[] = [];
+
+  for (let gNum = 1; gNum <= 7; gNum++) {
+    const groupKey = `ECS GROUP-0${gNum}`;
+    const meta = groupsMeta[groupKey];
+
+    // Minor Specialization (11:00 - 13:00 Monday through Friday for all groups)
+    ['MON', 'TUE', 'WED', 'THU', 'FRI'].forEach(day => {
+      slotsToInsert.push({
+        group: groupKey,
+        day,
+        startTime: '11:00',
+        endTime: '13:00',
+        subject: 'Minor',
+        room: 'Designated Minor Rooms',
+        faculty: 'Minor Department Faculty'
+      });
     });
-    count++;
+
+    // ───────────────── MONDAY ─────────────────
+    if (gNum === 1 || gNum === 2 || gNum === 3) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'T&P',
+        room: meta.tpRoom,
+        faculty: meta.tpFaculty
+      });
+    } else if (gNum === 4) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '14:00',
+        endTime: '15:00',
+        subject: 'ENPP',
+        room: meta.enppRoom,
+        faculty: meta.enppFaculty
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'Project-I',
+        room: 'Project Lab',
+        faculty: 'Project Supervisor / Committee'
+      });
+    } else if (gNum === 5 || gNum === 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'Project-I',
+        room: 'Project Lab',
+        faculty: 'Project Supervisor / Committee'
+      });
+    } else if (gNum === 7) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '13:00',
+        endTime: '14:00',
+        subject: 'ENPP',
+        room: meta.enppRoom,
+        faculty: meta.enppFaculty
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '14:00',
+        endTime: '15:00',
+        subject: 'ENPP',
+        room: meta.enppRoom,
+        faculty: meta.enppFaculty
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'MON',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'T&P',
+        room: meta.tpRoom,
+        faculty: meta.tpFaculty
+      });
+    }
+
+    // ───────────────── TUESDAY ─────────────────
+    if (gNum >= 1 && gNum <= 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'TUE',
+        startTime: '14:00',
+        endTime: '15:00',
+        subject: 'ENPP',
+        room: meta.enppRoom,
+        faculty: meta.enppFaculty
+      });
+    }
+    if (gNum >= 2 && gNum <= 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'TUE',
+        startTime: '16:00',
+        endTime: '18:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+    }
+
+    // ───────────────── WEDNESDAY ─────────────────
+    if (gNum >= 1 && gNum <= 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '14:00',
+        endTime: '15:00',
+        subject: 'ENPP',
+        room: meta.enppRoom,
+        faculty: meta.enppFaculty
+      });
+    }
+    if (gNum === 2) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '16:00',
+        endTime: '17:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+    } else if (gNum >= 3 && gNum <= 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '16:00',
+        endTime: '17:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'WED',
+        startTime: '17:00',
+        endTime: '18:00',
+        subject: 'PE-IV',
+        room: peRoomDefault,
+        faculty: peFacultyDefault
+      });
+    }
+
+    // ───────────────── THURSDAY ─────────────────
+    slotsToInsert.push({
+      group: groupKey,
+      day: 'THU',
+      startTime: '14:00',
+      endTime: '16:00',
+      subject: 'PE-IV',
+      room: peRoomDefault,
+      faculty: peFacultyDefault
+    });
+    slotsToInsert.push({
+      group: groupKey,
+      day: 'THU',
+      startTime: '16:00',
+      endTime: '17:00',
+      subject: 'PE-IV',
+      room: peRoomDefault,
+      faculty: peFacultyDefault
+    });
+
+    // ───────────────── FRIDAY ─────────────────
+    if (gNum === 1 || gNum === 2 || gNum === 3 || gNum === 7) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'FRI',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'Project-I',
+        room: 'Project Lab',
+        faculty: 'Project Supervisor / Committee'
+      });
+    } else if (gNum === 4 || gNum === 5 || gNum === 6) {
+      slotsToInsert.push({
+        group: groupKey,
+        day: 'FRI',
+        startTime: '15:00',
+        endTime: '17:00',
+        subject: 'T&P',
+        room: meta.tpRoom,
+        faculty: meta.tpFaculty
+      });
+    }
   }
 
-  console.log(`✅ Seeded ${count} schedule slots for ECSc1 into the CourseSchedule table.`);
-  
-  console.log("NOTE: Because the copied PDF text had columns/rows concatenated (e.g., 'ECSc6ECSc1XXEECO...'),");
-  console.log("perfect automation is prone to shifting errors. This script creates the Database Schema");
-  console.log("and sets up the parsing logic you can expand via JSON or directly from a clean CSV format.");
+  console.log(`📦 Bulk creating ${slotsToInsert.length} slots in NeonDB...`);
+  const inserted = await prisma.courseSchedule.createMany({
+    data: slotsToInsert
+  });
+
+  console.log(`🎉 Successfully seeded ${inserted.count} schedule slots for Groups ECS GROUP-01 through 07!`);
 }
 
 main()

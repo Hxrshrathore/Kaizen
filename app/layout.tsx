@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono, Nunito_Sans, Manrope } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,27 @@ const handwritten = localFont({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#07070b",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   title: "KAIZEN | Academic Simulation",
   description: "The first rule-based academic engine.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/logo/kaizen-logo.png",
+    shortcut: "/logo/kaizen-logo.png",
+    apple: "/logo/kaizen-logo.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Nexus",
+  },
 };
 
 export default function RootLayout({

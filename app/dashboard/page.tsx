@@ -7,7 +7,6 @@ import {
   Upload, Activity, ArrowUpRight, ShieldAlert, CheckCircle, 
   AlertTriangle, Calendar, Clock, Plus, Trash2, X, Sparkles, ChevronRight, Lock, Loader2, BookOpen, Mail
 } from 'lucide-react';
-import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 
 // --- TYPES ---
 interface UserProfile {
@@ -245,10 +244,6 @@ export default function Dashboard() {
              <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest mb-1 text-right">SESSION ID</div>
              <div className="text-xl font-display text-foreground bg-muted px-4 py-1 rounded border border-border">{profile.rollNumber || 'GUEST'}</div>
            </div>
-           <AnimatedThemeToggler 
-             variant="square" 
-             className="w-10 h-10 rounded bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-           />
         </div>
       </MotionDiv>
 

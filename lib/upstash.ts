@@ -46,7 +46,15 @@ export const upstashRedis = {
     const raw = await redisCommand<string | null>(["GET", key]);
     if (raw === null || raw === undefined) return null;
     try {
-      return JSON.parse(raw) as T;
+      let parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      while (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          break;
+        }
+      }
+      return parsed as T;
     } catch {
       return raw as unknown as T;
     }

@@ -59,9 +59,30 @@ export async function GET(request: Request) {
       pdf
     )}&page=${page}&x0=${x0 || 0}&y0=${y0 || 0}&x1=${x1 || 595}&y1=${y1 || 842}&padTop=${padTop}&padBottom=${padBottom}&padLeft=${padLeft}&padRight=${padRight}&dpi=${dpi}&rotation=${rotation}`;
 
-    const resp = await fetch(fastApiUrl);
-    if (!resp.ok) {
-      return NextResponse.json({ error: "Failed to crop PDF" }, { status: resp.status });
+    const resp = await fetch(fastApiUrl, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+    if (!resp || !resp.ok) {
+      // Graceful fallback to pre-saved crop on Cloudflare R2 / local
+      if (id) {
+        let fallbackPath: string | null = null;
+        try {
+          const q = await prisma.ocrQuestion.findUnique({ where: { id } });
+          if (q?.imagePath) fallbackPath = q.imagePath;
+        } catch {}
+        if (!fallbackPath) {
+          try {
+            const sq = await upstashRedis.get<StagedQuestion>(`kaizen:staging:item:${id}`);
+            if (sq?.imageUrl) fallbackPath = sq.imageUrl;
+          } catch {}
+        }
+        if (fallbackPath) {
+          const clean = fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`;
+          const cdnUrl = fallbackPath.startsWith("http")
+            ? fallbackPath
+            : `https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev${clean}`;
+          return NextResponse.redirect(cdnUrl, 307);
+        }
+      }
+      return NextResponse.json({ error: "Failed to crop PDF" }, { status: resp ? resp.status : 503 });
     }
 
     const imageBuffer = await resp.arrayBuffer();

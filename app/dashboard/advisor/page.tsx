@@ -90,6 +90,12 @@ export default function AIAdvisorPage() {
 
       const data = await response.json();
       
+      // Dispatch token consumption event to dynamically update the header quota bar
+      if (typeof window !== 'undefined') {
+        const estimatedTokens = Math.max(120, Math.round(((input.length + (data.text?.length || 0)) / 4)));
+        window.dispatchEvent(new CustomEvent('ai-token-consumed', { detail: { tokens: estimatedTokens } }));
+      }
+
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 

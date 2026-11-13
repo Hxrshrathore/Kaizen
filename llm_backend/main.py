@@ -1,6 +1,11 @@
 import sys
 from pathlib import Path
 
+# Ensure venv site-packages is in sys.path regardless of how python was invoked
+_venv_site = Path(__file__).resolve().parent / "venv" / "Lib" / "site-packages"
+if _venv_site.exists() and str(_venv_site) not in sys.path:
+    sys.path.insert(0, str(_venv_site))
+
 # Ensure sys.stdout and sys.stderr exist (prevent crash when spawned via pythonw / windowless)
 if sys.stdout is None:
     _log_path = Path(__file__).resolve().parent / "backend.log"
@@ -20,16 +25,28 @@ from fastapi.responses import Response
 import boto3
 from botocore.config import Config
 
-BASE_DIR = Path(__file__).parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = BASE_DIR / "data" / "pyqs" / "raw"
 DATASET_DIR = BASE_DIR / "public" / "dataset" / "raw"
 
-# Cloudflare R2 Object Storage
-R2_ENDPOINT = "https://3288bf4dc7bac5817897bcbd7cbe19d8.r2.cloudflarestorage.com"
-R2_ACCESS_KEY = "1d8c7202b9b5738a1915532b5fff6f1c"
-R2_SECRET_KEY = "191e3a6f3d5d72dd34a36033a1e80990c252a642a4640a2d176cc76c5f97358b"
-R2_BUCKET = "kaizen"
-R2_PUBLIC_BASE = "https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev"
+# Load credentials from .env and production.env if present
+for _env_candidate in [BASE_DIR / ".env", BASE_DIR / "production.env"]:
+    if _env_candidate.exists():
+        try:
+            for _line in _env_candidate.read_text(encoding="utf-8").splitlines():
+                if "=" in _line and not _line.strip().startswith("#"):
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+        except Exception:
+            pass
+
+# Cloudflare R2 Object Storage (Configured via Environment Variables)
+_r2_account_id = os.environ.get("CLOUDFLARE_R2_ACCOUNT_ID", "3288bf4dc7bac5817897bcbd7cbe19d8")
+R2_ENDPOINT = os.environ.get("CLOUDFLARE_R2_ENDPOINT", f"https://{_r2_account_id}.r2.cloudflarestorage.com")
+R2_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "1d8c7202b9b5738a1915532b5fff6f1c")
+R2_SECRET_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "191e3a6f3d5d72dd34a36033a1e80990c252a642a4640a2d176cc76c5f97358b")
+R2_BUCKET = os.environ.get("CLOUDFLARE_R2_BUCKET", "kaizen")
+R2_PUBLIC_BASE = os.environ.get("NEXT_PUBLIC_R2_URL", "https://pub-60fc676d8ba24a13a46925ab4941ddb5.r2.dev")
 
 s3_r2 = boto3.client(
     "s3",
@@ -292,50 +309,69 @@ async def recrop_pdf(req: RecropRequest):
         method_used = "pymupdf_vector"
 
         # If vector text is sparse/empty (scanned PDF) or forceGemini is requested
+        dbg_log = []
+        dbg_log.append(f"forceGemini={req.forceGemini}, extracted_text_len={len(extracted_text)}")
         if req.forceGemini or len(extracted_text) < 25:
-            gemini_key = os.environ.get("GEMINI_API_KEY")
-            if not gemini_key and (BASE_DIR / ".env").exists():
-                for line in (BASE_DIR / ".env").read_text(encoding="utf-8").split("\n"):
-                    if line.startswith("GEMINI_API_KEY="):
-                        gemini_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        break
+            # Always prefer reading the fresh key directly from .env file
+            gemini_key = None
+            for env_candidate in [BASE_DIR / ".env", BASE_DIR / "production.env"]:
+                if env_candidate.exists():
+                    for line in env_candidate.read_text(encoding="utf-8").splitlines():
+                        line = line.strip()
+                        if line.startswith("GEMINI_API_KEY="):
+                            gemini_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+                if gemini_key:
+                    break
+            if not gemini_key:
+                gemini_key = os.environ.get("GEMINI_API_KEY")
+
+            dbg_log.append(f"gemini_key_prefix={gemini_key[:12] if gemini_key else 'None'}")
             if gemini_key:
                 prompt = (
-                    "You are an expert examination digitizer and LaTeX formatter. "
-                    "Transcribe the complete question text, question numbers (e.g. Q1, 1(a)), sub-parts (a, b, c, i, ii), options (A, B, C, D), and marks allocation from this cropped exam snippet. "
-                    "Format all mathematical equations, formulas, variables, and matrices using standard LaTeX (e.g. $E=mc^2$, $\\int_0^\\infty f(x)dx$). "
-                    "Preserve exact code snippets in markdown code blocks. "
-                    "Output ONLY the cleaned transcription, with zero conversational filler or metadata preamble."
+                    "You are an expert examination digitizer, LaTeX formatter, and technical diagram transcriber.\n"
+                    "1. Transcribe the complete question text, question numbers (e.g. Q1, 5(a)), sub-parts (a, b, c, i, ii), options (A, B, C, D), and marks allocation from this cropped exam snippet.\n"
+                    "2. Format all mathematical equations, formulas, variables, and matrices using standard LaTeX (e.g. $E=mc^2$, $\\int_0^\\infty f(x)dx$, $(5, 0, 8)$).\n"
+                    "3. Tables: Convert any tables into clean Markdown tables.\n"
+                    "4. Diagrams, Graphs & Figures: If the question contains a diagram, circuit, network graph, flowchart, state machine, or illustration:\n"
+                    "   - If it can be modeled as a network topology, graph, or flowchart, provide an interactive ```mermaid or clear ASCII diagram representing the nodes, connections, labels, and weights.\n"
+                    "   - Include a concise semantic description block: `> **[Diagram Context]** <clear description of the visual figure, components, directions, and labels>` so text-only AI models and students have full context even without the image.\n"
+                    "5. Preserve exact code snippets in markdown code blocks.\n"
+                    "Output ONLY the cleaned transcription and diagram representations, with zero conversational filler or metadata preamble."
                 )
 
                 # 1. Primary: Modern official Google GenAI SDK (google.genai)
                 try:
                     from google import genai
                     from google.genai import types
+                    dbg_log.append("google.genai imported successfully")
                     client = genai.Client(api_key=gemini_key)
                     part = types.Part.from_bytes(data=pix.tobytes("png"), mime_type="image/png")
                     for model_name in [
-                        "gemini-2.5-flash-lite",
                         "gemini-flash-lite-latest",
+                        "gemini-3.5-flash-lite",
                         "gemini-3.8-flash",
                         "gemini-flash-latest",
-                        "gemini-3.5-flash-lite",
-                        "gemini-3.5-flash",
+                        "gemini-2.5-flash",
                     ]:
                         try:
                             resp = client.models.generate_content(
                                 model=model_name,
                                 contents=[part, prompt]
                             )
-                            if resp and resp.text and len(resp.text.strip()) > 5:
+                            dbg_log.append(f"model={model_name}, resp_text_len={len(resp.text) if resp and resp.text else 0}")
+                            if resp and resp.text and len(resp.text.strip()) > 3:
                                 extracted_text = resp.text.strip()
                                 method_used = f"{model_name}_genai_vision"
-                                print(f"[OCR] Successfully extracted {len(extracted_text)} chars using google.genai {model_name}")
+                                dbg_log.append(f"SUCCESS with {method_used}")
                                 break
                         except Exception as m_err:
-                            print(f"[OCR] Model {model_name} failed: {m_err}")
+                            dbg_log.append(f"model={model_name} failed: {m_err}")
                 except Exception as g_err:
-                    print(f"Warning: google.genai error: {g_err}. Trying legacy fallback...")
+                    dbg_log.append(f"google.genai import/client failed: {g_err}")
+
+                # 2. Legacy fallback
+                if not extracted_text or extracted_text == "":
                     try:
                         import google.generativeai as leg_genai
                         leg_genai.configure(api_key=gemini_key)
@@ -344,14 +380,20 @@ async def recrop_pdf(req: RecropRequest):
                             try:
                                 g_model = leg_genai.GenerativeModel(model_name)
                                 resp = g_model.generate_content([prompt, img_data])
-                                if resp and resp.text and len(resp.text.strip()) > 5:
+                                if resp and resp.text and len(resp.text.strip()) > 3:
                                     extracted_text = resp.text.strip()
                                     method_used = f"{model_name}_legacy_vision"
+                                    dbg_log.append(f"SUCCESS with {method_used}")
                                     break
                             except Exception:
                                 pass
                     except Exception as leg_err:
-                        print(f"Warning: Legacy Gemini OCR also failed: {leg_err}")
+                        dbg_log.append(f"legacy gemini failed: {leg_err}")
+
+        try:
+            (Path(__file__).resolve().parent / "recrop_debug.log").write_text("\n".join(dbg_log), encoding="utf-8")
+        except:
+            pass
         
         saved_path = None
         if req.saveFilename:

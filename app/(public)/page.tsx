@@ -8,24 +8,28 @@ import {
   ChevronRight, Database, Cpu, HeartPulse, Sparkles, Timer, Layers, Code
 } from 'lucide-react';
 import { CinematicHero } from '@/components/ui/cinematic-landing-hero';
-
-
 import { GooeyLoader } from '@/components/ui/gooey-loader';
+import { ArchitectureFlow } from '@/components/ui/architecture-flow';
 
 // --- ANIMATION WRAPPERS ---
 const MotionDiv = motion.div as any;
 const MotionH1 = motion.h1 as any;
 const MotionP = motion.p as any;
 
-// --- CONSTANTS (Single Source of Truth) ---
+// --- 60-30-10 COLOR PALETTE (Strict High-Contrast Dark System) ---
+// 60% Base: Deep Obsidian #07070b
+// 30% Primary: Structural Cards #0f0f17, Crisp White #f4f4f5, Muted Zinc #a1a1aa, Borders rgba(255,255,255,0.08)
+// 10% Accent: Electric Lime #bbf246 / #ccff00 (Matching the Kaizen Logo)
 const COLORS = {
-  accent: "#3B82F6", // Deep blue accent
-  surface: "#f8fafc", // slate-50
-  surfaceHover: "#f1f5f9", // slate-100
-  border: "#000000", // black border
-  borderHover: "#333333", // dark gray
-  text: "#0f172a", // slate-900
-  textMuted: "#64748b" // slate-500
+  base: "#07070b",                        // 60% Base Canvas
+  surface: "#0f0f17",                     // 30% Primary Surface
+  surfaceHover: "#161624",                // 30% Primary Surface Hover
+  border: "rgba(255, 255, 255, 0.08)",   // 30% Primary Border
+  borderHover: "rgba(187, 242, 70, 0.35)",// 10% Accent Glow Border
+  text: "#f4f4f5",                        // 30% Primary High-Contrast Text
+  textMuted: "#a1a1aa",                   // 30% Primary Secondary Text
+  accent: "#bbf246",                      // 10% Accent Electric Lime
+  accentGlow: "rgba(187, 242, 70, 0.25)",
 };
 
 export default function LandingPage() {
@@ -41,30 +45,8 @@ export default function LandingPage() {
   }, []);
 
   const handleEnter = () => {
-    console.log("Navigating to join beta Page...");
     router.push('/join-beta');
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   return (
     <>
@@ -75,21 +57,20 @@ export default function LandingPage() {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-white"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 dark:bg-[#07070b]/95 backdrop-blur-md"
           >
             <div className="flex flex-col items-center justify-center">
               <GooeyLoader 
-                primaryColor="#3B82F6" 
-                secondaryColor="#1d4ed8" 
-                borderColor="#1e293b" 
+                primaryColor="#bbf246" 
+                secondaryColor="#84cc16" 
+                borderColor="#181824" 
               />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div ref={containerRef} className="relative w-full overflow-hidden bg-white text-slate-900">
-
+      <div ref={containerRef} className="relative w-full overflow-hidden bg-background text-foreground transition-colors duration-300">
 
       <main className="relative z-10 w-full min-h-[100dvh]">
         <CinematicHero
@@ -97,17 +78,18 @@ export default function LandingPage() {
           tagline1="Continuous evolution,"
           tagline2="redefined."
           cardHeading="Academic intelligence, elevated."
-          cardDescription={<><span className="text-white font-semibold">KAIZEN</span> empowers students with rule-based grade prediction, AI-powered advisory, and beautiful attendance analytics — built for the modern academic journey.</>}
+          cardDescription={<><span className="text-[#bbf246] font-semibold">KAIZEN</span> empowers students with rule-based grade prediction, AI-powered advisory, and beautiful attendance analytics — built for the modern academic journey.</>}
           metricValue={9}
           metricLabel="CGPA Target"
           ctaHeading="Your potential, realized."
           ctaDescription="Join students who turned grade anxiety into actionable data — powered by Gemini AI."
         />
       </main>
-      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border">
+
+      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border dark:border-white/10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
           <div className="md:col-span-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono uppercase mb-6 rounded-full">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-xs font-mono uppercase mb-6 rounded-full">
               <HeartPulse size={12} /> The Research Problem
             </div>
             <h2 className="text-4xl md:text-6xl font-display text-foreground mb-8 leading-[0.9]">
@@ -122,15 +104,14 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
-          <div className="md:col-span-7 relative h-[500px] md:h-[600px] rounded-3xl overflow-hidden group" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-            
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
+          <div className="md:col-span-7 relative h-[500px] md:h-[600px] rounded-3xl overflow-hidden group bg-card dark:bg-[#0f0f17] border border-border dark:border-white/10 shadow-2xl">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.12),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
             
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <GooeyLoader 
-                primaryColor="#3B82F6" 
-                secondaryColor="#1d4ed8" 
-                borderColor="#1e293b" 
+                primaryColor="#bbf246" 
+                secondaryColor="#84cc16" 
+                borderColor="#181824" 
               />
             </div>
           </div>
@@ -138,15 +119,15 @@ export default function LandingPage() {
       </section>
 
       {/* --- THE PROTOCOL --- */}
-      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border">
+      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border dark:border-white/10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
           
           {/* Sticky Left Column */}
           <div className="lg:col-span-5 lg:sticky top-32">
-            <h2 className="text-5xl md:text-7xl font-display mb-6 leading-[0.9]">
+            <h2 className="text-5xl md:text-7xl font-display text-foreground mb-6 leading-[0.9]">
               THE <br/> <span className="text-muted-foreground">PROTOCOL.</span>
             </h2>
-            <p className="text-primary font-mono uppercase tracking-widest text-sm mb-8">From Chaos to Clarity</p>
+            <p className="text-primary dark:text-[#bbf246] font-mono uppercase tracking-widest text-sm mb-8">From Chaos to Clarity</p>
             <p className="text-muted-foreground text-lg leading-relaxed max-w-md">
               A systematic approach to academic optimization. We break down complex semester data into actionable, daily targets.
             </p>
@@ -158,32 +139,48 @@ export default function LandingPage() {
                number="01"
                title="Ingest"
                desc="Upload raw academic PDFs. System parses credits, grades, and backlogs locally."
-               icon={<Database size={28} />}
+               icon={<Database size={28} className="text-primary dark:text-[#bbf246]" />}
              />
              <ProtocolStep 
                number="02"
                title="Analyze"
                desc="Algorithms detect weak subjects (C/D grades) and simulate future scenarios."
-               icon={<Cpu size={28} />}
+               icon={<Cpu size={28} className="text-primary dark:text-[#bbf246]" />}
              />
              <ProtocolStep 
                number="03"
                title="Execute"
                desc="Deploy focus timers and study plans to meet the calculated targets."
-               icon={<Zap size={28} />}
+               icon={<Zap size={28} className="text-primary dark:text-[#bbf246]" />}
              />
           </div>
 
         </div>
       </section>
 
+      {/* --- SYSTEM ARCHITECTURE FLOW (Animated Beam Pipeline) --- */}
+      <section id="architecture" className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border dark:border-white/10 scroll-mt-24">
+        <div id="features" className="text-center max-w-3xl mx-auto mb-16">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 dark:bg-[#bbf246]/10 border border-primary/20 dark:border-[#bbf246]/30 text-xs font-mono uppercase tracking-widest text-primary dark:text-[#bbf246] mb-5 shadow-sm">
+            <Sparkles size={13} />
+            <span>Multi-Agent System Architecture</span>
+          </div>
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-extrabold text-foreground tracking-tight mb-5 leading-tight">
+            CONNECTED <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-emerald-400 to-[#bbf246]">INTELLIGENCE.</span>
+          </h2>
+          <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
+            The full pipeline: from Apple Health circadian sleep sync & Google Classroom assignment reminders, through Upstash Redis & Vector course notes, to the Kaizen Model Router, per-subject QLoRA fine-tuning, AI-driven PYQ practice drills for weak topics, and morning class absence prediction.
+          </p>
+        </div>
 
+        <ArchitectureFlow />
+      </section>
 
       {/* --- TECH STACK --- */}
-      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border">
+      <section className="relative z-10 py-32 px-6 max-w-7xl mx-auto border-b border-border dark:border-white/10">
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
            <div>
-              <h3 className="text-xs font-mono text-primary mb-4 uppercase tracking-widest">System Core</h3>
+              <h3 className="text-xs font-mono text-primary dark:text-[#bbf246] mb-4 uppercase tracking-widest">System Core</h3>
               <h2 className="text-5xl md:text-6xl font-display text-foreground mb-6 leading-tight">
                 ENGINEERED WITH <br/> PRECISION.
               </h2>
@@ -191,15 +188,14 @@ export default function LandingPage() {
                 Built on a modern stack ensuring type safety, blazing fast interactions, and secure local data processing.
               </p>
               <div className="grid grid-cols-2 gap-4">
-                 <TechItem label="React 19" icon={<Code size={24} />} />
-                 <TechItem label="Gemini API" icon={<Sparkles size={24} />} />
+                 <TechItem label="React 19" icon={<Code size={24} className="text-primary dark:text-[#bbf246]" />} />
+                 <TechItem label="Gemini API" icon={<Sparkles size={24} className="text-primary dark:text-[#bbf246]" />} />
                  <TechItem label="TypeScript" icon={<BracketsIcon />} />
-                 <TechItem label="Framer Motion" icon={<Layers size={24} />} />
+                 <TechItem label="Framer Motion" icon={<Layers size={24} className="text-primary dark:text-[#bbf246]" />} />
               </div>
            </div>
-           <div className="h-full min-h-[400px] rounded-[2rem] border relative overflow-hidden flex flex-col items-center justify-center group shadow-2xl" style={{ backgroundColor: COLORS.surface, borderColor: COLORS.border }}>
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_70%)] opacity-50 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay" />
+           <div className="h-full min-h-[400px] rounded-[2rem] border border-border dark:border-white/10 relative overflow-hidden flex flex-col items-center justify-center group shadow-2xl bg-card dark:bg-[#0f0f17] transition-colors duration-300">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.12),transparent_70%)] opacity-50 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
               
               <div className="relative z-10 text-center flex flex-col items-center">
                  <MotionDiv 
@@ -207,16 +203,16 @@ export default function LandingPage() {
                    whileInView={{ scale: 1, opacity: 1 }}
                    viewport={{ once: true }}
                    transition={{ duration: 0.8, type: "spring", bounce: 0.5 }}
-                   className="w-24 h-24 rounded-full border border-primary/30 flex items-center justify-center mb-6 bg-primary/5 backdrop-blur-md relative"
+                   className="w-24 h-24 rounded-full border border-primary/40 dark:border-[#bbf246]/30 flex items-center justify-center mb-6 bg-primary/10 dark:bg-[#bbf246]/10 backdrop-blur-md relative"
                  >
-                    <div className="absolute inset-0 rounded-full border border-primary/50 border-t-transparent animate-spin" style={{ animationDuration: '3s' }} />
-                    <Database size={32} className="text-primary animate-pulse" />
+                    <div className="absolute inset-0 rounded-full border border-primary/50 dark:border-[#bbf246]/50 border-t-transparent animate-spin" style={{ animationDuration: '3s' }} />
+                    <Database size={32} className="text-primary dark:text-[#bbf246] animate-pulse" />
                  </MotionDiv>
                  
-                 <div className="text-7xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 mb-4 tracking-tighter drop-shadow-sm">
+                 <div className="text-7xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/40 mb-4 tracking-tighter drop-shadow-sm">
                    100%
                  </div>
-                 <div className="text-xs font-mono text-primary uppercase tracking-widest px-5 py-2 rounded-full border border-primary/20 bg-primary/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                 <div className="text-xs font-mono text-primary dark:text-[#bbf246] uppercase tracking-widest px-5 py-2 rounded-full border border-primary/30 dark:border-[#bbf246]/30 bg-primary/10 dark:bg-[#bbf246]/10 shadow-[0_0_15px_rgba(187,242,70,0.2)]">
                    Client Side Processing
                  </div>
               </div>
@@ -227,11 +223,11 @@ export default function LandingPage() {
       {/* --- ROADMAP --- */}
       <section id="roadmap" className="relative z-10 py-32 px-6 max-w-7xl mx-auto overflow-hidden">
         <div className="text-center mb-24">
-          <h2 className="text-4xl md:text-6xl font-display mb-4">PROJECT TIMELINE</h2>
+          <h2 className="text-4xl md:text-6xl font-display text-foreground mb-4">PROJECT TIMELINE</h2>
           <p className="text-muted-foreground font-mono uppercase tracking-widest text-sm">Development Roadmap</p>
         </div>
 
-        <div className="absolute left-1/2 top-[300px] bottom-32 w-px bg-muted -translate-x-1/2 hidden md:block pointer-events-none" />
+        <div className="absolute left-1/2 top-[300px] bottom-32 w-px bg-border dark:bg-white/10 -translate-x-1/2 hidden md:block pointer-events-none" />
 
         <div className="relative space-y-24">
           <RoadmapItem 
@@ -266,10 +262,11 @@ export default function LandingPage() {
       </section>
 
       {/* --- FOOTER CTA --- */}
-      <section className="relative z-10 h-[60vh] flex flex-col items-center justify-center group cursor-pointer overflow-hidden" onClick={handleEnter} style={{ background: "radial-gradient(circle at center, #162C6D 0%, #0A101D 100%)" }}>
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay" />
-        
-        <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl pointer-events-none" />
+      <section 
+        className="relative z-10 h-[60vh] flex flex-col items-center justify-center group cursor-pointer overflow-hidden border-t border-border dark:border-white/10 bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.18)_0%,var(--background)_80%)] dark:bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.12)_0%,#07070b_80%)] transition-colors duration-300" 
+        onClick={handleEnter} 
+      >
+        <div className="absolute inset-0 bg-[#bbf246]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-3xl pointer-events-none" />
 
         <MotionDiv 
           initial={{ y: 50, opacity: 0 }}
@@ -278,24 +275,23 @@ export default function LandingPage() {
           className="relative z-10 text-center flex flex-col items-center gap-8 pointer-events-none"
         >
           <div className="relative">
-            <h2 className="text-[8vw] sm:text-[10vw] font-display font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 group-hover:to-blue-400 group-hover:scale-105 transition-all duration-700 ease-out" style={{ filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.8))" }}>
+            <h2 className="text-[8vw] sm:text-[10vw] font-display font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/60 group-hover:to-primary dark:group-hover:to-[#bbf246] group-hover:scale-105 transition-all duration-700 ease-out">
               ENTER KAIZEN
             </h2>
-            <div className="absolute -inset-4 bg-blue-500/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 -z-10" />
+            <div className="absolute -inset-4 bg-[#bbf246]/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 -z-10" />
           </div>
           
-          <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-md group-hover:bg-white/10 group-hover:border-white/20 transition-all duration-500 shadow-xl">
+          <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-card/80 dark:bg-white/5 border border-border dark:border-white/10 backdrop-blur-md group-hover:bg-primary/10 dark:group-hover:bg-[#bbf246]/10 group-hover:border-primary/40 dark:group-hover:border-[#bbf246]/30 transition-all duration-500 shadow-xl">
             <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#bbf246] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#bbf246]"></span>
             </span>
-            <p className="font-mono text-sm sm:text-base uppercase tracking-[0.2em] text-blue-200/80 group-hover:text-white transition-colors">
+            <p className="font-mono text-sm sm:text-base uppercase tracking-[0.2em] text-muted-foreground group-hover:text-foreground transition-colors">
               Initialize Academic Core
             </p>
           </div>
         </MotionDiv>
       </section>
-
 
     </div>
     </>
@@ -304,44 +300,6 @@ export default function LandingPage() {
 
 // --- Sub-Components ---
 
-const MethodologyStep: React.FC<{ number: string, title: string, desc: string, icon: React.ReactNode }> = ({ number, title, desc, icon }) => (
-  <motion.div 
-    initial="initial"
-    whileHover="hovered"
-    variants={{
-      initial: { borderColor: COLORS.border, backgroundColor: COLORS.surface },
-      hovered: { borderColor: COLORS.accent, backgroundColor: COLORS.surfaceHover }
-    }}
-    transition={{ duration: 0.3 }}
-    className="border p-8 rounded-3xl text-center relative z-10 cursor-default shadow-lg"
-  >
-    <motion.div 
-      variants={{
-        initial: { color: COLORS.textMuted, borderColor: COLORS.border },
-        hovered: { color: COLORS.accent, borderColor: COLORS.accent }
-      }}
-      transition={{ duration: 0.3 }}
-      className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-background border rounded-full flex items-center justify-center"
-      style={{ backgroundColor: "#050914" }}
-    >
-      {icon}
-    </motion.div>
-    
-    <motion.div 
-      variants={{
-        initial: { color: COLORS.textMuted },
-        hovered: { color: COLORS.text }
-      }}
-      className="mt-6 mb-4 text-4xl font-display font-bold"
-    >
-      {number}
-    </motion.div>
-    
-    <h3 className="text-xl font-display text-foreground mb-2">{title}</h3>
-    <p className="text-sm text-muted-foreground">{desc}</p>
-  </motion.div>
-);
-
 const ProtocolStep: React.FC<{ number: string, title: string, desc: string, icon: React.ReactNode }> = ({ number, title, desc, icon }) => (
   <MotionDiv 
     initial="initial"
@@ -349,22 +307,22 @@ const ProtocolStep: React.FC<{ number: string, title: string, desc: string, icon
     whileHover="hovered"
     viewport={{ once: true, margin: "-50px" }}
     variants={{
-      initial: { opacity: 0, x: 50, backgroundColor: COLORS.surface, borderColor: COLORS.border },
-      visible: { opacity: 1, x: 0, transition: { duration: 0.6, type: "spring", bounce: 0.4 }, backgroundColor: COLORS.surface, borderColor: COLORS.border },
-      hovered: { scale: 1.02, backgroundColor: COLORS.surfaceHover, borderColor: COLORS.accent, transition: { duration: 0.3 } }
+      initial: { opacity: 0, x: 50 },
+      visible: { opacity: 1, x: 0, transition: { duration: 0.6, type: "spring", bounce: 0.4 } },
+      hovered: { scale: 1.02, transition: { duration: 0.3 } }
     }}
-    className="p-8 md:p-12 border rounded-[2rem] relative overflow-hidden group shadow-2xl"
+    className="p-8 md:p-12 border border-border dark:border-white/10 bg-card dark:bg-[#0f0f17] hover:border-primary/60 dark:hover:border-[#bbf246] rounded-[2rem] relative overflow-hidden group shadow-2xl transition-all duration-300"
   >
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(187,242,70,0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
     
     <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start md:items-center">
-      <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-center text-primary shadow-inner group-hover:scale-110 transition-transform duration-500">
+      <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-muted/70 dark:bg-black/60 border border-border dark:border-white/10 flex items-center justify-center text-primary dark:text-[#bbf246] shadow-inner group-hover:scale-110 transition-transform duration-500">
         {icon}
       </div>
       
       <div className="flex-grow">
         <div className="flex items-center gap-4 mb-3">
-          <span className="font-mono text-3xl font-bold text-muted-foreground/30 group-hover:text-primary/50 transition-colors">{number}</span>
+          <span className="font-mono text-3xl font-bold text-foreground/20 dark:text-white/20 group-hover:text-primary/70 dark:group-hover:text-[#bbf246]/60 transition-colors">{number}</span>
           <h3 className="text-3xl font-display text-foreground">{title}</h3>
         </div>
         <p className="text-muted-foreground text-lg leading-relaxed">{desc}</p>
@@ -372,53 +330,6 @@ const ProtocolStep: React.FC<{ number: string, title: string, desc: string, icon
     </div>
   </MotionDiv>
 );
-
-const FeatureCard: React.FC<{
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  delay?: number;
-  isNew?: boolean;
-}> = ({ title, description, icon, color, delay = 0, isNew }) => {
-  return (
-    <MotionDiv 
-      initial="initial"
-      whileInView="visible"
-      whileHover="hovered"
-      viewport={{ once: true, margin: "-50px" }}
-      variants={{
-        initial: { opacity: 0, y: 50, backgroundColor: COLORS.surface, borderColor: COLORS.border },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6, delay }, backgroundColor: COLORS.surface, borderColor: COLORS.border },
-        hovered: { y: -5, backgroundColor: COLORS.surfaceHover, borderColor: COLORS.accent }
-      }}
-      className="p-8 border rounded-3xl min-h-[280px] flex flex-col justify-between relative cursor-pointer shadow-lg"
-    >
-      {isNew && (
-        <div className="absolute top-4 right-4 px-2 py-1 text-black text-[10px] font-bold uppercase tracking-widest rounded-sm" style={{ backgroundColor: COLORS.accent }}>
-          New
-        </div>
-      )}
-      
-      <MotionDiv 
-        variants={{
-          initial: { scale: 1 },
-          hovered: { scale: 1.1 }
-        }}
-        transition={{ duration: 0.3 }}
-        className={`w-12 h-12 rounded-full flex items-center justify-center ${color} mb-6 shadow-inner`}
-        style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
-      >
-        {icon}
-      </MotionDiv>
-      
-      <div>
-        <h3 className="text-2xl font-display font-medium mb-3 text-foreground">{title}</h3>
-        <p className="text-muted-foreground font-light leading-relaxed text-sm">{description}</p>
-      </div>
-    </MotionDiv>
-  );
-}
 
 const RoadmapItem: React.FC<{
   quarter: string;
@@ -433,7 +344,7 @@ const RoadmapItem: React.FC<{
       whileHover="hovered"
       className="relative flex flex-col md:flex-row items-center justify-between w-full group"
     >
-      <div className="absolute left-0 top-0 bottom-0 w-px bg-muted md:hidden pointer-events-none" />
+      <div className="absolute left-0 top-0 bottom-0 w-px bg-border dark:bg-white/10 md:hidden pointer-events-none" />
       
       <MotionDiv 
         whileInView={{ opacity: 1, x: 0 }}
@@ -445,36 +356,29 @@ const RoadmapItem: React.FC<{
         <div className={`flex flex-col gap-2 mb-3 ${position === 'left' ? 'md:items-end' : 'md:items-start'}`}>
           <div className="flex items-center gap-3">
              {position === 'right' && (
-                <span className="text-primary font-mono text-xs uppercase tracking-widest">{quarter}</span>
+                <span className="text-primary dark:text-[#bbf246] font-mono text-xs uppercase tracking-widest">{quarter}</span>
              )}
-            <span className={`text-[10px] uppercase px-2 py-0.5 rounded border ${
-              status === 'Active' ? 'border-primary text-primary bg-primary/10' : 
-              status === 'Complete' ? 'border-green-500 text-green-500 bg-green-500/10' :
-              'border-input text-muted-foreground'
+            <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+              status === 'Active' ? 'border-primary dark:border-[#bbf246] text-primary dark:text-[#bbf246] bg-primary/10 dark:bg-[#bbf246]/10' : 
+              status === 'Complete' ? 'border-emerald-500 text-emerald-500 dark:text-emerald-400 bg-emerald-500/10' :
+              'border-border dark:border-white/10 text-muted-foreground'
             }`}>
               {status}
             </span>
              {position === 'left' && (
-                <span className="text-primary font-mono text-xs uppercase tracking-widest">{quarter}</span>
+                <span className="text-primary dark:text-[#bbf246] font-mono text-xs uppercase tracking-widest">{quarter}</span>
              )}
           </div>
           
-          <motion.h3 
-            variants={{
-              initial: { color: COLORS.text },
-              hovered: { color: COLORS.accent }
-            }}
-            transition={{ duration: 0.3 }}
-            className="text-2xl font-display font-bold"
-          >
+          <h3 className="text-2xl font-display font-bold text-foreground group-hover:text-primary dark:group-hover:text-[#bbf246] transition-colors">
             {title}
-          </motion.h3>
+          </h3>
         </div>
         <p className="text-muted-foreground text-sm leading-relaxed max-w-sm ml-0 md:ml-auto">{description}</p>
       </MotionDiv>
 
-      <div className="absolute left-0 md:left-1/2 -translate-x-1/2 md:-translate-x-1/2 top-0 w-4 h-4 rounded-full border-4 border-black z-10 flex items-center justify-center pointer-events-none">
-         <div className={`w-full h-full rounded-full transition-all duration-300 ${status === 'Active' ? 'bg-primary animate-pulse shadow-primary/50' : status === 'Complete' ? 'bg-green-500' : 'bg-[#444]'}`} />
+      <div className="absolute left-0 md:left-1/2 -translate-x-1/2 md:-translate-x-1/2 top-0 w-4 h-4 rounded-full border-4 border-background dark:border-[#07070b] z-10 flex items-center justify-center pointer-events-none transition-colors">
+         <div className={`w-full h-full rounded-full transition-all duration-300 ${status === 'Active' ? 'bg-primary dark:bg-[#bbf246] shadow-[0_0_10px_#bbf246]' : status === 'Complete' ? 'bg-emerald-400' : 'bg-muted-foreground/30 dark:bg-white/20'}`} />
       </div>
     </motion.div>
   );
@@ -482,18 +386,16 @@ const RoadmapItem: React.FC<{
 
 const TechItem: React.FC<{ label: string, icon: React.ReactNode }> = ({ label, icon }) => (
   <motion.div 
-    whileHover={{ y: -4, backgroundColor: COLORS.surfaceHover, borderColor: COLORS.accent }}
-    className="flex flex-col items-center justify-center gap-4 p-6 border rounded-2xl text-sm text-muted-foreground transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-xl"
-    style={{ borderColor: COLORS.border, backgroundColor: COLORS.surface }}
+    whileHover={{ y: -4 }}
+    className="flex flex-col items-center justify-center gap-4 p-6 border border-border dark:border-white/10 rounded-2xl text-sm text-muted-foreground transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-xl bg-card dark:bg-[#0f0f17] hover:border-primary/60 dark:hover:border-[#bbf246]"
   >
-    <div className="w-14 h-14 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all duration-500">
+    <div className="w-14 h-14 rounded-xl bg-muted/60 dark:bg-black/60 border border-border dark:border-white/10 flex items-center justify-center text-primary dark:text-[#bbf246] group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(187,242,70,0.3)] transition-all duration-500">
       {icon}
     </div>
-    <span className="font-medium group-hover:text-foreground transition-colors tracking-wide">{label}</span>
+    <span className="font-medium text-foreground/90 group-hover:text-foreground transition-colors tracking-wide">{label}</span>
   </motion.div>
 );
 
 const BracketsIcon = () => (
-   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary dark:text-[#bbf246]"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
 );
-

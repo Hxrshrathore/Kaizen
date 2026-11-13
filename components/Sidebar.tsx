@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Upload, Play, TrendingUp, Activity, LogOut, 
   User, PieChart, Sparkles, Zap, BrainCircuit, FileQuestion, 
   CalendarClock, Mail, ChevronRight, DatabaseZap, Shield,
-  Pin, PinOff
+  Pin, PinOff, GraduationCap
 } from 'lucide-react';
 import { getOfficialBadge } from '@/lib/rbac';
 
@@ -18,6 +18,9 @@ interface SidebarProps {
   user?: {
     name: string;
     email: string;
+    image?: string | null;
+    department?: string | null;
+    designation?: string | null;
     userType?: string;
     officialTag?: string;
     officialTags?: string[];
@@ -64,6 +67,7 @@ export default function Sidebar({
       section: 'ACADEMIC ENGINE', 
       items: [
         { path: '/dashboard/upload', label: 'Ingest Grades', icon: <Upload size={19} /> },
+        { path: '/dashboard/records', label: 'Academic Ledger', icon: <GraduationCap size={19} /> },
         { path: '/dashboard/simulator', label: 'SGPA Simulator', icon: <Play size={19} /> },
         { path: '/dashboard/improvement', label: 'Optimizer', icon: <TrendingUp size={19} /> },
         { path: '/dashboard/mock-exams', label: 'Exo-Sim', icon: <FileQuestion size={19} /> },
@@ -99,9 +103,10 @@ export default function Sidebar({
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-3.5 border-b border-border shrink-0 overflow-hidden">
         <div className="flex items-center min-w-0">
-          <div className="w-10 h-10 bg-primary text-primary-foreground rounded-lg flex items-center justify-center shrink-0 shadow-sm transition-transform duration-200 hover:scale-105">
-            <Activity className="w-5 h-5" />
-          </div>
+          <Link href="/dashboard" className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-md overflow-hidden border border-black/10 dark:border-white/15 transition-transform duration-200 hover:scale-105 bg-card dark:bg-[#07070b]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo/kaizen-logo.png" alt="Kaizen" className="w-full h-full object-cover" />
+          </Link>
           <div
             className={`transition-all duration-300 overflow-hidden whitespace-nowrap ml-3 ${
               expanded ? 'opacity-100 max-w-[140px]' : 'opacity-0 max-w-0 pointer-events-none'
@@ -200,9 +205,30 @@ export default function Sidebar({
       <div className="p-3 border-t border-border bg-muted/30 shrink-0 overflow-hidden transition-all duration-300">
         {expanded ? (
           <div className="space-y-2.5 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between gap-1.5 overflow-hidden">
+            <Link 
+              href="/dashboard/profile"
+              className="flex items-center gap-2.5 p-1 -m-1 rounded-lg hover:bg-muted/50 transition-colors group"
+            >
+              <div className="relative w-8 h-8 rounded-full overflow-hidden bg-primary/10 border border-primary/20 shrink-0 flex items-center justify-center">
+                {displayUser.image ? (
+                  <img
+                    src={displayUser.image}
+                    alt={displayUser.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="text-xs font-bold font-mono text-primary">
+                    {displayUser.name?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-foreground font-bold truncate">{displayUser.name}</div>
+                <div className="text-xs text-foreground font-bold truncate group-hover:text-primary transition-colors">
+                  {displayUser.name}
+                </div>
                 <div className="text-[10px] text-muted-foreground truncate font-mono" title={displayUser.email}>
                   {displayUser.email}
                 </div>
@@ -213,7 +239,7 @@ export default function Sidebar({
               >
                 {badge.label}
               </span>
-            </div>
+            </Link>
             <button 
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-destructive hover:bg-destructive/10 transition-colors text-[10px] uppercase tracking-widest font-bold shadow-sm"
@@ -224,12 +250,24 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold font-mono text-primary cursor-pointer hover:scale-105 transition-transform"
+            <Link
+              href="/dashboard/profile"
+              className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold font-mono text-primary cursor-pointer hover:scale-105 transition-transform shrink-0"
               title={`${displayUser.name} (${badge.label})`}
             >
-              {displayUser.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
+              {displayUser.image ? (
+                <img
+                  src={displayUser.image}
+                  alt={displayUser.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                displayUser.name?.charAt(0).toUpperCase() || 'U'
+              )}
+            </Link>
             <button 
               onClick={handleLogout}
               className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10 transition-colors"

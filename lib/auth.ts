@@ -59,3 +59,15 @@ export async function verifySessionData(token: string) {
     return null;
   }
 }
+
+/**
+ * Creates a long-lived JWT token for Apple HealthKit & Android Webhooks (365 days)
+ */
+export async function createHealthSyncToken(userId: string) {
+  const token = await new SignJWT({ userId, purpose: 'health_sync' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('365d')
+    .sign(JWT_SECRET);
+  return token;
+}
