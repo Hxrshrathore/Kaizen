@@ -7,7 +7,7 @@ import {
   BookOpen, Calendar, Clock, ChevronRight, Loader2, 
   ExternalLink, FileText, AlertCircle, ArrowLeft, EyeOff, Eye,
   Sparkles, CheckCircle2, AlertTriangle, Check, X, Filter,
-  Layers, RefreshCw, GraduationCap
+  Layers, RefreshCw, GraduationCap, Edit3, Link2, Unlink
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -49,6 +49,22 @@ interface CourseStats {
   pending: number;
 }
 
+export interface MappedSubjectInfo {
+  code: string;
+  name: string | null;
+  isManual: boolean;
+}
+
+export interface SubjectPoolItem {
+  code: string;
+  name: string;
+  type: 'CORE' | 'ELECTIVE' | 'MENTOR';
+  isAllotted?: boolean;
+  faculty?: string;
+  room?: string;
+  description?: string;
+}
+
 interface Course {
   id: string;
   name: string;
@@ -58,6 +74,8 @@ interface Course {
   assignments: Assignment[];
   stats: CourseStats;
   classification: CourseClassification;
+  mappedSubject?: MappedSubjectInfo | null;
+  needsSubjectSelection?: boolean;
 }
 
 interface ClassroomSummary {
@@ -70,6 +88,7 @@ interface ClassroomSummary {
   unfilteredPastCount: number;
   recommendedActiveIds: string[];
   recommendedHiddenIds: string[];
+  unmappedActiveCount: number;
 }
 
 // --- ANIMATION WRAPPERS ---
@@ -81,17 +100,19 @@ const CourseCard = ({
   course, 
   index, 
   isHidden, 
-  onClick 
+  onClick,
+  onOpenMappingModal
 }: { 
   course: Course; 
   index: number; 
   isHidden: boolean; 
-  onClick: () => void 
+  onClick: () => void;
+  onOpenMappingModal: (course: Course) => void;
 }) => {
   const isCurrentSem = course.classification?.category === 'CURRENT_SEMESTER';
   const isAmbiguous = course.classification?.category === 'AMBIGUOUS';
-  const isPast = course.classification?.category === 'PREVIOUS_SEMESTER';
   const stats = course.stats || { total: course.assignments.length, submitted: 0, pending: course.assignments.length };
+  const mappedSub = course.mappedSubject;
 
   return (
     <MotionDiv
@@ -114,14 +135,36 @@ const CourseCard = ({
       }`} />
 
       <div>
-        {/* Header Badges */}
+        {/* Header Badges: Subject Mapping & Section */}
         <div className="flex justify-between items-start gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            {course.classification?.matchedSubjectCode && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/30">
-                {course.classification.matchedSubjectCode}
-              </span>
+            {mappedSub ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenMappingModal(course);
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/30 flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                title="Click to view or change Subject Code mapping"
+              >
+                <span>[{mappedSub.code}]</span>
+                <span className="truncate max-w-[100px]">{mappedSub.name || mappedSub.code}</span>
+                <Edit3 size={9} className="opacity-70 ml-0.5" />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenMappingModal(course);
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
+                title="Click to map this classroom to a 7th semester subject"
+              >
+                <AlertCircle size={10} />
+                <span>Map Subject</span>
+              </button>
             )}
+
             <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest bg-muted px-2 py-0.5 rounded border border-border">
               {course.section || 'General'}
             </span>
@@ -291,11 +334,24 @@ export default function ClassroomPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [summary, setSummary] = useState<ClassroomSummary | null>(null);
   const [filterTab, setFilterTab] = useState<'ALL_ACTIVE' | 'PENDING' | 'TURNED_IN'>('ALL_ACTIVE');
+  const [subjectsPool, setSubjectsPool] = useState<SubjectPoolItem[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Confirmation Modal State
+  // Confirmation Modal State (Auto-Detect Current Sem)
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedForActive, setSelectedForActive] = useState<Set<string>>(new Set());
   const [confirmSaving, setConfirmSaving] = useState(false);
+
+  // Subject Mapping Modal State
+  const [mappingModalCourse, setMappingModalCourse] = useState<Course | null>(null);
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('');
+  const [customCodeInput, setCustomCodeInput] = useState<string>('');
+  const [savingSubjectMapping, setSavingSubjectMapping] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Fetch Classroom Data
   const fetchData = async () => {
@@ -310,6 +366,7 @@ export default function ClassroomPage() {
         const hiddenSet = new Set<string>(data.hiddenCourseIds || []);
         setHiddenCourseIds(hiddenSet);
         setSummary(data.summary || null);
+        setSubjectsPool(data.currentSemesterSubjectsPool || []);
 
         // Pre-populate modal selection with recommended active courses
         const activeIds = (data.courses || [])
@@ -336,10 +393,9 @@ export default function ClassroomPage() {
     fetchData();
   }, []);
 
-  // Open modal and pre-populate recommendations
+  // Open Auto-Detect Confirmation Modal
   const openConfirmModal = () => {
     if (summary?.recommendedActiveIds) {
-      // Pre-select recommended 7th sem courses
       setSelectedForActive(new Set(summary.recommendedActiveIds));
     } else {
       const rec = courses
@@ -348,6 +404,118 @@ export default function ClassroomPage() {
       setSelectedForActive(new Set(rec));
     }
     setIsConfirmModalOpen(true);
+  };
+
+  // Open Subject Mapping Modal for a Course
+  const openSubjectMappingModal = (course: Course) => {
+    setMappingModalCourse(course);
+    const existingCode = course.mappedSubject?.code || course.classification?.matchedSubjectCode || '';
+    setSelectedSubjectCode(existingCode);
+    setCustomCodeInput('');
+  };
+
+  // Save Subject Mapping
+  const handleSaveSubjectMapping = async () => {
+    if (!mappingModalCourse) return;
+    const finalCode = (customCodeInput.trim() || selectedSubjectCode).trim().toUpperCase();
+    if (!finalCode) {
+      alert('Please select or enter a subject code');
+      return;
+    }
+
+    try {
+      setSavingSubjectMapping(true);
+      // Find subject name from pool if available
+      const poolItem = subjectsPool.find(p => p.code.toUpperCase() === finalCode);
+      const subjectName = poolItem?.name || finalCode;
+
+      const res = await fetch('/api/classroom/map-subject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: mappingModalCourse.id,
+          courseName: mappingModalCourse.name,
+          subjectCode: finalCode,
+          subjectName,
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        // Update local course state
+        setCourses(prev => prev.map(c => {
+          if (c.id === mappingModalCourse.id) {
+            return {
+              ...c,
+              mappedSubject: {
+                code: finalCode,
+                name: subjectName,
+                isManual: true,
+              },
+              needsSubjectSelection: false,
+            };
+          }
+          return c;
+        }));
+
+        if (selectedCourse?.id === mappingModalCourse.id) {
+          setSelectedCourse(prev => prev ? {
+            ...prev,
+            mappedSubject: {
+              code: finalCode,
+              name: subjectName,
+              isManual: true,
+            },
+            needsSubjectSelection: false,
+          } : null);
+        }
+
+        showToast(`Successfully mapped to [${finalCode}] ${subjectName}!`);
+        setMappingModalCourse(null);
+      } else {
+        alert(data.error || 'Failed to map subject');
+      }
+    } catch (err: any) {
+      alert('Error mapping subject: ' + err.message);
+    } finally {
+      setSavingSubjectMapping(false);
+    }
+  };
+
+  // Remove Subject Mapping
+  const handleRemoveSubjectMapping = async () => {
+    if (!mappingModalCourse) return;
+    try {
+      setSavingSubjectMapping(true);
+      const res = await fetch(`/api/classroom/map-subject?courseId=${mappingModalCourse.id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setCourses(prev => prev.map(c => {
+          if (c.id === mappingModalCourse.id) {
+            return {
+              ...c,
+              mappedSubject: null,
+              needsSubjectSelection: true,
+            };
+          }
+          return c;
+        }));
+
+        if (selectedCourse?.id === mappingModalCourse.id) {
+          setSelectedCourse(prev => prev ? {
+            ...prev,
+            mappedSubject: null,
+            needsSubjectSelection: true,
+          } : null);
+        }
+
+        showToast('Subject mapping removed.');
+        setMappingModalCourse(null);
+      }
+    } finally {
+      setSavingSubjectMapping(false);
+    }
   };
 
   // Toggle course in confirmation modal
@@ -361,24 +529,6 @@ export default function ClassroomPage() {
       }
       return next;
     });
-  };
-
-  // Select all recommended 7th sem courses
-  const selectAllRecommended = () => {
-    const recIds = courses
-      .filter(c => c.classification?.recommendedActive)
-      .map(c => c.id);
-    setSelectedForActive(new Set(recIds));
-  };
-
-  // Select all courses
-  const selectAll = () => {
-    setSelectedForActive(new Set(courses.map(c => c.id)));
-  };
-
-  // Deselect all
-  const clearAll = () => {
-    setSelectedForActive(new Set());
   };
 
   // Save confirmed active classrooms
@@ -403,7 +553,7 @@ export default function ClassroomPage() {
       if (res.ok) {
         setHiddenCourseIds(new Set(resData.hiddenCourseIds || hiddenCourseIdsToSave));
         setIsConfirmModalOpen(false);
-        // Refresh to update summary stats
+        showToast('Active 7th-semester classrooms updated & saved!');
         await fetchData();
       } else {
         alert(resData.error || 'Failed to save configuration');
@@ -457,7 +607,7 @@ export default function ClassroomPage() {
           <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin" />
           <Loader2 className="absolute inset-0 m-auto text-primary/50 animate-pulse" size={24} />
         </div>
-        <p className="text-xs uppercase tracking-[0.3em] animate-pulse">Syncing Google Classroom &amp; Submissions...</p>
+        <p className="text-xs uppercase tracking-[0.3em] animate-pulse">Syncing Google Classroom &amp; Subject Mappings...</p>
       </div>
     );
   }
@@ -496,8 +646,23 @@ export default function ClassroomPage() {
   const pastSemesterCourses = courses.filter(c => c.classification?.category === 'PREVIOUS_SEMESTER');
 
   return (
-    <div className="max-w-7xl mx-auto pt-8 pb-32 px-4">
+    <div className="max-w-7xl mx-auto pt-8 pb-32 px-4 relative">
       
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-primary text-black font-mono text-xs font-bold shadow-2xl flex items-center gap-2"
+          >
+            <CheckCircle2 size={16} />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Navigation Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -578,7 +743,7 @@ export default function ClassroomPage() {
                 {summary.unfilteredPastCount} Previous Semester Classrooms Detected
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                University professors rarely archive past courses. Auto-detect your active 7th semester papers so completed 5th/6th sem assignments don't clutter your view.
+                University professors rarely archive past courses. Auto-detect your active 7th semester papers so completed 5th/6th sem assignments don&apos;t clutter your view.
               </p>
             </div>
           </div>
@@ -615,7 +780,8 @@ export default function ClassroomPage() {
                       course={course} 
                       index={idx} 
                       isHidden={hiddenCourseIds.has(course.id)}
-                      onClick={() => setSelectedCourse(course)} 
+                      onClick={() => setSelectedCourse(course)}
+                      onOpenMappingModal={openSubjectMappingModal}
                     />
                   </div>
                 ))}
@@ -653,16 +819,36 @@ export default function ClassroomPage() {
                   <span className="text-[10px] text-primary font-mono uppercase tracking-[0.2em] font-bold">
                     Course Protocol
                   </span>
-                  {selectedCourse.classification?.matchedSubjectCode && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-                      {selectedCourse.classification.matchedSubjectCode}
-                    </span>
+                  {selectedCourse.mappedSubject ? (
+                    <button
+                      onClick={() => openSubjectMappingModal(selectedCourse)}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                      title="Click to edit subject mapping"
+                    >
+                      <span>[{selectedCourse.mappedSubject.code}]</span>
+                      <Edit3 size={10} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openSubjectMappingModal(selectedCourse)}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
+                    >
+                      <AlertCircle size={10} />
+                      <span>Map Subject</span>
+                    </button>
                   )}
                 </div>
 
-                <h2 className="text-xl font-display font-bold text-foreground mb-3 leading-tight">
+                <h2 className="text-xl font-display font-bold text-foreground mb-1 leading-tight">
                   {selectedCourse.name}
                 </h2>
+
+                {selectedCourse.mappedSubject && (
+                  <div className="text-xs font-mono text-primary font-bold mb-3 flex items-center gap-1.5">
+                    <Link2 size={12} />
+                    <span>Mapped to: {selectedCourse.mappedSubject.name || selectedCourse.mappedSubject.code}</span>
+                  </div>
+                )}
 
                 <p className="text-xs font-mono text-muted-foreground mb-6 leading-relaxed">
                   {selectedCourse.classification?.reason || selectedCourse.descriptionHeading || 'Enrolled Academic Coursework'}
@@ -672,6 +858,10 @@ export default function ClassroomPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground uppercase">Section</span>
                     <span className="text-foreground font-bold">{selectedCourse.section || 'General'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground uppercase">Subject Code</span>
+                    <span className="text-primary font-bold">{selectedCourse.mappedSubject?.code || 'UNMAPPED'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground uppercase">Total Work</span>
@@ -688,6 +878,14 @@ export default function ClassroomPage() {
                 </div>
 
                 <div className="flex flex-col gap-2.5">
+                  <button
+                    onClick={() => openSubjectMappingModal(selectedCourse)}
+                    className="w-full h-11 border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-mono font-bold flex items-center justify-center gap-2 transition-all uppercase tracking-wider text-xs rounded-xl"
+                  >
+                    <Link2 size={14} />
+                    <span>{selectedCourse.mappedSubject ? 'Change Subject Mapping' : 'Link to 7th Sem Subject'}</span>
+                  </button>
+
                   <a 
                     href={selectedCourse.alternateLink}
                     target="_blank"
@@ -795,6 +993,153 @@ export default function ClassroomPage() {
         )}
       </AnimatePresence>
 
+      {/* ── INTERACTIVE SUBJECT MAPPING MODAL (POOL OF 7TH SEM SUBJECTS) ── */}
+      <AnimatePresence>
+        {mappingModalCourse && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <MotionDiv
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-card border border-border w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-border flex items-start justify-between gap-4 bg-muted/20">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Link2 className="text-primary" size={18} />
+                    <h2 className="text-xl font-display font-bold text-foreground">
+                      Map Classroom to 7th Semester Subject
+                    </h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono leading-relaxed">
+                    Classroom: <span className="text-foreground font-bold">&quot;{mappingModalCourse.name}&quot;</span> ({mappingModalCourse.section || 'General'})
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMappingModalCourse(null)}
+                  className="p-2 text-muted-foreground hover:text-foreground rounded-lg border border-border hover:border-input transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Pool of Subjects List */}
+              <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-bold">
+                  Select from Current 7th-Semester Curriculum:
+                </div>
+
+                <div className="space-y-2.5">
+                  {subjectsPool.map((subj) => {
+                    const isSelected = selectedSubjectCode === subj.code.toUpperCase() && !customCodeInput.trim();
+                    const isAllotted = subj.isAllotted;
+
+                    return (
+                      <div
+                        key={subj.code}
+                        onClick={() => {
+                          setSelectedSubjectCode(subj.code.toUpperCase());
+                          setCustomCodeInput('');
+                        }}
+                        className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'bg-primary/10 border-primary shadow-sm text-foreground' 
+                            : 'bg-card border-border hover:border-input text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors ${
+                            isSelected ? 'bg-primary border-primary text-black' : 'border-border'
+                          }`}>
+                            {isSelected && <Check size={12} strokeWidth={3} />}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-primary">[{subj.code}]</span>
+                              <span className="font-semibold text-sm text-foreground">{subj.name}</span>
+                              {isAllotted && (
+                                <span className="px-2 py-0.2 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                  Your Allotted Elective
+                                </span>
+                              )}
+                              {subj.type === 'CORE' && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-muted text-muted-foreground border border-border">
+                                  Core
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                              {subj.description} {subj.faculty ? `• ${subj.faculty}` : ''} {subj.room ? `(${subj.room})` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Subject Code Input */}
+                <div className="pt-2 border-t border-border space-y-2">
+                  <div className="text-xs font-mono text-muted-foreground">Or enter a custom Subject Code:</div>
+                  <input
+                    type="text"
+                    value={customCodeInput}
+                    onChange={(e) => setCustomCodeInput(e.target.value.toUpperCase())}
+                    placeholder="e.g. CS40099"
+                    className="w-full px-3.5 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-mono uppercase focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-xs font-mono text-muted-foreground">
+                  Selected Code: <span className="text-primary font-bold">{customCodeInput.trim() || selectedSubjectCode || 'None'}</span>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  {mappingModalCourse.mappedSubject && (
+                    <button
+                      onClick={handleRemoveSubjectMapping}
+                      disabled={savingSubjectMapping}
+                      className="px-3 py-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs font-mono transition-colors flex items-center gap-1.5"
+                    >
+                      <Unlink size={13} />
+                      <span>Unlink</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setMappingModalCourse(null)}
+                    className="px-4 py-2 rounded-xl border border-border text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSubjectMapping}
+                    disabled={savingSubjectMapping || (!selectedSubjectCode && !customCodeInput.trim())}
+                    className="px-5 py-2 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all flex items-center gap-2 shadow-sm shadow-primary/20 disabled:opacity-50"
+                  >
+                    {savingSubjectMapping ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        <span>Save Mapping</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </MotionDiv>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ── INTERACTIVE 7TH SEMESTER CONFIRMATION MODAL ── */}
       <AnimatePresence>
         {isConfirmModalOpen && (
@@ -826,36 +1171,8 @@ export default function ClassroomPage() {
                 </button>
               </div>
 
-              {/* Quick Action Buttons */}
-              <div className="px-6 py-3 border-b border-border bg-muted/10 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
-                <span className="text-muted-foreground">
-                  Quick Select:
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={selectAllRecommended}
-                    className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors font-bold"
-                  >
-                    Recommended (7th Sem Only)
-                  </button>
-                  <button
-                    onClick={selectAll}
-                    className="px-2.5 py-1 rounded-lg bg-card border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    onClick={clearAll}
-                    className="px-2.5 py-1 rounded-lg bg-card border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-
               {/* Modal Body: Scrollable Course Categories */}
               <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-                
                 {/* 1. Recommended 7th Sem Classrooms */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
@@ -888,9 +1205,9 @@ export default function ClassroomPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm text-foreground">{course.name}</span>
-                                {course.classification?.matchedSubjectCode && (
+                                {course.mappedSubject?.code && (
                                   <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
-                                    {course.classification.matchedSubjectCode}
+                                    {course.mappedSubject.code}
                                   </span>
                                 )}
                               </div>

@@ -65,6 +65,7 @@ model User {
 
   // Classroom specific
   hiddenCourses   HiddenCourse[]
+  classroomMappings ClassroomSubjectMapping[]
   attendance      AttendanceRecord[]
   healthMetrics   HealthMetric[]
 
@@ -94,6 +95,23 @@ model HiddenCourse {
   createdAt DateTime @default(now())
 
   @@unique([userId, courseId])
+}
+
+model ClassroomSubjectMapping {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  courseName  String
+  subjectCode String
+  subjectName String?
+  isManual    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([subjectCode])
 }
 
 

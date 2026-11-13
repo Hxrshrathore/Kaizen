@@ -25,6 +25,7 @@ export async function GET() {
       hiddenCourseIds: classroomData.hiddenCourseIds,
       studentProfile: classroomData.studentProfile,
       enrolledSubjects: classroomData.enrolledSubjects,
+      currentSemesterSubjectsPool: classroomData.currentSemesterSubjectsPool,
       summary: classroomData.summary
     });
 

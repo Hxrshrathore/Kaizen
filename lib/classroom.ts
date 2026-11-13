@@ -3,6 +3,24 @@ import { getStudentEnrolledSubjects, ELECTIVE_SECTION_MAP, StudentEnrolledSubjec
 
 const CLASSROOM_API_BASE = 'https://classroom.googleapis.com/v1';
 
+// --- TYPES ---
+
+export interface SubjectPoolItem {
+  code: string;
+  name: string;
+  type: 'CORE' | 'ELECTIVE' | 'MENTOR';
+  isAllotted?: boolean;
+  faculty?: string;
+  room?: string;
+  description?: string;
+}
+
+export interface MappedSubjectInfo {
+  code: string;
+  name: string | null;
+  isManual: boolean;
+}
+
 // --- API FUNCTIONS ---
 
 export async function getValidToken(userId: string): Promise<string> {
@@ -100,7 +118,6 @@ export async function fetchStudentSubmissions(accessToken: string, courseId: str
     );
 
     if (!response.ok) {
-      // Submissions API might return 404 or 403 if coursework is empty or permissions restricted
       return [];
     }
 
@@ -331,10 +348,92 @@ export function classifyCourseForStudent(
   };
 }
 
+/**
+ * Build complete pool of 7th Semester Subjects for the student to select from
+ */
+export function buildCurrentSemesterSubjectsPool(studentData?: StudentEnrolledSubjectsResult | null): SubjectPoolItem[] {
+  const pool: SubjectPoolItem[] = [];
+
+  // 1. Core Subjects for 7th Sem
+  pool.push(
+    {
+      code: 'EX40003',
+      name: 'Embedded Systems & IoT Lab',
+      type: 'CORE',
+      description: 'Core Practical Laboratory (7th Sem)',
+    },
+    {
+      code: 'HS40001',
+      name: 'Engineering Professional Practice',
+      type: 'CORE',
+      description: 'Core Humanities & Professional Ethics',
+    },
+    {
+      code: 'TP40001',
+      name: 'Training & Placement',
+      type: 'CORE',
+      description: 'Career Advisory & Placement Preparation',
+    },
+    {
+      code: 'EC47001',
+      name: 'Project-I',
+      type: 'CORE',
+      description: 'Major Capstone Project Phase-I',
+    },
+    {
+      code: 'MN40001',
+      name: 'Minor Project',
+      type: 'CORE',
+      description: 'Interdisciplinary Minor Coursework',
+    }
+  );
+
+  // 2. Student's Allotted Elective
+  const allottedElective = studentData?.currentSemesterSubjects?.find(s => s.isElective);
+  if (allottedElective) {
+    pool.unshift({
+      code: allottedElective.code,
+      name: allottedElective.name,
+      type: 'ELECTIVE',
+      isAllotted: true,
+      faculty: allottedElective.allottedFaculty || undefined,
+      room: allottedElective.allottedRoom || undefined,
+      description: `Your Allotted PE-IV Elective (Section: ${allottedElective.electiveSection || 'Allotted'})`,
+    });
+  }
+
+  // 3. Other PE-IV Elective options available in 7th Sem (deduplicated)
+  const existingCodes = new Set(pool.map(p => p.code.toUpperCase()));
+  for (const [secKey, meta] of Object.entries(ELECTIVE_SECTION_MAP)) {
+    if (!existingCodes.has(meta.code.toUpperCase())) {
+      existingCodes.add(meta.code.toUpperCase());
+      pool.push({
+        code: meta.code,
+        name: meta.name,
+        type: 'ELECTIVE',
+        isAllotted: false,
+        faculty: meta.defaultFaculty,
+        room: meta.defaultRoom,
+        description: `Professional Elective IV Option (${meta.shortName})`,
+      });
+    }
+  }
+
+  // 4. University Mentorship
+  pool.push({
+    code: 'MENTOR',
+    name: 'Tutor-Mentor Forum',
+    type: 'MENTOR',
+    description: 'Proctorial & Student Mentorship Group',
+  });
+
+  return pool;
+}
+
 export async function getClassroomData(userId: string) {
   const token = await getValidToken(userId);
   
-  // Fetch hidden courses from the database
+  // 1. Fetch hidden courses from database
   let hiddenCourseIds: string[] = [];
   try {
     const hiddenRecords = await db.hiddenCourse.findMany({
@@ -346,7 +445,7 @@ export async function getClassroomData(userId: string) {
     console.warn("Failed to fetch hidden courses:", err);
   }
 
-  // Fetch student profile & enrolled subjects for classification
+  // 2. Fetch student profile & enrolled subjects for classification
   let studentData: StudentEnrolledSubjectsResult | null = null;
   try {
     studentData = await getStudentEnrolledSubjects(userId);
@@ -354,9 +453,21 @@ export async function getClassroomData(userId: string) {
     console.warn("Failed to resolve student enrolled subjects for classroom classification:", err);
   }
 
+  // 3. Fetch persistent subject mappings from ClassroomSubjectMapping
+  let existingMappings: any[] = [];
+  try {
+    existingMappings = await db.$queryRawUnsafe<any[]>(
+      `SELECT "courseId", "subjectCode", "subjectName", "isManual" FROM "ClassroomSubjectMapping" WHERE "userId" = $1;`,
+      userId
+    );
+  } catch (mapErr) {
+    console.warn("Failed to query ClassroomSubjectMapping:", mapErr);
+  }
+  const mappingByCourseId = new Map<string, any>(existingMappings.map(m => [m.courseId, m]));
+
   const rawCourses = await fetchUserCourses(token);
   
-  // Fetch assignments and student submissions in parallel for each course
+  // 4. Fetch assignments and student submissions in parallel for each course
   const coursesWithDetails = await Promise.all(
     rawCourses.map(async (course: any) => {
       const [assignments, submissions] = await Promise.all([
@@ -406,6 +517,47 @@ export async function getClassroomData(userId: string) {
       // Classify course for current 7th semester
       const classification = classifyCourseForStudent(course, studentData);
 
+      // Determine Subject Mapping (Persistent DB Mapping vs Auto-Detection)
+      let mappedSubject: MappedSubjectInfo | null = null;
+      let needsSubjectSelection = false;
+
+      if (mappingByCourseId.has(course.id)) {
+        const saved = mappingByCourseId.get(course.id);
+        mappedSubject = {
+          code: saved.subjectCode,
+          name: saved.subjectName,
+          isManual: Boolean(saved.isManual),
+        };
+      } else if (classification.matchedSubjectCode && classification.confidence === 'HIGH') {
+        // High-confidence auto-detection: automatically persist in DB
+        mappedSubject = {
+          code: classification.matchedSubjectCode,
+          name: classification.matchedSubjectName || classification.matchedSubjectCode,
+          isManual: false,
+        };
+
+        // Auto-persist in DB asynchronously
+        try {
+          await db.$executeRawUnsafe(
+            `
+            INSERT INTO "ClassroomSubjectMapping" ("id", "userId", "courseId", "courseName", "subjectCode", "subjectName", "isManual", "updatedAt")
+            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, false, NOW())
+            ON CONFLICT ("userId", "courseId") DO NOTHING;
+            `,
+            userId,
+            course.id,
+            course.name,
+            classification.matchedSubjectCode,
+            classification.matchedSubjectName || classification.matchedSubjectCode
+          );
+        } catch (e) {
+          console.warn('Auto-persist mapping warning for course:', course.id, e);
+        }
+      } else {
+        // Unmapped or ambiguous: needs student selection
+        needsSubjectSelection = classification.category !== 'PREVIOUS_SEMESTER';
+      }
+
       return {
         ...course,
         assignments: enrichedAssignments,
@@ -415,6 +567,8 @@ export async function getClassroomData(userId: string) {
           pending: pendingAssignments,
         },
         classification,
+        mappedSubject,
+        needsSubjectSelection,
       };
     })
   );
@@ -438,11 +592,15 @@ export async function getClassroomData(userId: string) {
     .filter(c => !c.classification.recommendedActive)
     .map(c => c.id);
 
+  // Build the student's 7th-semester subjects pool for manual mapping
+  const currentSemesterSubjectsPool = buildCurrentSemesterSubjectsPool(studentData);
+
   return { 
     courses: coursesWithDetails,
     hiddenCourseIds,
     studentProfile: studentData?.student || null,
     enrolledSubjects: studentData?.currentSemesterSubjects || [],
+    currentSemesterSubjectsPool,
     summary: {
       totalCourses,
       activeCount: activeCourses.length,
@@ -453,6 +611,7 @@ export async function getClassroomData(userId: string) {
       unfilteredPastCount: unfilteredPastCourses.length,
       recommendedActiveIds,
       recommendedHiddenIds,
+      unmappedActiveCount: activeCourses.filter(c => !c.mappedSubject).length,
     }
   };
 }
