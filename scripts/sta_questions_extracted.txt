@@ -1,0 +1,87 @@
+<USER_REQUEST>
+add the following question bank to STA subject find its subject code and then add this in vector Database and make sure we pass the vector DB while generating question papers 
+
+QUESTION BANK
+
+Each Question carries 5 marks
+1. Explain the difference between Verification and Validation.
+2. What is Test Automation? Mention its advantages.
+3. Explain the Software Testing Life Cycle (STLC).
+4. Describe the characteristics of a good test case.
+5. Explain the different types of Regression Testing. 
+6. What is Regression Testing? Explain its purpose.
+7. What factors should be considered when selecting test cases for Regression Testing? 
+8. How does automation support Regression Testing?
+9. What challenges are faced in Regression Testing?
+10. What factors should be considered when selecting test cases for Regression Testing?
+11. Explain the advantages of using automation testing tools.
+12. What are the key features of Selenium as an automation testing tool?
+13. Compare Selenium and QTP/UFT as automation testing tools.
+14. What is test automation framework? Explain different types.
+15. What are the limitations of automation testing tools?
+16. Explain Dynamic Testing. How is it different from Static Testing? 
+17. Describe the levels of Dynamic Testing with examples.
+18. What are the advantages and disadvantages of Dynamic Testing?
+19. Explain Black-Box Dynamic Testing Techniques with examples.
+20. What is Dynamic Test Automation? Explain its benefits.
+21. Define Static Testing. Explain its importance in the software development life cycle.
+22. What are the different types of static testing techniques? Explain with examples.
+23. Explain the Static Testing process with a neat flow.
+24. Differentiate between Static Testing and Dynamic Testing.
+25. What is Static Analysis? List its advantages.
+26. Illustrate the Block Diagram and Briefly explain Software Testing Goals .
+The concept of schools of testing was given by Bret Pettichord [82]. He has proposed five schools taking Software Testing as a process . List and explain .
+27. Do the Bug Classification based on Criticality .Also illustrate the life cycle of a Bug.
+28. How V diagram provides the basis for every type of software testing.
+29. What are various verification activities?
+30. What are various validation activities?
+31. How to perform verification at each stage of SDLC?
+32. What are various validation test plans?
+33. How Verification of Data Design is done ?
+34. How Verification of Architectural Design  is done ?
+35. How Verification of User-Interface Design  is done ?
+36. How Verification Test Plan is done ?
+37. Explain how Various test maturity models for assessment and improvement of test process is accomplished . { TIM,TPI,TOM & TMM }
+38. Briefly explain Test Improvement Model (TIM).
+39. Briefly explain Test Process Improvement Model (TPI).
+40. Briefly explain Test Organization Model (TOM).
+41. Briefly explain Test Maturity Model (TMM).
+42. Discuss the Need for Test Process Maturity (5 points)
+43. What are the different types of Test Case Prioritization .
+	General Test Case Prioritization
+	Version-Specific Test Case Prioritization
+	Prioritization for Regression Test Suite
+	Prioritization for System test Suite 
+45 . Explain Some Commercial Testing Tools 
+( Hint :Such as Mercury Interactive’s WinRunner 
+
+Segue Software’s SilkTest
+
+IBM rational SQA Robot
+
+Mercury Interactive’s LoadRunner
+
+Apache’s JMeter
+
+Mercury Interactive’s TestDirector )
+46. Write a short note on Monkey Testing.
+47. List and Discuss the metrics that can be used for defect prevention and how. 
+48. Describe the characteristics of a good test case.
+49. What are the major needs for the process test process maturity ?(Any 4)  Define TIM,TPI,TOM and TMM .
+50. A program reads an integer number within the range [1,100] and determines whether the number is a prime number or not. Design all test cases and draw a table for this program using BVC and Robust testing. 
+
+
+
+as END SEM Question bank
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-13T20:59:10+05:30.
+
+The user's current state is as follows:
+Other open documents:
+- d:\KIIT-MUN\nexus-tsx\my-app\production.env (LANGUAGE_UNSPECIFIED)
+- d:\KIIT-MUN\nexus-tsx\my-app\.github\workflows\release.yml (LANGUAGE_UNSPECIFIED)
+- d:\KIIT-MUN\nexus-tsx\my-app\lib\model-router.ts (LANGUAGE_UNSPECIFIED)
+- d:\KIIT-MUN\nexus-tsx\my-app\.env (LANGUAGE_UNSPECIFIED)
+- d:\KIIT-MUN\nexus-tsx\my-app\app\api\ai\generate\route.ts (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

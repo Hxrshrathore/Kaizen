@@ -273,13 +273,32 @@ SECTION B (Analytical & Problem Solving)
         throw new Error(data.error || 'Paper generation failed');
       }
 
+      const consumed = data.tokens_consumed || 4600;
       setGeneratedPaper(data.response || data.text || 'Paper generated successfully.');
       setReasoningContent(data.reasoning || null);
       setGenStats({
-        tokens: data.tokens_consumed || 4600,
+        tokens: consumed,
         latency: data.time_taken || 2.4,
         model: data.model || 'NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)',
       });
+
+      // Synchronize consumed tokens with Header Quota Bar and LocalStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const current = parseInt(localStorage.getItem('kaizen_extra_tokens_consumed') || '0', 10);
+          localStorage.setItem('kaizen_extra_tokens_consumed', String(current + consumed));
+          window.dispatchEvent(new CustomEvent('ai-token-consumed', { detail: { tokens: consumed } }));
+          window.dispatchEvent(new CustomEvent('kaizen:tokens-consumed', { detail: { tokens: consumed } }));
+          // Notify server quota endpoint asynchronously
+          fetch('/api/ai/quota', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tokens: consumed })
+          }).catch(() => {});
+        } catch (e) {
+          console.warn('Failed to dispatch token consumption event:', e);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate paper. Please try again.');
     } finally {

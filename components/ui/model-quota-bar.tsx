@@ -65,7 +65,7 @@ export function ModelQuotaBar() {
   useEffect(() => {
     loadQuota();
 
-    // Listen for custom token usage events from chat or simulator
+    // Listen for custom token usage events from chat, generator, or simulator
     const handleTokenEvent = (e: any) => {
       const addedTokens = e.detail?.tokens || 500;
       const current = parseInt(localStorage.getItem('kaizen_extra_tokens_consumed') || '0', 10);
@@ -73,7 +73,15 @@ export function ModelQuotaBar() {
       loadQuota();
     };
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'kaizen_extra_tokens_consumed') {
+        loadQuota();
+      }
+    };
+
     window.addEventListener('ai-token-consumed', handleTokenEvent);
+    window.addEventListener('kaizen:tokens-consumed', handleTokenEvent);
+    window.addEventListener('storage', handleStorageChange);
 
     // Click outside to dismiss popover
     const handleClickOutside = (e: MouseEvent) => {
@@ -85,6 +93,8 @@ export function ModelQuotaBar() {
 
     return () => {
       window.removeEventListener('ai-token-consumed', handleTokenEvent);
+      window.removeEventListener('kaizen:tokens-consumed', handleTokenEvent);
+      window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
@@ -255,7 +265,21 @@ export function ModelQuotaBar() {
               {/* Tier 2 */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs font-mono">
                 <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px] font-bold">2</span>
+                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[9px] font-bold">2</span>
+                  <div>
+                    <div className="text-white font-semibold">NVIDIA Nemotron 30B Reasoning</div>
+                    <div className="text-[9px] text-muted-foreground">NIM Cloud Microservice · Exam Synthesis</div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold">
+                  ACTIVE
+                </span>
+              </div>
+
+              {/* Tier 3 */}
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px] font-bold">3</span>
                   <div>
                     <div className="text-white font-semibold">Gemini 2.5 Flash Lite</div>
                     <div className="text-[9px] text-muted-foreground">Cloud API · High-Throughput</div>
@@ -266,10 +290,10 @@ export function ModelQuotaBar() {
                 </span>
               </div>
 
-              {/* Tier 3 */}
+              {/* Tier 4 */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs font-mono">
                 <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[9px] font-bold">3</span>
+                  <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[9px] font-bold">4</span>
                   <div>
                     <div className="text-white font-semibold">OpenRouter Fallback Pool</div>
                     <div className="text-[9px] text-muted-foreground">Llama 3.3 70B · Failover only</div>
