@@ -6,7 +6,7 @@ export default function MockExamsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/generator');
+    router.replace('/dashboard/generator');
   }, [router]);
 
   return (

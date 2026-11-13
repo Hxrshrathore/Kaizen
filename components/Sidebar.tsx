@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Upload, Play, TrendingUp, Activity, LogOut, 
   User, PieChart, Sparkles, Zap, BrainCircuit, FileQuestion, 
   CalendarClock, Mail, ChevronRight, DatabaseZap, Shield,
-  Pin, PinOff, GraduationCap
+  Pin, PinOff, GraduationCap, School, FileText, BookOpen
 } from 'lucide-react';
 import { getOfficialBadge } from '@/lib/rbac';
 
@@ -68,6 +68,7 @@ export default function Sidebar({
       items: [
         { path: '/dashboard/upload', label: 'Ingest Grades', icon: <Upload size={19} /> },
         { path: '/dashboard/records', label: 'Academic Ledger', icon: <GraduationCap size={19} /> },
+        { path: '/dashboard/generator', label: 'Paper Generator', icon: <FileText size={19} /> },
         { path: '/dashboard/simulator', label: 'SGPA Simulator', icon: <Play size={19} /> },
         { path: '/dashboard/improvement', label: 'Optimizer', icon: <TrendingUp size={19} /> },
         { path: '/dashboard/mock-exams', label: 'Exo-Sim', icon: <FileQuestion size={19} /> },
@@ -91,6 +92,7 @@ export default function Sidebar({
     { 
       section: 'CONNECTIVITY', 
       items: [
+        { path: '/dashboard/classroom', label: 'Google Classroom', icon: <School size={19} /> },
         { path: '/dashboard/mail-sync', label: 'Neural Inbox', icon: <Mail size={19} /> },
         { path: '/dashboard/scheduler', label: 'Chrono-Sync', icon: <CalendarClock size={19} /> },
       ]

@@ -55,6 +55,20 @@ export async function POST(req: Request) {
       });
     }
 
+    // ── LOG TELEMETRY FOR SELF-HEALING CLASSIFIER ──
+    try {
+      await db.$executeRawUnsafe(
+        `
+        INSERT INTO "ClassroomFeedbackLog" ("id", "userId", "courseId", "courseName", "confirmedCategory", "wasOverridden")
+        SELECT gen_random_uuid()::text, $1, unnest($2::text[]), 'Batch Active Confirmation', 'CURRENT_SEMESTER', false;
+        `,
+        userId,
+        activeCourseIds
+      );
+    } catch (e) {
+      // Non-blocking telemetry
+    }
+
     // Query updated list of hidden course ids
     const updatedHidden = await db.hiddenCourse.findMany({
       where: { userId },

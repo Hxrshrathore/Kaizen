@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   Upload, Activity, ArrowUpRight, ShieldAlert, CheckCircle, 
-  AlertTriangle, Calendar, Clock, Plus, Trash2, X, Sparkles, ChevronRight, Lock, Loader2, BookOpen, Mail
+  AlertTriangle, Calendar, Clock, Plus, Trash2, X, Sparkles, ChevronRight, Lock, Loader2, BookOpen, Mail, FileText
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -497,8 +497,9 @@ export default function Dashboard() {
           <ActionButton delay={0.1} icon={<Upload size={20} />} title="Ingest Grades" desc="Upload Semester PDFs" onClick={() => router.push('/dashboard/upload')} />
           <ActionButton delay={0.2} icon={<ArrowUpRight size={20} />} title="Optimizer" desc="Generate Improvement Plan" onClick={() => router.push('/dashboard/improvement')} />
           <ActionButton delay={0.3} icon={<Activity size={20} />} title="Cognitive Check" desc="Log Daily Wellness" onClick={() => router.push('/dashboard/checkin')} />
-          <ActionButton delay={0.4} icon={<BookOpen size={20} />} title="Google Classroom" desc="View Courses & Handouts" onClick={() => router.push('/classroom')} />
-          <ActionButton delay={0.5} icon={<Mail size={20} />} title="Attendance Sync" desc="Fetch University Emails" onClick={() => router.push('/attendance')} />
+          <ActionButton delay={0.4} icon={<BookOpen size={20} />} title="Google Classroom" desc="View Courses & Handouts" onClick={() => router.push('/dashboard/classroom')} />
+          <ActionButton delay={0.5} icon={<FileText size={20} />} title="Paper Generator" desc="AI Exam Synthesizer" onClick={() => router.push('/dashboard/generator')} />
+          <ActionButton delay={0.6} icon={<Mail size={20} />} title="Attendance Sync" desc="Fetch University Emails" onClick={() => router.push('/attendance')} />
         </div>
       </MotionDiv>
 

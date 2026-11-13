@@ -21,6 +21,35 @@ export interface MappedSubjectInfo {
   isManual: boolean;
 }
 
+export interface CourseTeacher {
+  userId: string;
+  name: string;
+  email?: string;
+  photoUrl?: string;
+}
+
+export interface ProbabilityBreakdown {
+  profScore: number;
+  secScore: number;
+  regexScore: number;
+  empiricalScore: number;
+  sampleCount: number;
+}
+
+export interface CourseClassification {
+  category: 'CURRENT_SEMESTER' | 'PREVIOUS_SEMESTER' | 'AMBIGUOUS';
+  recommendedActive: boolean;
+  matchedSubjectCode: string | null;
+  matchedSubjectName: string | null;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  reason: string;
+  probability?: number;
+  detectedProfessor?: string | null;
+  detectedSection?: string | null;
+  probabilityBreakdown?: ProbabilityBreakdown;
+  evidence?: string[];
+}
+
 // --- API FUNCTIONS ---
 
 export async function getValidToken(userId: string): Promise<string> {
@@ -96,14 +125,12 @@ export async function fetchCourseWork(accessToken: string, courseId: string) {
     });
 
     if (!response.ok) {
-      console.warn(`Error fetching coursework for course ${courseId}: ${response.status}`);
       return [];
     }
 
     const data = await response.json();
     return data.courseWork || [];
   } catch (err) {
-    console.warn(`Exception fetching coursework for course ${courseId}:`, err);
     return [];
   }
 }
@@ -124,32 +151,240 @@ export async function fetchStudentSubmissions(accessToken: string, courseId: str
     const data = await response.json();
     return data.studentSubmissions || [];
   } catch (err) {
-    console.warn(`Exception fetching submissions for course ${courseId}:`, err);
     return [];
   }
 }
 
-// --- CLASSIFIER LOGIC ---
+/**
+ * Fetch teachers for a course from Google Classroom API.
+ * Gracefully returns an empty array if scope is missing or forbidden.
+ */
+export async function fetchCourseTeachers(accessToken: string, courseId: string): Promise<CourseTeacher[]> {
+  try {
+    const response = await fetch(`${CLASSROOM_API_BASE}/courses/${courseId}/teachers`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-export interface CourseClassification {
-  category: 'CURRENT_SEMESTER' | 'PREVIOUS_SEMESTER' | 'AMBIGUOUS';
-  recommendedActive: boolean;
-  matchedSubjectCode: string | null;
-  matchedSubjectName: string | null;
-  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
-  reason: string;
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    return (data.teachers || []).map((t: any) => ({
+      userId: t.userId,
+      name: t.profile?.name?.fullName || t.profile?.name?.givenName || 'Faculty',
+      email: t.profile?.emailAddress || '',
+      photoUrl: t.profile?.photoUrl || '',
+    }));
+  } catch {
+    return [];
+  }
 }
+
+/**
+ * Fetch verified teacher directory indexed by ownerId from NeonDB
+ */
+export async function getTeacherDirectory(): Promise<Map<string, { name: string; email: string; department?: string; subjectCode?: string; sampleCount: number }>> {
+  try {
+    const rows = await db.$queryRawUnsafe<any[]>(
+      `SELECT "ownerId", "name", "email", "department", "subjectCode", "sampleCount" FROM "ClassroomTeacherDirectory";`
+    );
+    const map = new Map();
+    for (const r of rows) {
+      map.set(r.ownerId, r);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+// --- MATHEMATICAL / BAYESIAN PROBABILITY ENGINE ---
+
+interface ProbCalcInput {
+  course: any;
+  candidateSubject: {
+    code: string;
+    name: string;
+    shortName?: string | null;
+    faculty?: string | null;
+    classroom?: string | null;
+    room?: string | null;
+  };
+  studentProfile?: any;
+  detectedProfessor?: string | null;
+  sampleCount?: number;
+  positiveConfirmations?: number;
+}
+
+/**
+ * Computes a calibrated mathematical probability score P(Subject | Course, Student, Teacher)
+ * based on multi-factor evidence: Professor (0.35) + Section/Room (0.25) + Lexical/Regex (0.20) + Empirical (0.20-0.30)
+ */
+export function calculateCourseSubjectProbability({
+  course,
+  candidateSubject,
+  studentProfile,
+  detectedProfessor,
+  sampleCount = 0,
+  positiveConfirmations = 0,
+}: ProbCalcInput): {
+  probability: number;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  breakdown: ProbabilityBreakdown;
+  evidence: string[];
+} {
+  const courseName = (course.name || '').toLowerCase();
+  const courseSection = (course.section || '').toLowerCase();
+  const courseSubject = (course.subject || '').toLowerCase();
+  const courseRoom = (course.room || '').toLowerCase();
+  const courseDesc = (course.descriptionHeading || course.description || '').toLowerCase();
+  const combinedCourseText = `${courseName} ${courseSection} ${courseSubject} ${courseRoom} ${courseDesc}`;
+
+  const subCode = candidateSubject.code.toLowerCase();
+  const subName = candidateSubject.name.toLowerCase();
+  const subFaculty = (candidateSubject.faculty || '').toLowerCase();
+  const subRoom = (candidateSubject.classroom || candidateSubject.room || '').toLowerCase();
+
+  const evidence: string[] = [];
+
+  // 1. Evidence Factor 1: Professor / Teacher Match (Weight: 0.35)
+  let profScore = 0.0;
+  if (detectedProfessor) {
+    const pClean = detectedProfessor.toLowerCase().replace(/^(prof|dr|mr|mrs)\.?\s+/i, '').trim();
+    const pTokens = pClean.split(/\s+/).filter(t => t.length > 2);
+
+    const studentElectiveFaculty = (studentProfile?.electiveFaculty || '').toLowerCase();
+    const isStudentAllottedProf = pTokens.some(tok => studentElectiveFaculty.includes(tok));
+    const isSubjectFacultyRoster = pTokens.some(tok => subFaculty.includes(tok));
+
+    if (isStudentAllottedProf) {
+      profScore = 1.0;
+      evidence.push(`Direct Faculty Match: Assigned professor [${detectedProfessor}]`);
+    } else if (isSubjectFacultyRoster) {
+      profScore = 0.85;
+      evidence.push(`Faculty Roster Match: [${detectedProfessor}] teaches ${candidateSubject.code}`);
+    } else {
+      profScore = 0.05;
+    }
+  } else {
+    // If no professor detected, use a neutral baseline
+    profScore = 0.20;
+  }
+
+  // 2. Evidence Factor 2: Student Allotted Section & Room Match (Weight: 0.25)
+  let secScore = 0.0;
+  const studentSec = (studentProfile?.section || '').toLowerCase();
+  const studentElectiveSec = (studentProfile?.electiveSection || '').toLowerCase(); // e.g. STA_A_PM
+
+  if (courseSection) {
+    const hasGroupA = /\b(group\s*a|a)\b/i.test(courseSection) && /(_a_|_a$|group\s*a)/i.test(studentElectiveSec);
+    const hasGroupB = /\b(group\s*b|b)\b/i.test(courseSection) && /(_b_|_b$|group\s*b)/i.test(studentElectiveSec);
+    const hasCohortSec = studentSec && courseSection.includes(studentSec);
+
+    if (hasGroupA || hasGroupB) {
+      secScore = 1.0;
+      evidence.push(`Section group matches your allotted elective group (${course.section})`);
+    } else if (hasCohortSec) {
+      secScore = 0.85;
+      evidence.push(`Classroom section matches your cohort section (${course.section})`);
+    } else if (/group/i.test(courseSection)) {
+      secScore = 0.50;
+      evidence.push(`Section matches departmental group format (${course.section})`);
+    } else {
+      secScore = 0.20;
+    }
+  } else {
+    secScore = 0.30;
+  }
+
+  // Room verification
+  if (courseRoom && subRoom && subRoom.includes(courseRoom)) {
+    secScore = Math.min(1.0, secScore + 0.3);
+    evidence.push(`Room matches designated classroom: ${course.room}`);
+  }
+
+  // 3. Evidence Factor 3: Regex & Lexical Matching (Weight: 0.20)
+  let regexScore = 0.0;
+  const codeRegex = new RegExp(`\\b${subCode}\\b`, 'i');
+  if (codeRegex.test(combinedCourseText)) {
+    regexScore = 1.0;
+    evidence.push(`Explicit Subject Code detected: ${candidateSubject.code}`);
+  } else if (courseSubject && (courseSubject.includes(subName) || subName.includes(courseSubject))) {
+    regexScore = 0.95;
+    evidence.push(`Classroom course subject matches: ${course.subject}`);
+  } else if (subCode === 'cs40003' && /\b(sat|st&a|software testing)\b/i.test(combinedCourseText)) {
+    regexScore = 0.90;
+    evidence.push(`Standard acronym match: SAT/ST&A for ${candidateSubject.name}`);
+  } else if (subCode === 'ex40003' && /\b(engineering professional practice|professional practice|epp)\b/i.test(combinedCourseText)) {
+    regexScore = 0.92;
+    evidence.push(`Core curricular match: Engineering Professional Practice`);
+  } else if (subCode === 'tp40001' && /\b(t&p|training & placement|placement)\b/i.test(combinedCourseText)) {
+    regexScore = 0.90;
+    evidence.push(`T&P curricular match`);
+  } else if (subCode === 'mentor' && /\b(tutor_mentor|mentorship|proctor)\b/i.test(combinedCourseText)) {
+    regexScore = 0.95;
+    evidence.push(`University mentorship group match`);
+  } else if (combinedCourseText.includes(subName) || (candidateSubject.shortName && combinedCourseText.includes(candidateSubject.shortName.toLowerCase()))) {
+    regexScore = 0.85;
+    evidence.push(`Subject title lexical match: ${candidateSubject.name}`);
+  } else {
+    regexScore = 0.05;
+  }
+
+  // 4. Evidence Factor 4: Empirical Bayesian Frequency Factor (Weight: 0.20 to 0.30)
+  const alpha = 2; // Laplace smoothing parameters
+  const beta = 1;
+  const empiricalScore = (positiveConfirmations + alpha) / (sampleCount + alpha + beta);
+  const dynamicEmpiricalWeight = 0.20 + 0.10 * Math.min(1.0, sampleCount / 5);
+
+  if (sampleCount > 0) {
+    evidence.push(`Learned collective prior: ${positiveConfirmations}/${sampleCount} cohort confirmations (${Math.round(empiricalScore * 100)}%)`);
+  }
+
+  // Weighted posterior combination
+  const wProf = 0.35;
+  const wSec = 0.25;
+  const wRegex = 0.20;
+  const wEmp = dynamicEmpiricalWeight;
+
+  const totalWeight = wProf + wSec + wRegex + wEmp;
+  const rawProb = (wProf * profScore + wSec * secScore + wRegex * regexScore + wEmp * empiricalScore) / totalWeight;
+  const finalProb = Math.min(0.99, Math.max(0.01, Math.round(rawProb * 1000) / 1000));
+
+  let confidence: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
+  if (finalProb >= 0.70) confidence = 'HIGH';
+  else if (finalProb >= 0.40) confidence = 'MEDIUM';
+
+  return {
+    probability: finalProb,
+    confidence,
+    breakdown: {
+      profScore: Math.round(profScore * 100) / 100,
+      secScore: Math.round(secScore * 100) / 100,
+      regexScore: Math.round(regexScore * 100) / 100,
+      empiricalScore: Math.round(empiricalScore * 100) / 100,
+      sampleCount,
+    },
+    evidence,
+  };
+}
+
+// --- CLASSIFIER LOGIC ---
 
 export function classifyCourseForStudent(
   course: any,
-  studentData?: StudentEnrolledSubjectsResult | null
+  studentData?: StudentEnrolledSubjectsResult | null,
+  healingPatterns?: any[],
+  detectedProfessor?: string | null
 ): CourseClassification {
   const name = (course.name || '').trim();
   const section = (course.section || '').trim();
-  const desc = (course.descriptionHeading || '').trim();
-  const combined = `${name} ${section} ${desc}`.toLowerCase();
+  const desc = (course.descriptionHeading || course.description || '').trim();
+  const sub = (course.subject || '').trim();
+  const combined = `${name} ${section} ${sub} ${desc}`.toLowerCase();
 
-  // 1. Explicit Backlog / Improvement / Supplementary / Repeat courses
+  // 1. Negative Filters: Explicit Backlog / Improvement / Supplementary / Repeat courses
   if (/(backlog|supplementary|improvement|grade improvement|re-registration)/i.test(combined)) {
     return {
       category: 'PREVIOUS_SEMESTER',
@@ -157,11 +392,14 @@ export function classifyCourseForStudent(
       matchedSubjectCode: null,
       matchedSubjectName: null,
       confidence: 'HIGH',
+      probability: 0.02,
+      detectedProfessor: detectedProfessor || null,
+      detectedSection: section || null,
       reason: 'Historical Backlog / Supplementary / Improvement Course',
     };
   }
 
-  // 2. Explicit Previous Semesters (1st to 6th Sem)
+  // 2. Negative Filters: Explicit Previous Semesters (1st to 6th Sem)
   if (/\b([1-6](st|nd|rd|th)\s*sem(ester)?)\b/i.test(combined)) {
     return {
       category: 'PREVIOUS_SEMESTER',
@@ -169,11 +407,14 @@ export function classifyCourseForStudent(
       matchedSubjectCode: null,
       matchedSubjectName: null,
       confidence: 'HIGH',
+      probability: 0.01,
+      detectedProfessor: detectedProfessor || null,
+      detectedSection: section || null,
       reason: 'Explicitly labeled as 1st–6th semester coursework',
     };
   }
 
-  // 3. Known Previous Semester core subjects, labs, or historical groups (5th/6th Sem)
+  // 3. Negative Filters: Known Previous Semester core subjects, labs, or historical groups
   if (/\b(wta|mes|cvpr|fpm|dl:a&i|deep learning|software engineering|ad lab|algorithm lab|ecsc\s*6|dms_m)\b/i.test(combined)) {
     return {
       category: 'PREVIOUS_SEMESTER',
@@ -181,145 +422,90 @@ export function classifyCourseForStudent(
       matchedSubjectCode: null,
       matchedSubjectName: null,
       confidence: 'HIGH',
+      probability: 0.03,
+      detectedProfessor: detectedProfessor || null,
+      detectedSection: section || null,
       reason: 'Completed 5th/6th semester subject or lab',
     };
   }
 
-  // 4. Tutor-Mentor Forum / Academic Mentorship
-  if (/tutor_mentor|tutor mentor|mentorship|proctor/i.test(combined)) {
-    return {
-      category: 'CURRENT_SEMESTER',
-      recommendedActive: true,
-      matchedSubjectCode: 'MENTOR',
-      matchedSubjectName: 'Tutor-Mentor Forum',
-      confidence: 'HIGH',
-      reason: 'Active Academic Mentorship Forum',
-    };
-  }
+  // 4. Candidate Subject Pool for 7th Semester
+  const candidatePool = buildCurrentSemesterSubjectsPool(studentData);
 
-  // 5. Match Active 7th Semester Subjects
-  // 5a. Core: Engineering Professional Practice (HS40001 / EX40003)
-  if (/ex40003|hs40001|engineering professional practice|professional practice/i.test(combined) || combined.includes('7th semester')) {
-    return {
-      category: 'CURRENT_SEMESTER',
-      recommendedActive: true,
-      matchedSubjectCode: 'EX40003',
-      matchedSubjectName: 'Engineering Professional Practice',
-      confidence: 'HIGH',
-      reason: '7th Semester Core Course (EX40003 / HS40001)',
-    };
-  }
-
-  // 5b. Core: Training & Placement (TP40001)
-  if (/tp40001|t&p|training & placement|placement/i.test(combined)) {
-    return {
-      category: 'CURRENT_SEMESTER',
-      recommendedActive: true,
-      matchedSubjectCode: 'TP40001',
-      matchedSubjectName: 'Training & Placement',
-      confidence: 'HIGH',
-      reason: '7th Semester Training & Placement (TP40001)',
-    };
-  }
-
-  // 5c. Core: Project-I (EC47001) / Minor (MN40001)
-  if (/ec47001|project-i|project 1|minor project|mn40001/i.test(combined)) {
-    return {
-      category: 'CURRENT_SEMESTER',
-      recommendedActive: true,
-      matchedSubjectCode: 'EC47001',
-      matchedSubjectName: 'Project-I / Minor',
-      confidence: 'HIGH',
-      reason: '7th Semester Project / Minor',
-    };
-  }
-
-  // 5d. Match Student's Enrolled Elective (PE-IV)
-  const elective = studentData?.currentSemesterSubjects?.find(s => s.isElective);
-  if (elective) {
-    const code = elective.code.toLowerCase();
-    const short = (elective.shortName || '').toLowerCase();
-    const elName = elective.name.toLowerCase();
-
-    // Check SAT / ST&A / Software Testing
-    if (code === 'cs40003' || short === 'st&a') {
-      if (/\b(sat|st&a|software testing|automation|cs40003)\b/i.test(combined)) {
-        return {
-          category: 'CURRENT_SEMESTER',
-          recommendedActive: true,
-          matchedSubjectCode: elective.code,
-          matchedSubjectName: elective.name,
-          confidence: 'HIGH',
-          reason: `Matches your 7th Sem Elective: ${elective.name} (${elective.code})`,
-        };
+  // Check self-healing patterns for initial counts
+  const patternStats = new Map<string, { samples: number; confidence: number }>();
+  if (healingPatterns && healingPatterns.length > 0) {
+    for (const hp of healingPatterns) {
+      const pKey = (hp.patternKey || '').toLowerCase().trim();
+      if (pKey) {
+        patternStats.set(pKey, {
+          samples: hp.sampleCount || 1,
+          confidence: hp.confidence || 0.8,
+        });
       }
     }
+  }
 
-    // Check HCI / CS40005
-    if (code === 'cs40005' || short === 'hci') {
-      if (/\b(hci|human computer interaction|cs40005)\b/i.test(combined)) {
-        return {
-          category: 'CURRENT_SEMESTER',
-          recommendedActive: true,
-          matchedSubjectCode: elective.code,
-          matchedSubjectName: elective.name,
-          confidence: 'HIGH',
-          reason: `Matches your 7th Sem Elective: ${elective.name} (${elective.code})`,
-        };
-      }
-    }
+  // 5. Run Mathematical Probability Scoring for each Candidate Subject
+  let bestCandidate: any = null;
+  let bestProbResult: any = null;
 
-    // Check CNS / CS40015
-    if (code === 'cs40015' || short === 'c&ns' || short === 'cns') {
-      if (/\b(cns|c&ns|cryptography|network security|cs40015)\b/i.test(combined)) {
-        return {
-          category: 'CURRENT_SEMESTER',
-          recommendedActive: true,
-          matchedSubjectCode: elective.code,
-          matchedSubjectName: elective.name,
-          confidence: 'HIGH',
-          reason: `Matches your 7th Sem Elective: ${elective.name} (${elective.code})`,
-        };
-      }
-    }
+  for (const cand of candidatePool) {
+    const pKey = `${(cand.code || '').toLowerCase()}_${(section || 'gen').toLowerCase()}`;
+    const pStats = patternStats.get(pKey) || { samples: 0, confidence: 0.5 };
 
-    // Generic match against elective code or name
-    if (combined.includes(code) || (short && combined.includes(short)) || combined.includes(elName)) {
-      return {
-        category: 'CURRENT_SEMESTER',
-        recommendedActive: true,
-        matchedSubjectCode: elective.code,
-        matchedSubjectName: elective.name,
-        confidence: 'HIGH',
-        reason: `Matches your 7th Sem Elective: ${elective.name} (${elective.code})`,
-      };
+    const probRes = calculateCourseSubjectProbability({
+      course,
+      candidateSubject: cand,
+      studentProfile: studentData?.student,
+      detectedProfessor,
+      sampleCount: pStats.samples,
+      positiveConfirmations: Math.round(pStats.samples * pStats.confidence),
+    });
+
+    if (!bestProbResult || probRes.probability > bestProbResult.probability) {
+      bestProbResult = probRes;
+      bestCandidate = cand;
     }
   }
 
-  // 6. Check other elective keywords if student elective not yet set or matched
-  for (const [secKey, meta] of Object.entries(ELECTIVE_SECTION_MAP)) {
-    const metaCode = meta.code.toLowerCase();
-    const metaShort = meta.shortName.toLowerCase();
-    const metaName = meta.name.toLowerCase();
-
-    if (
-      combined.includes(metaCode) ||
-      combined.includes(metaShort) ||
-      combined.includes(metaName) ||
-      (metaCode === 'cs40003' && /\b(sat|st&a)\b/i.test(combined))
-    ) {
-      return {
-        category: 'AMBIGUOUS',
-        recommendedActive: false,
-        matchedSubjectCode: meta.code,
-        matchedSubjectName: meta.name,
-        confidence: 'MEDIUM',
-        reason: `Matches PE-IV Elective option: ${meta.name} (${meta.code}). Please confirm if you are enrolled in this section.`,
-      };
-    }
+  // 6. Thresholding & Category Determination
+  if (bestProbResult && bestProbResult.probability >= 0.70) {
+    const isMentor = bestCandidate.code === 'MENTOR';
+    return {
+      category: 'CURRENT_SEMESTER',
+      recommendedActive: true,
+      matchedSubjectCode: bestCandidate.code,
+      matchedSubjectName: bestCandidate.name,
+      confidence: 'HIGH',
+      probability: bestProbResult.probability,
+      detectedProfessor: detectedProfessor || null,
+      detectedSection: section || null,
+      probabilityBreakdown: bestProbResult.breakdown,
+      evidence: bestProbResult.evidence,
+      reason: isMentor 
+        ? 'Active Academic Mentorship Forum' 
+        : `${Math.round(bestProbResult.probability * 100)}% Match: ${bestCandidate.name} (${bestCandidate.code})`,
+    };
   }
 
-  // 7. Check historical subjects from student transcript
+  if (bestProbResult && bestProbResult.probability >= 0.40) {
+    return {
+      category: 'AMBIGUOUS',
+      recommendedActive: false,
+      matchedSubjectCode: bestCandidate.code,
+      matchedSubjectName: bestCandidate.name,
+      confidence: 'MEDIUM',
+      probability: bestProbResult.probability,
+      detectedProfessor: detectedProfessor || null,
+      detectedSection: section || null,
+      probabilityBreakdown: bestProbResult.breakdown,
+      evidence: bestProbResult.evidence,
+      reason: `${Math.round(bestProbResult.probability * 100)}% Probability: Matches ${bestCandidate.name} (${bestCandidate.code}). Please confirm your section.`,
+    };
+  }
+
+  // Check historical subjects from student transcript
   if (studentData?.historicalSubjects) {
     for (const h of studentData.historicalSubjects) {
       const hCode = h.code.toLowerCase();
@@ -331,19 +517,25 @@ export function classifyCourseForStudent(
           matchedSubjectCode: h.code,
           matchedSubjectName: h.name,
           confidence: 'HIGH',
+          probability: 0.05,
+          detectedProfessor: detectedProfessor || null,
+          detectedSection: section || null,
           reason: `Completed in Semester ${h.semesterNumber || 'past'} (${h.code})`,
         };
       }
     }
   }
 
-  // Fallback: Ambiguous
+  // Fallback: Ambiguous / Low confidence
   return {
     category: 'AMBIGUOUS',
     recommendedActive: false,
     matchedSubjectCode: null,
     matchedSubjectName: null,
     confidence: 'LOW',
+    probability: bestProbResult?.probability || 0.15,
+    detectedProfessor: detectedProfessor || null,
+    detectedSection: section || null,
     reason: 'Unverified course - please confirm if this belongs to your current 7th semester.',
   };
 }
@@ -358,32 +550,42 @@ export function buildCurrentSemesterSubjectsPool(studentData?: StudentEnrolledSu
   pool.push(
     {
       code: 'EX40003',
-      name: 'Embedded Systems & IoT Lab',
+      name: 'Engineering Professional Practice',
       type: 'CORE',
-      description: 'Core Practical Laboratory (7th Sem)',
+      faculty: 'Faculty In-Charge (ECE/ECS)',
+      room: 'Group-3 / Campus 15 Lab',
+      description: 'Core Practical Laboratory & Ethics (7th Sem)',
     },
     {
       code: 'HS40001',
-      name: 'Engineering Professional Practice',
+      name: 'Engineering Economics and Project Management',
       type: 'CORE',
-      description: 'Core Humanities & Professional Ethics',
+      faculty: 'Prof. S. Padhy / Prof. S. Alpna / Prof. P. Dutta',
+      room: 'CL-A-01 - CL-A-06',
+      description: 'Core Humanities & Economics',
     },
     {
       code: 'TP40001',
       name: 'Training & Placement',
       type: 'CORE',
+      faculty: 'Training & Placement Faculty',
+      room: 'CL-A-01 - CL-A-06',
       description: 'Career Advisory & Placement Preparation',
     },
     {
       code: 'EC47001',
       name: 'Project-I',
       type: 'CORE',
+      faculty: 'Project Supervisor / Evaluation Committee',
+      room: 'Project Laboratory',
       description: 'Major Capstone Project Phase-I',
     },
     {
       code: 'MN40001',
       name: 'Minor Project',
       type: 'CORE',
+      faculty: 'Department Faculty',
+      room: 'Designated Minor Rooms',
       description: 'Interdisciplinary Minor Coursework',
     }
   );
@@ -424,6 +626,8 @@ export function buildCurrentSemesterSubjectsPool(studentData?: StudentEnrolledSu
     code: 'MENTOR',
     name: 'Tutor-Mentor Forum',
     type: 'MENTOR',
+    faculty: 'Academic Proctor / Tutor Mentor',
+    room: 'Campus-12',
     description: 'Proctorial & Student Mentorship Group',
   });
 
@@ -457,7 +661,7 @@ export async function getClassroomData(userId: string) {
   let existingMappings: any[] = [];
   try {
     existingMappings = await db.$queryRawUnsafe<any[]>(
-      `SELECT "courseId", "subjectCode", "subjectName", "isManual" FROM "ClassroomSubjectMapping" WHERE "userId" = $1;`,
+      `SELECT "courseId", "subjectCode", "subjectName", "isManual", "professorName" FROM "ClassroomSubjectMapping" WHERE "userId" = $1;`,
       userId
     );
   } catch (mapErr) {
@@ -465,15 +669,70 @@ export async function getClassroomData(userId: string) {
   }
   const mappingByCourseId = new Map<string, any>(existingMappings.map(m => [m.courseId, m]));
 
+  // 4. Fetch self-healing institutional patterns
+  let healingPatterns: any[] = [];
+  try {
+    healingPatterns = await db.$queryRawUnsafe<any[]>(
+      `SELECT "patternKey", "coursePattern", "targetCode", "category", "confidence", "sampleCount" FROM "ClassroomHealingPattern";`
+    );
+  } catch (patErr) {
+    console.warn("Failed to query ClassroomHealingPattern:", patErr);
+  }
+
+  // 5. Fetch teacher directory from NeonDB
+  const teacherDirectory = await getTeacherDirectory();
+
   const rawCourses = await fetchUserCourses(token);
   
-  // 4. Fetch assignments and student submissions in parallel for each course
+  // 6. Fetch assignments, submissions, and teachers in parallel for each course
   const coursesWithDetails = await Promise.all(
     rawCourses.map(async (course: any) => {
-      const [assignments, submissions] = await Promise.all([
+      // Teacher Resolution: Try API first, fallback to directory by ownerId, then course heuristics
+      let detectedProfessor: string | null = null;
+      let teacherEmail: string | null = null;
+
+      // Check persistent mapping first
+      if (mappingByCourseId.has(course.id) && mappingByCourseId.get(course.id).professorName) {
+        detectedProfessor = mappingByCourseId.get(course.id).professorName;
+      }
+
+      // If not yet known, check directory by ownerId
+      if (!detectedProfessor && course.ownerId && teacherDirectory.has(course.ownerId)) {
+        const tEntry = teacherDirectory.get(course.ownerId);
+        detectedProfessor = tEntry?.name || null;
+        teacherEmail = tEntry?.email || null;
+      }
+
+      // Try fetching teachers from Google Classroom API
+      const [assignments, submissions, teachers] = await Promise.all([
         fetchCourseWork(token, course.id),
-        fetchStudentSubmissions(token, course.id)
+        fetchStudentSubmissions(token, course.id),
+        detectedProfessor ? Promise.resolve([]) : fetchCourseTeachers(token, course.id)
       ]);
+
+      if (teachers && teachers.length > 0) {
+        detectedProfessor = teachers[0].name;
+        teacherEmail = teachers[0].email || null;
+
+        // Upsert newly discovered teacher into NeonDB directory
+        if (course.ownerId && detectedProfessor) {
+          try {
+            await db.$executeRawUnsafe(
+              `
+              INSERT INTO "ClassroomTeacherDirectory" ("ownerId", "name", "email", "updatedAt")
+              VALUES ($1, $2, $3, NOW())
+              ON CONFLICT ("ownerId") DO UPDATE SET
+                "name" = EXCLUDED."name",
+                "email" = COALESCE(EXCLUDED."email", "ClassroomTeacherDirectory"."email"),
+                "updatedAt" = NOW();
+              `,
+              course.ownerId,
+              detectedProfessor,
+              teacherEmail || ''
+            );
+          } catch {}
+        }
+      }
 
       // Map submissions by courseWorkId
       const submissionsMap = new Map<string, any>();
@@ -514,8 +773,8 @@ export async function getClassroomData(userId: string) {
       const submittedAssignments = enrichedAssignments.filter((a: any) => a.isSubmitted).length;
       const pendingAssignments = totalAssignments - submittedAssignments;
 
-      // Classify course for current 7th semester
-      const classification = classifyCourseForStudent(course, studentData);
+      // Classify course using mathematical probability engine
+      const classification = classifyCourseForStudent(course, studentData, healingPatterns, detectedProfessor);
 
       // Determine Subject Mapping (Persistent DB Mapping vs Auto-Detection)
       let mappedSubject: MappedSubjectInfo | null = null;
@@ -540,15 +799,17 @@ export async function getClassroomData(userId: string) {
         try {
           await db.$executeRawUnsafe(
             `
-            INSERT INTO "ClassroomSubjectMapping" ("id", "userId", "courseId", "courseName", "subjectCode", "subjectName", "isManual", "updatedAt")
-            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, false, NOW())
+            INSERT INTO "ClassroomSubjectMapping" ("id", "userId", "courseId", "courseName", "subjectCode", "subjectName", "isManual", "professorName", "ownerId", "updatedAt")
+            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, false, $6, $7, NOW())
             ON CONFLICT ("userId", "courseId") DO NOTHING;
             `,
             userId,
             course.id,
             course.name,
             classification.matchedSubjectCode,
-            classification.matchedSubjectName || classification.matchedSubjectCode
+            classification.matchedSubjectName || classification.matchedSubjectCode,
+            detectedProfessor || null,
+            course.ownerId || null
           );
         } catch (e) {
           console.warn('Auto-persist mapping warning for course:', course.id, e);
@@ -560,6 +821,8 @@ export async function getClassroomData(userId: string) {
 
       return {
         ...course,
+        detectedProfessor,
+        teacherEmail,
         assignments: enrichedAssignments,
         stats: {
           total: totalAssignments,

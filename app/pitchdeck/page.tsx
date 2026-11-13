@@ -155,18 +155,19 @@ export default function PitchDeckPage() {
     {
       id: 6,
       category: 'CLASSROOM NEURAL BRIDGE',
-      tag: 'SUBMISSION TRACKING & FILTER',
-      title: 'Google Classroom Neural Bridge',
-      subtitle: 'Live submission state sync and intelligent 7th-semester archival disambiguation',
+      tag: 'SUBMISSION TRACKING & SELF-HEALING',
+      title: 'Google Classroom Bridge & Self-Healing Sync',
+      subtitle: 'Live submission state sync, smart archival filter, and autonomous self-healing pattern feedback loop',
       ficNotes: {
-        academicJustification: 'Eliminates assignment submission anxiety by showing real Google Classroom submission states (Turned In vs Pending) and auto-filtering older semester clutter.',
+        academicJustification: 'Eliminates assignment submission anxiety by showing real Google Classroom submission states (Turned In vs Pending) and auto-filtering older semester clutter with a continuous learning feedback loop.',
         technicalHighlights: [
           'Single-request batch query to studentSubmissions?userId=me for all coursework',
-          'Automatic 7th-semester classifier matching PE-IV and Core subjects',
-          'Interactive confirmation modal allowing students to review and confirm active classrooms'
+          'Self-Healing Pattern Bank (ClassroomHealingPattern in NeonDB) learns verified aliases',
+          'Every user confirmation or manual subject mapping feeds telemetry back into institutional weights'
         ],
         defensePoints: [
-          'Respects student autonomy: the system recommends 7th-sem courses but always requires student confirmation before saving hidden courses to NeonDB.'
+          'Zero manual regex maintenance: if a professor creates an atypical course name (e.g. "SAT Group A" -> CS40003), the engine logs the user override and self-heals for the entire cohort.',
+          'Respects student autonomy: the system recommends 7th-sem courses and subjects but always asks the student for confirmation before finalizing.'
         ]
       }
     },
@@ -923,68 +924,84 @@ export default function PitchDeckPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3 font-mono text-xs">
-                    <div className="flex items-center gap-2 text-primary font-bold">
-                      <CheckCircle2 size={16} />
-                      <span>Live Submission State</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2.5 font-mono text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-primary font-bold mb-1">
+                        <CheckCircle2 size={16} />
+                        <span>Live Submission State</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Single batch query to `studentSubmissions?userId=me`. Real-time tracking of:
+                      </p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Queries `courseWork/-/studentSubmissions?userId=me` in a single parallel batch. Tracks:
-                    </p>
-                    <ul className="space-y-1.5 text-[11px]">
-                      <li className="flex items-center gap-2 text-emerald-400">
+                    <ul className="space-y-1 text-[11px] pt-1 border-t border-white/5">
+                      <li className="flex items-center gap-1.5 text-emerald-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         <span>`TURNED_IN` / `RETURNED`</span>
                       </li>
-                      <li className="flex items-center gap-2 text-amber-400">
+                      <li className="flex items-center gap-1.5 text-amber-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                         <span>`CREATED` / `PENDING`</span>
                       </li>
-                      <li className="flex items-center gap-2 text-rose-400">
+                      <li className="flex items-center gap-1.5 text-rose-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                         <span>`LATE: true` / Missing</span>
                       </li>
                     </ul>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3 font-mono text-xs">
-                    <div className="flex items-center gap-2 text-cyan-400 font-bold">
-                      <Sparkles size={16} />
-                      <span>7th-Sem Smart Classifier</span>
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2.5 font-mono text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-cyan-400 font-bold mb-1">
+                        <Sparkles size={16} />
+                        <span>7th-Sem Smart Classifier</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Matches course titles against student&apos;s active 7th semester profile:
+                      </p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Analyzes course titles against student&apos;s active 7th semester papers:
-                    </p>
-                    <ul className="space-y-1.5 text-[11px]">
-                      <li className="text-emerald-400">
-                        <span>SAT -&gt; CS40003 (PE-IV Elective)</span>
-                      </li>
-                      <li className="text-emerald-400">
-                        <span>7th Sem EPP -&gt; EX40003 / HS40001</span>
-                      </li>
-                      <li className="text-emerald-400">
-                        <span>T&amp;P SoEE 2027 -&gt; TP40001</span>
-                      </li>
-                      <li className="text-muted-foreground">
-                        <span>MES, SE, AD Lab -&gt; Previous Semesters</span>
-                      </li>
+                    <ul className="space-y-1 text-[11px] pt-1 border-t border-white/5">
+                      <li className="text-emerald-400">SAT -&gt; CS40003 (Allotted Elective)</li>
+                      <li className="text-emerald-400">EPP -&gt; EX40003 / HS40001 (Core)</li>
+                      <li className="text-emerald-400">T&amp;P -&gt; TP40001 (Batch 2027)</li>
+                      <li className="text-muted-foreground">MES, SE, AD Lab -&gt; Past Sem</li>
                     </ul>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3 font-mono text-xs">
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <ShieldCheck size={16} />
-                      <span>Confirmation Modal</span>
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2.5 font-mono text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-emerald-400 font-bold mb-1">
+                        <ShieldCheck size={16} />
+                        <span>Confirmation Modal</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Guarantees student autonomy before applying filters:
+                      </p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Protects student agency:
-                    </p>
-                    <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1 text-[10px]">
+                    <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1 text-[10px]">
                       <div>• Pre-selects recommended 7th sem</div>
                       <div>• Pre-unselects 14 historical classes</div>
                       <div>• Requires explicit student confirm</div>
                       <div>• Persists to `HiddenCourse` in DB</div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-primary/[0.04] border border-primary/30 space-y-2.5 font-mono text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-primary font-bold mb-1">
+                        <RefreshCw size={16} />
+                        <span>Self-Healing Engine</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Continuous reinforcement learning from user feedback:
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-black/40 border border-primary/20 space-y-1 text-[10px] text-primary">
+                      <div>• Logs every manual override</div>
+                      <div>• Ingests into `ClassroomHealingPattern`</div>
+                      <div>• Auto-boosts pattern confidence</div>
+                      <div>• Benefits all 638 students in cohort</div>
                     </div>
                   </div>
                 </div>
@@ -1377,7 +1394,7 @@ export default function PitchDeckPage() {
                       <ArrowRight size={13} />
                     </button>
                     <button
-                      onClick={() => router.push('/classroom')}
+                      onClick={() => router.push('/dashboard/classroom')}
                       className="px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-xs font-mono text-foreground hover:bg-white/[0.08] transition-all flex items-center gap-1.5"
                     >
                       <span>Classroom Demo</span>

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowRight, Zap, Activity, Brain, Eye, Menu, X, 
-  ChevronRight, Database, Cpu, HeartPulse, Sparkles, Timer, Layers, Code
+  ChevronRight, Database, Cpu, HeartPulse, Sparkles, Timer, Layers, Code, RefreshCw
 } from 'lucide-react';
 import { CinematicHero } from '@/components/ui/cinematic-landing-hero';
 import { GooeyLoader } from '@/components/ui/gooey-loader';
@@ -153,6 +153,12 @@ export default function LandingPage() {
                desc="Deploy focus timers and study plans to meet the calculated targets."
                icon={<Zap size={28} className="text-primary dark:text-[#bbf246]" />}
              />
+             <ProtocolStep 
+               number="04"
+               title="Self-Heal"
+               desc="Continuous feedback loops: user overrides train institutional patterns, automatically self-healing classroom classifications and timetable sync."
+               icon={<RefreshCw size={28} className="text-primary dark:text-[#bbf246]" />}
+             />
           </div>
 
         </div>
@@ -231,31 +237,31 @@ export default function LandingPage() {
 
         <div className="relative space-y-24">
           <RoadmapItem 
-            quarter="MINI PROJECT"
-            title="Rule-Based Core"
+            quarter="PHASE 1 (COMPLETED)"
+            title="Core Engine & Self-Healing Sync"
             status="Complete"
-            description="Core simulator, grade parsing, and deterministic calculations."
+            description="Relational Subject Registry, Dynamic Routine Resolver for 638 students, Google Classroom Submissions API & 7th-Sem Auto-Filter with Self-Healing Feedback."
             position="left"
           />
           <RoadmapItem 
-            quarter="MINI PROJECT"
-            title="Lite Intelligence"
+            quarter="PHASE 2 (CURRENT)"
+            title="Neural OCR & Model Tuning"
             status="Active"
-            description="Integration of Gemini 3 Flash for basic Q&A and academic context."
+            description="FIC Major Project Review 1, Ingestion Studio for 500+ KIIT Endsem papers, Fine-tuning Kaizen-Tutor 3B on T4 GPU, Multi-modal RAG search."
             position="right"
           />
           <RoadmapItem 
-            quarter="MINOR PROJECT"
-            title="Predictive Core"
+            quarter="PHASE 3 (UPCOMING)"
+            title="Campus Pilot & Proctorial Sync"
             status="Locked"
-            description="Probabilistic grade prediction using regression models on historical data."
+            description="Campus-wide deployment for 638 ECS students, Tutor-Mentor Proctorial integration, Predictive SGPA Simulation, Final B.Tech Defense."
             position="left"
           />
           <RoadmapItem 
             quarter="FUTURE"
-            title="Neural Mentor"
+            title="Campus Intelligence Network"
             status="Concept"
-            description="Voice-native conversational interface for real-time academic coaching."
+            description="Federated learning across departments, automated proctorial reporting, and campus-wide knowledge graphs."
             position="right"
           />
         </div>
