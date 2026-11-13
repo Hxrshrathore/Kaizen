@@ -942,7 +942,7 @@ export default function PitchDeckPage() {
                     <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-2">
                       <div className="text-cyan-400 font-bold">2. Relational Student Resolution</div>
                       <p className="text-muted-foreground text-[11px]">
-                        System queries student roll `2330231` -&gt; resolves section `ECS GROUP-03`, elective `STA_A_PM` -&gt; maps `CS40003: Software Testing &amp; Automation`, `Prof. Proshikshya Mukherjee`, `CL-A-06`.
+                        System queries student roll `2330231` -&gt; resolves elective `STA_A_PM` -&gt; maps `CS40003: Software Testing &amp; Automation`, `Prof. Proshikshya Mukherjee`, `CL-A-06`.
                       </p>
                     </div>
 
@@ -1137,7 +1137,7 @@ export default function PitchDeckPage() {
                       <div className="flex items-center gap-2">
                         <BarChart3 size={15} className="text-emerald-400" />
                         <span className="font-bold text-foreground uppercase tracking-wider text-xs">
-                          PYQ Topic Recurrence &amp; Bloom&apos;s CO Distribution
+                          Statistical PYQ Recurrence
                         </span>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
@@ -1145,10 +1145,14 @@ export default function PitchDeckPage() {
                       </span>
                     </div>
 
+                    <p className="text-[11px] font-mono text-muted-foreground">
+                      Synthesized from 16 archived KIIT Autumn/Spring examination questions for [CS40003].
+                    </p>
+
                     <div className="space-y-3 pt-1">
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px]">
-                          <span className="text-foreground">Boundary Value Analysis &amp; Robustness [CO1]</span>
+                          <span className="text-foreground">Boundary Value Analysis &amp; Robustness Testing</span>
                           <span className="text-emerald-400 font-bold">95% Recurrence</span>
                         </div>
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -1158,7 +1162,7 @@ export default function PitchDeckPage() {
 
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px]">
-                          <span className="text-foreground">Cyclomatic Complexity V(G) &amp; CFG [CO2]</span>
+                          <span className="text-foreground">Control Flow Graph &amp; Cyclomatic Complexity V(G)</span>
                           <span className="text-emerald-400 font-bold">92% Recurrence</span>
                         </div>
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -1168,7 +1172,7 @@ export default function PitchDeckPage() {
 
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px]">
-                          <span className="text-foreground">Equivalence Partitioning &amp; Decision Tables [CO2]</span>
+                          <span className="text-foreground">Equivalence Class Partitioning &amp; Decision Tables</span>
                           <span className="text-cyan-400 font-bold">86% Recurrence</span>
                         </div>
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -1178,17 +1182,7 @@ export default function PitchDeckPage() {
 
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px]">
-                          <span className="text-foreground">State Transition Diagrams &amp; FSM [CO4]</span>
-                          <span className="text-primary font-bold">84% Recurrence</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: '84%' }} />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-foreground">Integration Test Suites &amp; Automation ROI [CO3]</span>
+                          <span className="text-foreground">Integration, System &amp; Regression Testing Strategies</span>
                           <span className="text-amber-400 font-bold">80% Recurrence</span>
                         </div>
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden">

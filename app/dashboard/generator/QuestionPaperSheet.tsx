@@ -23,7 +23,8 @@ export function QuestionPaperSheet({
 }: QuestionPaperSheetProps) {
   // Parse lines to detect sections, code blocks, tables, and headers
   const renderFormattedPaper = () => {
-    const lines = content.replace(/\r\n/g, '\n').split('\n');
+    const sanitizedContent = content.replace(/\s*\(?ECS GROUP-03\)?/gi, '');
+    const lines = sanitizedContent.replace(/\r\n/g, '\n').split('\n');
     const elements: React.ReactNode[] = [];
 
     let inCodeBlock = false;
@@ -276,7 +277,7 @@ export function QuestionPaperSheet({
             <span className="font-bold">Course Code:</span> <span className="font-mono">{subjectCode || 'CS40003'}</span>
           </div>
           <div>
-            <span className="font-bold">Faculty Examiner:</span> {facultyName || 'Faculty In-Charge'}
+            <span className="font-bold">Faculty Examiner:</span> {facultyName?.replace(/\s*\(?ECS GROUP-03\)?/gi, '') || 'Prof. Proshikshya Mukherjee'}
           </div>
           <div className="sm:text-right font-bold">
             Full Marks: {fullMarks} &nbsp;&nbsp;|&nbsp;&nbsp; Time: {duration}

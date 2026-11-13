@@ -39,7 +39,7 @@ export default function DashboardGeneratorPage() {
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('CS40003');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string>('Software Testing and Automation');
   const [examType, setExamType] = useState<'mid_sem' | 'end_sem'>('end_sem');
-  const [studentSection, setStudentSection] = useState<string>('ECS GROUP-03');
+  const [studentSection, setStudentSection] = useState<string>('');
   const [studentSemester, setStudentSemester] = useState<number>(7);
   const [classroomAssignments, setClassroomAssignments] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(false);
@@ -202,7 +202,7 @@ export default function DashboardGeneratorPage() {
     const promptText = `
 You are the official Senior Examination Paper Setter: ${facultyName}
 Department: School of Electronics and Computer Science Engineering
-Academic Target: B.Tech ${semLabel} (${studentSection})
+Academic Target: B.Tech ${semLabel}
 Exam Type: ${examTitle} | Full Marks: ${fullMarks} | Duration: ${duration}
 Subject: ${selectedSubjectName} (${selectedSubjectCode})
 
@@ -222,7 +222,7 @@ Format strictly as follows:
 AUTUMN ${examTitle.toUpperCase()} - 2026-2027
 Course: ${selectedSubjectName}
 Course Code: ${selectedSubjectCode}
-Faculty Examiner: ${facultyName} (${studentSection})
+Faculty Examiner: ${facultyName}
 Full Marks: ${fullMarks}                                                    Time: ${duration}
 --------------------------------------------------------------------------------
 Answer ALL questions from SECTION A and any THREE questions from SECTION B.
@@ -274,7 +274,10 @@ SECTION B (Analytical & Problem Solving)
       }
 
       const consumed = data.tokens_consumed || 4600;
-      setGeneratedPaper(data.response || data.text || 'Paper generated successfully.');
+      const cleanPaper = (data.response || data.text || 'Paper generated successfully.')
+        .replace(/\s*\(?ECS GROUP-03\)?/gi, '')
+        .trim();
+      setGeneratedPaper(cleanPaper);
       setReasoningContent(data.reasoning || null);
       setGenStats({
         tokens: consumed,

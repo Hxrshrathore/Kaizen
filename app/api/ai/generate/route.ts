@@ -224,7 +224,8 @@ export async function POST(request: Request) {
         if (nimResp.ok) {
           const nimData = await nimResp.json();
           const choice = nimData.choices?.[0];
-          const generatedText = choice?.message?.content || "";
+          const rawText = choice?.message?.content || "";
+          const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
           const reasoningContent = choice?.message?.reasoning_content || "";
           return NextResponse.json({
             response: generatedText,
@@ -245,29 +246,43 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 3. GEMINI 2.5 FLASH CLOUD ENGINE (High Throughput Fallback) ──
+    // ── 3. GEMINI 3.5 FLASH LITE CLOUD ENGINE (High Throughput Fallback - 500 RPD) ──
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const geminiResp = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-09-2025",
-        contents: { role: "user", parts: [{ text: effectivePrompt }] },
-        config: {
-          temperature: 0.7,
-          maxOutputTokens: max_tokens,
-        },
-      });
+      
+      const targetGeminiModels = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite",
+      ];
 
-      const generatedText = geminiResp.text || "";
-      return NextResponse.json({
-        response: generatedText,
-        model: "Gemini 2.5 Flash",
-        tokens_consumed: Math.round((effectivePrompt.length + generatedText.length) / 4),
-        time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
-        provider: "gemini",
-        vector_grounded: vectorGroundingCount > 0,
-        vector_grounding_count: vectorGroundingCount,
-      });
+      for (const geminiModel of targetGeminiModels) {
+        try {
+          const geminiResp = await ai.models.generateContent({
+            model: geminiModel,
+            contents: { role: "user", parts: [{ text: effectivePrompt }] },
+            config: {
+              temperature: 0.65,
+              maxOutputTokens: max_tokens,
+            },
+          });
+
+          const rawText = geminiResp.text || "";
+          const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
+          return NextResponse.json({
+            response: generatedText,
+            model: `Gemini (${geminiModel})`,
+            tokens_consumed: Math.round((effectivePrompt.length + generatedText.length) / 4),
+            time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
+            provider: "gemini",
+            vector_grounded: vectorGroundingCount > 0,
+            vector_grounding_count: vectorGroundingCount,
+          });
+        } catch (geminiModelErr: any) {
+          console.warn(`Gemini model ${geminiModel} failed:`, geminiModelErr.message);
+        }
+      }
     }
 
     return NextResponse.json(
