@@ -258,10 +258,44 @@ export async function getStudentProfile(userId: string): Promise<StudentProfileI
 
   const section = dir?.section || ap?.section || 'ECS GROUP-03';
   const branch = dir?.branch || ap?.branch || 'E&CSc';
-  const semester = 7;
+
+  // Dynamically resolve semester:
+  // Priority 1: dir.semester or ap.semester (explicit column if present)
+  // Priority 2: Extract from program string e.g. "B.Tech ... (2nd Sem)" or "7th Sem"
+  const rawProg = dir?.program || ap?.program || '';
+  const semMatch = rawProg.match(/(\d+)(?:st|nd|rd|th)?\s*Sem/i);
+  const semFromProgram = semMatch ? parseInt(semMatch[1], 10) : null;
+
+  // Priority 3: Max completed semester from student's historical SemesterRecord + 1
+  let semFromHistory: number | null = null;
+  try {
+    const lastSemRecord = await db.semesterRecord.findFirst({
+      where: { profile: { userId } },
+      orderBy: { semesterNumber: 'desc' },
+      select: { semesterNumber: true }
+    });
+    if (lastSemRecord) {
+      semFromHistory = lastSemRecord.semesterNumber + 1;
+    }
+  } catch {}
+
+  // Priority 4: Roll number admission year heuristic (e.g. 23 = admitted 2023 -> Autumn 2026 = Sem 7)
+  let semFromRoll: number | null = null;
+  const rollPrefix = rollNumber.slice(0, 2);
+  if (/^\d{2}$/.test(rollPrefix)) {
+    const admitYear = 2000 + parseInt(rollPrefix, 10);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const yearsDiff = currentYear - admitYear;
+    const isAutumn = currentMonth >= 7; // July-Dec is Autumn term (odd semesters: 1, 3, 5, 7)
+    semFromRoll = Math.max(1, Math.min(8, yearsDiff * 2 + (isAutumn ? 1 : 0)));
+  }
+
+  const semester: number = dir?.semester || ap?.semester || semFromProgram || semFromHistory || semFromRoll || 7;
   const name = dir?.name || user?.name || 'Student';
   const email = user?.email || `${rollNumber}@kiit.ac.in`;
-  const program = dir?.program || ap?.program || 'B.Tech in Electronics & Computer Science (7th Sem)';
+  const program = dir?.program || ap?.program || `B.Tech in ${branch} (${semester}th Sem)`;
   const electiveSection = dir?.electiveSection || ap?.electiveSection || null;
   const electiveSubject = dir?.electiveSubject || ap?.electiveSubject || null;
   const electiveFaculty = dir?.electiveFaculty || ap?.electiveFaculty || null;
@@ -285,17 +319,36 @@ export async function getStudentProfile(userId: string): Promise<StudentProfileI
 
 /**
  * Resolve student's allotted subjects:
- * 1. 7th Semester Core subjects (HS40001, TP40001, EC47001, MN40001, EX40003)
- * 2. Specific allotted PE-IV elective (e.g. CS40003 for STA_A_PM)
+ * 1. Current Semester Core & Elective subjects loaded dynamically from Subject table
+ * 2. Specific allotted PE elective if applicable
  * 3. Historical subjects completed from GradeEntry
  */
 export async function getStudentEnrolledSubjects(userId: string): Promise<StudentEnrolledSubjectsResult> {
   const student = await getStudentProfile(userId);
 
-  // 1. Fetch official 7th Semester Core Subjects from DB
-  const coreSubjectCodes = ['HS40001', 'TP40001', 'EC47001', 'MN40001', 'EX40003'];
+  // 1. Fetch official Subjects from DB matching student's dynamic current semester
   const allSubjects = await getAllSubjects();
+  let semesterSubjects = allSubjects.filter(s => s.semester === student.semester);
+
+  // If no subjects mapped to this semester in DB, fallback to query directly by semester
+  if (semesterSubjects.length === 0) {
+    try {
+      semesterSubjects = await db.$queryRaw<SubjectItem[]>`
+        SELECT "id", "code", "name", "shortName", "semester", "type", "branch", "credits", "faculty", "classroom", "description"
+        FROM "Subject"
+        WHERE "semester" = ${student.semester}
+        ORDER BY "code" ASC;
+      `;
+    } catch {
+      semesterSubjects = [];
+    }
+  }
+
   const subjectMap = new Map(allSubjects.map(s => [s.code.toUpperCase(), s]));
+
+  // Separate Core vs Elective subjects for this semester
+  const coreSubjects = semesterSubjects.filter(s => s.type !== 'ELECTIVE');
+  const electiveOptions = semesterSubjects.filter(s => s.type === 'ELECTIVE');
 
   // 2. Resolve Elective Code
   let electiveCode = 'CS40003';
@@ -304,6 +357,8 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
   } else if (student.electiveSubject) {
     const match = student.electiveSubject.match(/\b([A-Z]{2,4}\d{4,5})\b/);
     if (match) electiveCode = match[1];
+  } else if (electiveOptions.length > 0) {
+    electiveCode = electiveOptions[0].code;
   }
 
   // 3. Fetch latest attendance for this student to enrich subjects
@@ -340,44 +395,44 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
   // Build current semester subject list
   const currentSemesterSubjects: EnrolledSubject[] = [];
 
-  // Add core subjects
-  for (const code of coreSubjectCodes) {
-    const subj = subjectMap.get(code);
-    if (subj) {
-      const pct = attMap.get(code) ?? null;
-      let status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'NO_DATA' = 'NO_DATA';
-      if (pct !== null) {
-        status = pct >= 75 ? 'NORMAL' : pct >= 60 ? 'WARNING' : 'CRITICAL';
-      }
-
-      // Dynamically resolve section professor from student timetable
-      const matchedSlot = sectionSlots.find(s => 
-        (s.subjectCode && s.subjectCode.toUpperCase() === code.toUpperCase()) ||
-        (code === 'EX40003' && s.subject && /enpp|epp|professional/i.test(s.subject)) ||
-        (code === 'HS40001' && s.subject && /enpp|epp|economics/i.test(s.subject)) ||
-        (code === 'TP40001' && s.subject && /t&p|placement/i.test(s.subject)) ||
-        (code === 'EC47001' && s.subject && /project/i.test(s.subject)) ||
-        (code === 'MN40001' && s.subject && /minor/i.test(s.subject))
-      );
-
-      const sectionFaculty = matchedSlot?.faculty || subj.faculty || 'School Faculty';
-      const sectionRoom = matchedSlot?.room || subj.classroom || 'Lecture Hall';
-
-      currentSemesterSubjects.push({
-        ...subj,
-        isElective: false,
-        allottedFaculty: sectionFaculty,
-        allottedRoom: sectionRoom,
-        attendancePercentage: pct,
-        attendanceStatus: status
-      });
+  // Add core subjects for student's dynamic semester
+  for (const subj of coreSubjects) {
+    const code = subj.code.toUpperCase();
+    const pct = attMap.get(code) ?? null;
+    let status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'NO_DATA' = 'NO_DATA';
+    if (pct !== null) {
+      status = pct >= 75 ? 'NORMAL' : pct >= 60 ? 'WARNING' : 'CRITICAL';
     }
+
+    // Dynamically resolve section professor from student timetable for this group
+    const matchedSlot = sectionSlots.find(s => 
+      (s.subjectCode && s.subjectCode.toUpperCase() === code) ||
+      (s.subject && s.subject.toUpperCase().includes(subj.name.toUpperCase())) ||
+      (s.subject && subj.shortName && s.subject.toUpperCase().includes(subj.shortName.toUpperCase())) ||
+      (code === 'EX40003' && s.subject && /enpp|epp|professional/i.test(s.subject)) ||
+      (code === 'HS40001' && s.subject && /enpp|epp|economics/i.test(s.subject)) ||
+      (code === 'TP40001' && s.subject && /t&p|placement/i.test(s.subject)) ||
+      (code === 'EC47001' && s.subject && /project/i.test(s.subject)) ||
+      (code === 'MN40001' && s.subject && /minor/i.test(s.subject))
+    );
+
+    const sectionFaculty = matchedSlot?.faculty || subj.faculty || 'Department Faculty';
+    const sectionRoom = matchedSlot?.room || subj.classroom || 'Lecture Hall';
+
+    currentSemesterSubjects.push({
+      ...subj,
+      isElective: false,
+      allottedFaculty: sectionFaculty,
+      allottedRoom: sectionRoom,
+      attendancePercentage: pct,
+      attendanceStatus: status
+    });
   }
 
-  // Add elective subject
-  const electiveSubj = subjectMap.get(electiveCode.toUpperCase());
-  if (electiveSubj) {
-    const pct = attMap.get(electiveCode.toUpperCase()) ?? null;
+  // Add elective subject if applicable for this semester
+  if (electiveOptions.length > 0) {
+    const chosenElective = electiveOptions.find(e => e.code.toUpperCase() === electiveCode.toUpperCase()) || electiveOptions[0];
+    const pct = attMap.get(chosenElective.code.toUpperCase()) ?? null;
     let status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'NO_DATA' = 'NO_DATA';
     if (pct !== null) {
       status = pct >= 75 ? 'NORMAL' : pct >= 60 ? 'WARNING' : 'CRITICAL';
@@ -385,14 +440,16 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
 
     const electiveFaculty = student.electiveFaculty || 
       (student.electiveSection && ELECTIVE_SECTION_MAP[student.electiveSection]?.defaultFaculty) ||
-      'Prof. Proshikshya Mukherjee';
+      chosenElective.faculty ||
+      'Department Elective Faculty';
 
     const electiveRoom = student.electiveRoom || 
       (student.electiveSection && ELECTIVE_SECTION_MAP[student.electiveSection]?.defaultRoom) ||
-      'CL-A-06';
+      chosenElective.classroom ||
+      'Designated Hall';
 
     currentSemesterSubjects.push({
-      ...electiveSubj,
+      ...chosenElective,
       isElective: true,
       allottedFaculty: electiveFaculty,
       allottedRoom: electiveRoom,

@@ -49,3 +49,4 @@ async function checkMaterials() {
 }
 
 checkMaterials().finally(() => prisma.$disconnect());
+

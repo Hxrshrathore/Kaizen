@@ -429,7 +429,7 @@ export function classifyCourseForStudent(
     };
   }
 
-  // 4. Candidate Subject Pool for 7th Semester
+  // 4. Candidate Subject Pool for Student's Current Semester
   const candidatePool = buildCurrentSemesterSubjectsPool(studentData);
 
   // Check self-healing patterns for initial counts
@@ -536,100 +536,88 @@ export function classifyCourseForStudent(
     probability: bestProbResult?.probability || 0.15,
     detectedProfessor: detectedProfessor || null,
     detectedSection: section || null,
-    reason: 'Unverified course - please confirm if this belongs to your current 7th semester.',
+    reason: 'Unverified course - please confirm if this belongs to your current active semester.',
   };
 }
 
 /**
- * Build complete pool of 7th Semester Subjects for the student to select from
+ * Build complete pool of Current Semester Subjects for the student to select from
  */
 export function buildCurrentSemesterSubjectsPool(studentData?: StudentEnrolledSubjectsResult | null): SubjectPoolItem[] {
   const pool: SubjectPoolItem[] = [];
+  const semNum = studentData?.student?.semester || 7;
 
-  // 1. Core Subjects for 7th Sem
-  pool.push(
-    {
-      code: 'EX40003',
-      name: 'Engineering Professional Practice',
-      type: 'CORE',
-      faculty: 'Faculty In-Charge (ECE/ECS)',
-      room: 'Group-3 / Campus 15 Lab',
-      description: 'Core Practical Laboratory & Ethics (7th Sem)',
-    },
-    {
-      code: 'HS40001',
-      name: 'Engineering Economics and Project Management',
-      type: 'CORE',
-      faculty: 'Prof. S. Padhy / Prof. S. Alpna / Prof. P. Dutta',
-      room: 'CL-A-01 - CL-A-06',
-      description: 'Core Humanities & Economics',
-    },
-    {
-      code: 'TP40001',
-      name: 'Training & Placement',
-      type: 'CORE',
-      faculty: 'Training & Placement Faculty',
-      room: 'CL-A-01 - CL-A-06',
-      description: 'Career Advisory & Placement Preparation',
-    },
-    {
-      code: 'EC47001',
-      name: 'Project-I',
-      type: 'CORE',
-      faculty: 'Project Supervisor / Evaluation Committee',
-      room: 'Project Laboratory',
-      description: 'Major Capstone Project Phase-I',
-    },
-    {
-      code: 'MN40001',
-      name: 'Minor Project',
-      type: 'CORE',
-      faculty: 'Department Faculty',
-      room: 'Designated Minor Rooms',
-      description: 'Interdisciplinary Minor Coursework',
-    }
-  );
-
-  // 2. Student's Allotted Elective
-  const allottedElective = studentData?.currentSemesterSubjects?.find(s => s.isElective);
-  if (allottedElective) {
-    pool.unshift({
-      code: allottedElective.code,
-      name: allottedElective.name,
-      type: 'ELECTIVE',
-      isAllotted: true,
-      faculty: allottedElective.allottedFaculty || undefined,
-      room: allottedElective.allottedRoom || undefined,
-      description: `Your Allotted PE-IV Elective (Section: ${allottedElective.electiveSection || 'Allotted'})`,
-    });
-  }
-
-  // 3. Other PE-IV Elective options available in 7th Sem (deduplicated)
-  const existingCodes = new Set(pool.map(p => p.code.toUpperCase()));
-  for (const [secKey, meta] of Object.entries(ELECTIVE_SECTION_MAP)) {
-    if (!existingCodes.has(meta.code.toUpperCase())) {
-      existingCodes.add(meta.code.toUpperCase());
+  // 1. Dynamic subjects from student's enrolled subjects profile
+  if (studentData?.currentSemesterSubjects && studentData.currentSemesterSubjects.length > 0) {
+    for (const s of studentData.currentSemesterSubjects) {
       pool.push({
-        code: meta.code,
-        name: meta.name,
-        type: 'ELECTIVE',
-        isAllotted: false,
-        faculty: meta.defaultFaculty,
-        room: meta.defaultRoom,
-        description: `Professional Elective IV Option (${meta.shortName})`,
+        code: s.code,
+        name: s.name,
+        type: (s.type as any) || (s.isElective ? 'ELECTIVE' : 'CORE'),
+        isAllotted: s.isElective,
+        faculty: s.allottedFaculty || s.faculty || undefined,
+        room: s.allottedRoom || s.classroom || undefined,
+        description: s.description || (s.isElective ? 'Your Allotted Elective' : `Core ${s.name} (Semester ${semNum})`),
       });
     }
+  } else {
+    // Fallback if enrollment data not yet loaded
+    pool.push(
+      {
+        code: 'EX40003',
+        name: 'Engineering Professional Practice',
+        type: 'CORE',
+        faculty: 'Faculty In-Charge (ECE/ECS)',
+        room: 'Group-3 / Campus 15 Lab',
+        description: 'Core Practical Laboratory & Ethics',
+      },
+      {
+        code: 'HS40001',
+        name: 'Engineering Economics and Project Management',
+        type: 'CORE',
+        faculty: 'Prof. S. Padhy / Prof. S. Alpna / Prof. P. Dutta',
+        room: 'CL-A-01 - CL-A-06',
+        description: 'Core Humanities & Economics',
+      },
+      {
+        code: 'TP40001',
+        name: 'Training & Placement',
+        type: 'CORE',
+        faculty: 'Training & Placement Faculty',
+        room: 'CL-A-01 - CL-A-06',
+        description: 'Career Advisory & Placement Preparation',
+      },
+      {
+        code: 'EC47001',
+        name: 'Project-I',
+        type: 'CORE',
+        faculty: 'Project Supervisor / Evaluation Committee',
+        room: 'Project Laboratory',
+        description: 'Major Capstone Project Phase-I',
+      },
+      {
+        code: 'MN40001',
+        name: 'Minor Project',
+        type: 'CORE',
+        faculty: 'Department Faculty',
+        room: 'Designated Minor Rooms',
+        description: 'Interdisciplinary Minor Coursework',
+      }
+    );
   }
 
-  // 4. University Mentorship
-  pool.push({
-    code: 'MENTOR',
-    name: 'Tutor-Mentor Forum',
-    type: 'MENTOR',
-    faculty: 'Academic Proctor / Tutor Mentor',
-    room: 'Campus-12',
-    description: 'Proctorial & Student Mentorship Group',
-  });
+  // 2. Add Tutor-Mentor Forum
+  const hasMentor = pool.some(p => p.code === 'MENTOR');
+  if (!hasMentor) {
+    pool.push({
+      code: 'MENTOR',
+      name: 'Tutor-Mentor Forum',
+      type: 'MENTOR',
+      faculty: 'Academic Proctor / Tutor Mentor',
+      room: 'Campus-12',
+      description: 'Proctorial & Student Mentorship Group',
+    });
+  }
 
   return pool;
 }

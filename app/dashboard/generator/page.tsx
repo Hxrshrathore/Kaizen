@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Sparkles, Download, Printer, Copy, Check, 
   Loader2, RefreshCw, BookOpen, BarChart3, AlertCircle, 
-  GraduationCap, CheckCircle2, ShieldCheck
+  GraduationCap, CheckCircle2, ShieldCheck, Eye, Code
 } from 'lucide-react';
+import { QuestionPaperSheet } from './QuestionPaperSheet';
 
 const MotionDiv = motion.div as any;
 
@@ -39,6 +40,7 @@ export default function DashboardGeneratorPage() {
   const [selectedSubjectName, setSelectedSubjectName] = useState<string>('Software Testing and Automation');
   const [examType, setExamType] = useState<'mid_sem' | 'end_sem'>('end_sem');
   const [studentSection, setStudentSection] = useState<string>('ECS GROUP-03');
+  const [studentSemester, setStudentSemester] = useState<number>(7);
   const [classroomAssignments, setClassroomAssignments] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
@@ -48,13 +50,19 @@ export default function DashboardGeneratorPage() {
   const [error, setError] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
+  const [paperViewMode, setPaperViewMode] = useState<'sheet' | 'raw'>('sheet');
+
+  const semSuffix = studentSemester === 1 ? 'st' : studentSemester === 2 ? 'nd' : studentSemester === 3 ? 'rd' : 'th';
+  const semLabel = `${studentSemester}${semSuffix} Semester`;
+  const semShort = `${studentSemester}${semSuffix} Sem`;
+
   const [pyqStats, setPyqStats] = useState<{
     sampleCount: number;
     recurrenceRate: number;
     topTopics: Array<{ topic: string; prob: number }>;
   } | null>(null);
 
-  // Fetch student enrolled subjects on mount: dynamically resolve Elective + EPP with section professors
+  // Fetch student enrolled subjects on mount: dynamically resolve subjects and professors for current semester
   useEffect(() => {
     async function loadSubjects() {
       try {
@@ -65,38 +73,54 @@ export default function DashboardGeneratorPage() {
           if (data.student?.section) {
             setStudentSection(data.student.section);
           }
+          if (data.student?.semester) {
+            setStudentSemester(data.student.semester);
+          }
           if (data.classroomCourseworkBySubject) {
             setClassroomAssignments(data.classroomCourseworkBySubject);
           }
 
           const currentSubs = data.currentSemesterSubjects || [];
 
-          // 1. Allotted Elective (PE-IV)
-          const foundElective = currentSubs.find((s: any) => s.isElective || s.code === 'CS40003');
-          const electiveItem: SubjectOption = {
-            code: foundElective?.code || 'CS40003',
-            name: foundElective?.name || 'Software Testing and Automation',
-            isAllotted: true,
-            faculty: foundElective?.allottedFaculty || 'Prof. Proshikshya Mukherjee',
-            type: 'ELECTIVE',
-          };
+          // Separate Elective vs Core subjects for this semester
+          const electiveItem = currentSubs.find((s: any) => s.isElective);
+          const coreItems = currentSubs.filter((s: any) => !s.isElective);
+          
+          let displaySubs: SubjectOption[] = [];
+          if (electiveItem) {
+            displaySubs.push({
+              code: electiveItem.code,
+              name: electiveItem.name,
+              isAllotted: true,
+              faculty: electiveItem.allottedFaculty || 'Department Elective Faculty',
+              type: 'ELECTIVE'
+            });
+          }
+          if (coreItems.length > 0) {
+            const primaryCore = coreItems[0];
+            displaySubs.push({
+              code: primaryCore.code,
+              name: primaryCore.name,
+              isAllotted: false,
+              faculty: primaryCore.allottedFaculty || 'Department Faculty',
+              type: 'CORE'
+            });
+          }
+          if (displaySubs.length === 0 && currentSubs.length > 0) {
+            displaySubs = currentSubs.slice(0, 2).map((s: any) => ({
+              code: s.code,
+              name: s.name,
+              isAllotted: s.isElective,
+              faculty: s.allottedFaculty || 'Department Faculty',
+              type: s.type || 'CORE'
+            }));
+          }
 
-          // 2. Engineering Professional Practice (EPP)
-          const foundEpp = currentSubs.find((s: any) => 
-            /ex40003|hs40001|engineering professional practice|professional practice|epp/i.test(`${s.code} ${s.name}`)
-          );
-          const eppItem: SubjectOption = {
-            code: foundEpp?.code || 'EX40003',
-            name: foundEpp?.name || 'Engineering Professional Practice (EPP)',
-            isAllotted: false,
-            faculty: foundEpp?.allottedFaculty || 'Prof. P. Dutta',
-            type: 'CORE',
-          };
-
-          const twoOnly = [electiveItem, eppItem];
-          setSubjects(twoOnly);
-          setSelectedSubjectCode(electiveItem.code);
-          setSelectedSubjectName(electiveItem.name);
+          if (displaySubs.length > 0) {
+            setSubjects(displaySubs);
+            setSelectedSubjectCode(displaySubs[0].code);
+            setSelectedSubjectName(displaySubs[0].name);
+          }
         }
       } catch (e) {
         console.error('Failed to load subjects:', e);
@@ -178,7 +202,7 @@ export default function DashboardGeneratorPage() {
     const promptText = `
 You are the official Senior Examination Paper Setter: ${facultyName}
 Department: School of Electronics and Computer Science Engineering
-Academic Target: B.Tech 7th Semester (${studentSection})
+Academic Target: B.Tech ${semLabel} (${studentSection})
 Exam Type: ${examTitle} | Full Marks: ${fullMarks} | Duration: ${duration}
 Subject: ${selectedSubjectName} (${selectedSubjectCode})
 
@@ -285,16 +309,55 @@ SECTION B (Analytical & Problem Solving)
     if (!generatedPaper) return;
     const w = window.open('', '_blank');
     if (w) {
+      const currentFaculty = subjects.find(s => s.code === selectedSubjectCode)?.faculty || 'Faculty In-Charge';
       w.document.write(`
+        <!DOCTYPE html>
         <html>
           <head>
             <title>KIIT - ${selectedSubjectCode} ${examType}</title>
             <style>
-              body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; white-space: pre-wrap; font-size: 13pt; }
+              @page { size: A4; margin: 15mm; }
+              body { font-family: 'Times New Roman', serif; line-height: 1.5; color: black; background: white; margin: 0; padding: 20px; font-size: 11pt; }
+              .header { text-align: center; margin-bottom: 10px; }
+              .header h1 { font-size: 14pt; margin: 0; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; }
+              .header h2 { font-size: 9.5pt; margin: 2px 0; font-style: italic; color: #444; }
+              .header h3 { font-size: 10.5pt; margin: 2px 0; text-transform: uppercase; font-weight: bold; }
+              .rules { border-top: 2px solid black; border-bottom: 1px solid black; padding: 2px 0; margin: 8px 0; }
+              .meta { display: flex; justify-content: space-between; font-size: 10pt; margin: 3px 0; }
+              .instruction { border-top: 1px solid black; border-bottom: 1px solid black; background: #f9f9f9; text-align: center; font-style: italic; font-size: 10pt; padding: 4px; margin: 6px 0; }
+              pre { background: #f4f4f4; border: 1px solid #ccc; padding: 8px; font-family: monospace; font-size: 9pt; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10pt; }
+              th, td { border: 1px solid black; padding: 4px 8px; text-align: left; }
+              th { background: #eee; }
               @media print { body { padding: 0; } }
             </style>
           </head>
-          <body>${generatedPaper}</body>
+          <body>
+            <div class="header">
+              <h1>KALINGA INSTITUTE OF INDUSTRIAL TECHNOLOGY</h1>
+              <h2>(Deemed to be University U/S 3 of the UGC Act, 1956)</h2>
+              <h3>SCHOOL OF ELECTRONICS &amp; COMPUTER SCIENCE</h3>
+              <div style="font-size: 9pt; color: #666;">BHUBANESWAR, ODISHA</div>
+            </div>
+            <div class="rules"></div>
+            <div style="text-align: center; font-weight: bold; font-size: 10.5pt; margin-bottom: 4px;">
+              AUTUMN ${examType === 'mid_sem' ? 'MID SEMESTER' : 'END SEMESTER'} EXAMINATION — 2026-2027
+            </div>
+            <div class="meta" style="border-top: 1px solid #ccc; padding-top: 4px;">
+              <div><strong>Course:</strong> ${selectedSubjectName} (${selectedSubjectCode})</div>
+              <div><strong>Time:</strong> ${examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours'} &nbsp;|&nbsp; <strong>Full Marks:</strong> ${examType === 'mid_sem' ? 25 : 60}</div>
+            </div>
+            <div class="meta">
+              <div><strong>Faculty Examiner:</strong> ${currentFaculty}</div>
+              <div><strong>Academic Target:</strong> ${semLabel} (${studentSection})</div>
+            </div>
+            <div class="instruction">
+              Answer ALL questions from SECTION A and any THREE questions from SECTION B.
+            </div>
+            <div style="white-space: pre-wrap; font-size: 10.5pt; line-height: 1.5; margin-top: 12px;">
+              ${generatedPaper}
+            </div>
+          </body>
         </html>
       `);
       w.document.close();
@@ -348,7 +411,7 @@ SECTION B (Analytical & Problem Solving)
             {/* Subject Selector: Exactly TWO subjects (Allotted Elective & EPP) */}
             <div>
               <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 font-bold">
-                Active 7th-Semester Subjects
+                Active {semLabel} Subjects
               </label>
 
               {loadingSubjects ? (
@@ -529,7 +592,37 @@ SECTION B (Analytical & Problem Solving)
               </div>
 
               {generatedPaper && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
+                  <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPaperViewMode('sheet')}
+                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                        paperViewMode === 'sheet'
+                          ? 'bg-primary text-black font-bold shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      title="Official KIIT Examination Paper View"
+                    >
+                      <Eye size={12} />
+                      <span className="hidden sm:inline">Paper Sheet</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaperViewMode('raw')}
+                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                        paperViewMode === 'raw'
+                          ? 'bg-primary text-black font-bold shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      title="Raw text view"
+                    >
+                      <Code size={12} />
+                      <span className="hidden sm:inline">Raw Text</span>
+                    </button>
+                  </div>
+
                   {reasoningContent && (
                     <button
                       onClick={() => setShowReasoning(!showReasoning)}
@@ -576,14 +669,14 @@ SECTION B (Analytical & Problem Solving)
             </div>
 
             {/* Paper Output Container */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-xs sm:text-sm leading-relaxed text-foreground select-text whitespace-pre-wrap">
+            <div className="flex-1 overflow-y-auto custom-scrollbar leading-relaxed text-foreground select-text">
               {loading ? (
                 <div className="h-[480px] flex flex-col items-center justify-center text-muted-foreground space-y-4">
                   <div className="relative w-14 h-14">
                     <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin" />
                     <Sparkles className="absolute inset-0 m-auto text-primary animate-pulse" size={20} />
                   </div>
-                  <p className="text-xs uppercase tracking-widest animate-pulse">
+                  <p className="text-xs uppercase tracking-widest animate-pulse font-mono">
                     NVIDIA Nemotron 30B Synthesizing KIIT Examination Paper for [{selectedSubjectCode}]...
                   </p>
                 </div>
@@ -593,14 +686,27 @@ SECTION B (Analytical & Problem Solving)
                     <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
                       <div className="font-bold text-primary mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
                         <Sparkles size={14} />
-                        <span>NVIDIA Nemotron 30B Pedagogical & Examination Blueprint Reasoning</span>
+                        <span>NVIDIA Nemotron 30B Pedagogical &amp; Examination Blueprint Reasoning</span>
                       </div>
                       {reasoningContent}
                     </div>
                   )}
-                  <div className="p-4 rounded-xl bg-background border border-border/80 shadow-inner">
-                    {generatedPaper}
-                  </div>
+
+                  {paperViewMode === 'sheet' ? (
+                    <QuestionPaperSheet
+                      content={generatedPaper}
+                      subjectCode={selectedSubjectCode}
+                      subjectName={selectedSubjectName}
+                      facultyName={subjects.find(s => s.code === selectedSubjectCode)?.faculty || 'Faculty In-Charge'}
+                      examType={examType}
+                      fullMarks={examType === 'mid_sem' ? 25 : 60}
+                      duration={examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours'}
+                    />
+                  ) : (
+                    <div className="p-4 rounded-xl bg-background border border-border/80 shadow-inner font-mono text-xs sm:text-sm whitespace-pre-wrap">
+                      {generatedPaper}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="h-[480px] flex flex-col items-center justify-center text-muted-foreground text-center p-6 space-y-3">
@@ -609,7 +715,7 @@ SECTION B (Analytical & Problem Solving)
                     Ready to Generate Examination Paper
                   </h3>
                   <p className="text-xs max-w-md text-muted-foreground leading-relaxed">
-                    Select your 7th semester paper (Allotted Elective or EPP) and exam format (Mid or End Sem) on the left, then click Generate.
+                    Select your {semLabel} paper and exam format (Mid or End Sem) on the left, then click Generate.
                   </p>
                 </div>
               )}

@@ -108,13 +108,15 @@ const CourseCard = ({
   index, 
   isHidden, 
   onClick,
-  onOpenMappingModal
+  onOpenMappingModal,
+  semShort = 'Active'
 }: { 
   course: Course; 
   index: number; 
   isHidden: boolean; 
   onClick: () => void;
   onOpenMappingModal: (course: Course) => void;
+  semShort?: string;
 }) => {
   const isCurrentSem = course.classification?.category === 'CURRENT_SEMESTER';
   const isAmbiguous = course.classification?.category === 'AMBIGUOUS';
@@ -165,7 +167,7 @@ const CourseCard = ({
                   onOpenMappingModal(course);
                 }}
                 className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
-                title="Click to map this classroom to a 7th semester subject"
+                title={`Click to map this classroom to an active ${semShort} subject`}
               >
                 <AlertCircle size={10} />
                 <span>Map Subject</span>
@@ -187,7 +189,7 @@ const CourseCard = ({
             {isCurrentSem ? (
               <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                7th Sem Active
+                {semShort} Active
               </span>
             ) : isAmbiguous ? (
               <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">
@@ -356,7 +358,14 @@ export default function ClassroomPage() {
   const [summary, setSummary] = useState<ClassroomSummary | null>(null);
   const [filterTab, setFilterTab] = useState<'ALL_ACTIVE' | 'PENDING' | 'TURNED_IN'>('ALL_ACTIVE');
   const [subjectsPool, setSubjectsPool] = useState<SubjectPoolItem[]>([]);
+  const [studentProfile, setStudentProfile] = useState<any | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Dynamic Semester Calculation (Supports any semester 1 to 8 seamlessly)
+  const semNum = studentProfile?.semester || 7;
+  const semSuffix = semNum === 1 ? 'st' : semNum === 2 ? 'nd' : semNum === 3 ? 'rd' : 'th';
+  const semLabel = `${semNum}${semSuffix} Semester`;
+  const semShort = `${semNum}${semSuffix} Sem`;
 
   // Confirmation Modal State (Auto-Detect Current Sem)
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -388,13 +397,14 @@ export default function ClassroomPage() {
         setHiddenCourseIds(hiddenSet);
         setSummary(data.summary || null);
         setSubjectsPool(data.currentSemesterSubjectsPool || []);
+        setStudentProfile(data.studentProfile || null);
 
         // Pre-populate modal selection with recommended active courses
         const activeIds = (data.courses || [])
           .filter((c: Course) => !hiddenSet.has(c.id))
           .map((c: Course) => c.id);
         
-        // If nothing is hidden yet, recommend 7th sem active courses
+        // If nothing is hidden yet, recommend active current semester courses
         if (hiddenSet.size === 0 && data.summary?.recommendedActiveIds) {
           setSelectedForActive(new Set(data.summary.recommendedActiveIds));
         } else {
@@ -578,7 +588,7 @@ export default function ClassroomPage() {
       if (res.ok) {
         setHiddenCourseIds(new Set(resData.hiddenCourseIds || hiddenCourseIdsToSave));
         setIsConfirmModalOpen(false);
-        showToast('Active 7th-semester classrooms updated & saved!');
+        showToast(`Active ${semLabel} classrooms updated & saved!`);
         await fetchData();
       } else {
         alert(resData.error || 'Failed to save configuration');
@@ -666,7 +676,7 @@ export default function ClassroomPage() {
   }
 
   // Split courses for modal
-  const recommended7thSemCourses = courses.filter(c => c.classification?.recommendedActive);
+  const recommendedActiveCourses = courses.filter(c => c.classification?.recommendedActive);
   const ambiguousCourses = courses.filter(c => c.classification?.category === 'AMBIGUOUS');
   const pastSemesterCourses = courses.filter(c => c.classification?.category === 'PREVIOUS_SEMESTER');
 
@@ -704,27 +714,27 @@ export default function ClassroomPage() {
               </h1>
               {!selectedCourse && (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-                  7th Semester
+                  {semLabel}
                 </span>
               )}
             </div>
             <p className="text-muted-foreground font-mono text-xs uppercase tracking-[0.2em] mt-1">
               {selectedCourse 
                 ? (selectedCourse.section || 'Active Coursework') 
-                : `${activeCount} Active 7th-Sem Courses • ${hiddenCount} Hidden Past Courses`}
+                : `${activeCount} Active ${semShort} Courses • ${hiddenCount} Hidden Past Courses`}
             </p>
           </div>
         </div>
 
         {!selectedCourse && (
           <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Auto-Detect 7th Sem Classrooms Button */}
+            {/* Auto-Detect Active Semester Classrooms Button */}
             <button
               onClick={openConfirmModal}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
             >
               <Sparkles size={14} />
-              <span>Auto-Detect 7th Sem</span>
+              <span>Auto-Detect {semShort}</span>
             </button>
 
             {/* Toggle Show Hidden */}
@@ -768,7 +778,7 @@ export default function ClassroomPage() {
                 {summary.unfilteredPastCount} Previous Semester Classrooms Detected
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                University professors rarely archive past courses. Auto-detect your active 7th semester papers so completed 5th/6th sem assignments don&apos;t clutter your view.
+                University professors rarely archive past courses. Auto-detect your active {semLabel} papers so completed previous semester assignments don&apos;t clutter your view.
               </p>
             </div>
           </div>
@@ -807,6 +817,7 @@ export default function ClassroomPage() {
                       isHidden={hiddenCourseIds.has(course.id)}
                       onClick={() => setSelectedCourse(course)}
                       onOpenMappingModal={openSubjectMappingModal}
+                      semShort={semShort}
                     />
                   </div>
                 ))}
@@ -818,7 +829,7 @@ export default function ClassroomPage() {
                   No Active Courses Displayed
                 </h3>
                 <p className="text-xs font-mono text-muted-foreground max-w-md mx-auto mb-6">
-                  All courses may currently be hidden. Click below to auto-detect your 7th semester classrooms or toggle &quot;Showing All&quot;.
+                  All courses may currently be hidden. Click below to auto-detect your {semLabel} classrooms or toggle &quot;Showing All&quot;.
                 </p>
                 <button
                   onClick={openConfirmModal}
@@ -908,7 +919,7 @@ export default function ClassroomPage() {
                     className="w-full h-11 border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-mono font-bold flex items-center justify-center gap-2 transition-all uppercase tracking-wider text-xs rounded-xl"
                   >
                     <Link2 size={14} />
-                    <span>{selectedCourse.mappedSubject ? 'Change Subject Mapping' : 'Link to 7th Sem Subject'}</span>
+                    <span>{selectedCourse.mappedSubject ? 'Change Subject Mapping' : `Link to ${semShort} Subject`}</span>
                   </button>
 
                   <a 
@@ -936,7 +947,7 @@ export default function ClassroomPage() {
                     ) : (
                       <EyeOff size={14} />
                     )}
-                    <span>{hiddenCourseIds.has(selectedCourse.id) ? 'Unhide Course' : 'Hide from 7th Sem View'}</span>
+                    <span>{hiddenCourseIds.has(selectedCourse.id) ? 'Unhide Course' : `Hide from ${semShort} View`}</span>
                   </button>
                 </div>
               </div>
@@ -1034,7 +1045,7 @@ export default function ClassroomPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Link2 className="text-primary" size={18} />
                     <h2 className="text-xl font-display font-bold text-foreground">
-                      Map Classroom to 7th Semester Subject
+                      Map Classroom to {semLabel} Subject
                     </h2>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono leading-relaxed">
@@ -1078,7 +1089,7 @@ export default function ClassroomPage() {
                 )}
 
                 <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-bold">
-                  Select from Current 7th-Semester Curriculum:
+                  Select from Current {semLabel} Curriculum:
                 </div>
 
                 <div className="space-y-2.5">
@@ -1207,11 +1218,11 @@ export default function ClassroomPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Sparkles className="text-primary" size={18} />
                     <h2 className="text-xl font-display font-bold text-foreground">
-                      Auto-Detect &amp; Confirm 7th Semester Classrooms
+                      Auto-Detect &amp; Confirm {semLabel} Classrooms
                     </h2>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono leading-relaxed">
-                    Review and confirm which classrooms belong to your active 7th semester. Historical and unselected courses will be hidden from your schedule and dashboard.
+                    Review and confirm which classrooms belong to your active {semLabel}. Historical and unselected courses will be hidden from your schedule and dashboard.
                   </p>
                 </div>
                 <button
@@ -1224,17 +1235,17 @@ export default function ClassroomPage() {
 
               {/* Modal Body: Scrollable Course Categories */}
               <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-                {/* 1. Recommended 7th Sem Classrooms */}
+                {/* 1. Recommended Active Classrooms */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <CheckCircle2 size={16} className="text-emerald-400" />
                     <h3 className="text-xs uppercase font-mono font-bold tracking-wider text-emerald-400">
-                      Recommended 7th-Semester Classrooms ({recommended7thSemCourses.length})
+                      Recommended {semLabel} Classrooms ({recommendedActiveCourses.length})
                     </h3>
                   </div>
 
                   <div className="space-y-2">
-                    {recommended7thSemCourses.map(course => {
+                    {recommendedActiveCourses.map(course => {
                       const isSelected = selectedForActive.has(course.id);
                       return (
                         <div
