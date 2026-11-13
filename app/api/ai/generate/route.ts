@@ -13,8 +13,11 @@ export async function POST(request: Request) {
       subject = "Academic Coursework", 
       subjectCode = "CS40003", 
       examType = "end_sem", 
-      model = "nemotron-3.5-bolt-e4b",
-      max_tokens = 1200 
+      faculty = "",
+      section = "",
+      classroomContext = "",
+      model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      max_tokens = 8192 
     } = body;
 
     if (!prompt) {
@@ -48,19 +51,22 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 2. NVIDIA NIM INFERENCE MICROSERVICES ──
+    // ── 2. NVIDIA NIM INFERENCE MICROSERVICES (Primary Generation Engine) ──
     const nvidiaKey = process.env.NVIDIA_API_KEY;
-    const isNimModel = model.includes("nemotron") || model.includes("deepseek") || model.includes("kimi") || model.includes("minimax");
+    const isNimModel = model.includes("nemotron") || model.includes("deepseek") || model.includes("kimi") || model.includes("minimax") || model.includes("nvidia");
 
     if (nvidiaKey && isNimModel) {
       try {
         // Map frontend IDs to official NIM microservice names
         const nimModelMap: Record<string, string> = {
+          "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+          "nemotron-3-nano-omni-30b": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
           "nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
           "deepseek-v4.1-flash": "deepseek-ai/deepseek-v4.1-flash",
           "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
         };
-        const targetNimModel = nimModelMap[model] || "nvidia/nemotron-3.5-bolt-e4b";
+        const targetNimModel = nimModelMap[model] || "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
+        const effectiveMaxTokens = Math.max(max_tokens || 8192, 6144);
 
         const nimResp = await fetch(`${NVIDIA_API_BASE}/chat/completions`, {
           method: "POST",
@@ -71,21 +77,28 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             model: targetNimModel,
             messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
-            max_tokens: max_tokens,
+            temperature: 0.6,
+            top_p: 0.95,
+            max_tokens: effectiveMaxTokens,
           }),
         });
 
         if (nimResp.ok) {
           const nimData = await nimResp.json();
-          const generatedText = nimData.choices?.[0]?.message?.content || "";
+          const choice = nimData.choices?.[0];
+          const generatedText = choice?.message?.content || "";
+          const reasoningContent = choice?.message?.reasoning_content || "";
           return NextResponse.json({
             response: generatedText,
-            model: targetNimModel,
+            reasoning: reasoningContent,
+            model: "NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)",
             tokens_consumed: nimData.usage?.total_tokens || Math.round((prompt.length + generatedText.length) / 4),
             time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
             provider: "nvidia_nim",
           });
+        } else {
+          const errBody = await nimResp.text();
+          console.warn(`NVIDIA NIM returned HTTP ${nimResp.status}:`, errBody);
         }
       } catch (nimErr) {
         console.warn("NVIDIA NIM call failed, falling back to Gemini:", nimErr);

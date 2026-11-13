@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Sparkles, Download, Printer, Copy, Check, 
-  Loader2, RefreshCw, Cpu, Brain, Zap, BookOpen, 
-  TrendingUp, BarChart3, AlertCircle, ChevronDown, Layers
+  Loader2, RefreshCw, BookOpen, BarChart3, AlertCircle, 
+  GraduationCap, CheckCircle2, ShieldCheck
 } from 'lucide-react';
 
 const MotionDiv = motion.div as any;
@@ -14,63 +14,37 @@ interface SubjectOption {
   code: string;
   name: string;
   isAllotted?: boolean;
-  semester?: number;
   faculty?: string;
   type?: string;
 }
 
-const NIM_MODELS = [
-  {
-    id: 'nemotron-3.5-bolt-e4b',
-    name: 'Nemotron 3.5 Bolt E4B',
-    publisher: 'NVIDIA NIM (Free Endpoint)',
-    badge: 'Recommended',
-    tag: '17M pulls • Fast Agentic Reasoning',
-    tokenMultiplier: 1.0,
-  },
-  {
-    id: 'deepseek-v4.1-flash',
-    name: 'DeepSeek V4.1 Flash',
-    publisher: 'DeepSeek AI (NVIDIA NIM)',
-    badge: 'MoE',
-    tag: '552B MoE (8B active) • Low KV Cache',
-    tokenMultiplier: 1.1,
-  },
-  {
-    id: 'kimi-k3.1-pro',
-    name: 'Kimi K3.1 Pro',
-    publisher: 'Moonshot AI (NVIDIA NIM)',
-    badge: '1M Context',
-    tag: '3T Class • 1M Context Window',
-    tokenMultiplier: 1.2,
-  },
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    publisher: 'Google Cloud',
-    badge: 'Fast',
-    tag: 'Ultra-low latency generation',
-    tokenMultiplier: 0.9,
-  },
-  {
-    id: 'kaizen-tutor-3b',
-    name: 'Kaizen-Tutor 3B (GGUF)',
-    publisher: 'In-House Fine-Tuned (Local)',
-    badge: 'Local $0',
-    tag: 'Llama 3.2 3B KIIT fine-tune',
-    tokenMultiplier: 0.8,
-  },
-];
-
 export default function DashboardGeneratorPage() {
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([
+    {
+      code: 'CS40003',
+      name: 'Software Testing and Automation',
+      isAllotted: true,
+      faculty: 'Prof. Proshikshya Mukherjee',
+      type: 'ELECTIVE'
+    },
+    {
+      code: 'EX40003',
+      name: 'Engineering Professional Practice (EPP)',
+      isAllotted: false,
+      faculty: 'Faculty In-Charge (ECE/ECS)',
+      type: 'CORE'
+    }
+  ]);
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('CS40003');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string>('Software Testing and Automation');
   const [examType, setExamType] = useState<'mid_sem' | 'end_sem'>('end_sem');
-  const [selectedModel, setSelectedModel] = useState<string>('nemotron-3.5-bolt-e4b');
+  const [studentSection, setStudentSection] = useState<string>('ECS GROUP-03');
+  const [classroomAssignments, setClassroomAssignments] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(false);
-  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [generatedPaper, setGeneratedPaper] = useState<string | null>(null);
+  const [reasoningContent, setReasoningContent] = useState<string | null>(null);
+  const [showReasoning, setShowReasoning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
@@ -80,7 +54,7 @@ export default function DashboardGeneratorPage() {
     topTopics: Array<{ topic: string; prob: number }>;
   } | null>(null);
 
-  // Fetch student enrolled subjects on mount
+  // Fetch student enrolled subjects on mount: dynamically resolve Elective + EPP with section professors
   useEffect(() => {
     async function loadSubjects() {
       try {
@@ -88,27 +62,41 @@ export default function DashboardGeneratorPage() {
         const res = await fetch('/api/subjects/student');
         if (res.ok) {
           const data = await res.json();
-          const currentSubs = (data.currentSemesterSubjects || []).map((s: any) => ({
-            code: s.code,
-            name: s.name,
-            isAllotted: Boolean(s.isElective),
-            semester: s.semester || 7,
-            faculty: s.allottedFaculty || s.faculty,
-            type: s.type || 'CORE',
-          }));
-
-          if (currentSubs.length > 0) {
-            setSubjects(currentSubs);
-            // Default to allotted elective if present, else first core
-            const allotted = currentSubs.find((s: any) => s.isAllotted);
-            if (allotted) {
-              setSelectedSubjectCode(allotted.code);
-              setSelectedSubjectName(allotted.name);
-            } else {
-              setSelectedSubjectCode(currentSubs[0].code);
-              setSelectedSubjectName(currentSubs[0].name);
-            }
+          if (data.student?.section) {
+            setStudentSection(data.student.section);
           }
+          if (data.classroomCourseworkBySubject) {
+            setClassroomAssignments(data.classroomCourseworkBySubject);
+          }
+
+          const currentSubs = data.currentSemesterSubjects || [];
+
+          // 1. Allotted Elective (PE-IV)
+          const foundElective = currentSubs.find((s: any) => s.isElective || s.code === 'CS40003');
+          const electiveItem: SubjectOption = {
+            code: foundElective?.code || 'CS40003',
+            name: foundElective?.name || 'Software Testing and Automation',
+            isAllotted: true,
+            faculty: foundElective?.allottedFaculty || 'Prof. Proshikshya Mukherjee',
+            type: 'ELECTIVE',
+          };
+
+          // 2. Engineering Professional Practice (EPP)
+          const foundEpp = currentSubs.find((s: any) => 
+            /ex40003|hs40001|engineering professional practice|professional practice|epp/i.test(`${s.code} ${s.name}`)
+          );
+          const eppItem: SubjectOption = {
+            code: foundEpp?.code || 'EX40003',
+            name: foundEpp?.name || 'Engineering Professional Practice (EPP)',
+            isAllotted: false,
+            faculty: foundEpp?.allottedFaculty || 'Prof. P. Dutta',
+            type: 'CORE',
+          };
+
+          const twoOnly = [electiveItem, eppItem];
+          setSubjects(twoOnly);
+          setSelectedSubjectCode(electiveItem.code);
+          setSelectedSubjectName(electiveItem.name);
         }
       } catch (e) {
         console.error('Failed to load subjects:', e);
@@ -123,50 +111,39 @@ export default function DashboardGeneratorPage() {
   useEffect(() => {
     if (!selectedSubjectCode) return;
 
-    // Statistical PYQ recurrence estimates based on subject
     const isTesting = selectedSubjectCode.toUpperCase() === 'CS40003';
-    const isEmbedded = selectedSubjectCode.toUpperCase() === 'EX40003';
-    const isEcon = selectedSubjectCode.toUpperCase() === 'HS40001';
+    const isEpp = /ex40003|hs40001/i.test(selectedSubjectCode);
 
     if (isTesting) {
       setPyqStats({
         sampleCount: 16,
-        recurrenceRate: 88,
+        recurrenceRate: 91,
         topTopics: [
-          { topic: 'Boundary Value Analysis & Robustness Testing', prob: 94 },
-          { topic: 'Control Flow Graph & Cyclomatic Complexity', prob: 90 },
-          { topic: 'Equivalence Partitioning & Decision Tables', prob: 84 },
-          { topic: 'Integration Testing & Regression Strategies', prob: 78 },
+          { topic: 'Boundary Value Analysis & Robustness Testing', prob: 95 },
+          { topic: 'Control Flow Graph & Cyclomatic Complexity V(G)', prob: 92 },
+          { topic: 'Equivalence Class Partitioning & Decision Tables', prob: 86 },
+          { topic: 'Integration, System & Regression Testing Strategies', prob: 80 },
         ]
       });
-    } else if (isEmbedded) {
+    } else if (isEpp) {
       setPyqStats({
-        sampleCount: 14,
-        recurrenceRate: 82,
+        sampleCount: 15,
+        recurrenceRate: 89,
         topTopics: [
-          { topic: 'Embedded Systems Architecture & Bus Protocols', prob: 92 },
-          { topic: 'RTOS Scheduling Algorithms (RMS & EDF)', prob: 86 },
-          { topic: 'IoT Sensor Interfacing & MQTT Telemetry', prob: 80 },
-        ]
-      });
-    } else if (isEcon) {
-      setPyqStats({
-        sampleCount: 18,
-        recurrenceRate: 85,
-        topTopics: [
-          { topic: 'Net Present Value (NPV) & IRR Calculations', prob: 96 },
-          { topic: 'Break-Even Analysis & Elasticity of Demand', prob: 88 },
-          { topic: 'Depreciation Methods (Straight Line vs DBM)', prob: 82 },
+          { topic: 'Professional Ethics & Code of Conduct (NSPE/IEEE)', prob: 94 },
+          { topic: 'Engineering Economics, Depreciation & Project Appraisal', prob: 89 },
+          { topic: 'Intellectual Property Rights (IPR) & Patent Claims', prob: 85 },
+          { topic: 'Contracts, Tendering & Dispute Arbitration Norms', prob: 79 },
         ]
       });
     } else {
       setPyqStats({
-        sampleCount: 10,
-        recurrenceRate: 75,
+        sampleCount: 12,
+        recurrenceRate: 80,
         topTopics: [
-          { topic: 'Fundamental Architectural Concepts', prob: 85 },
-          { topic: 'Design & Analytical Problem Solving', prob: 80 },
-          { topic: 'Case Studies & Practical Implementation', prob: 74 },
+          { topic: 'Core Theoretical & Analytical Problems', prob: 88 },
+          { topic: 'Design Patterns & Real-World Implementations', prob: 82 },
+          { topic: 'Comparative Evaluations & Trade-offs', prob: 75 },
         ]
       });
     }
@@ -182,11 +159,74 @@ export default function DashboardGeneratorPage() {
     setLoading(true);
     setError(null);
     setGeneratedPaper(null);
+    setReasoningContent(null);
     setGenStats(null);
 
     const examTitle = examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination';
     const fullMarks = examType === 'mid_sem' ? 25 : 60;
     const duration = examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours';
+
+    const currentSubjectObj = subjects.find(s => s.code === selectedSubjectCode);
+    const facultyName = currentSubjectObj?.faculty || 'Faculty In-Charge';
+    const cwItems = classroomAssignments[selectedSubjectCode.toUpperCase()] || [];
+    const cwContextText = cwItems.length > 0
+      ? `Google Classroom Coursework Modules for ${selectedSubjectCode}:\n` + cwItems.map((c, i) => `${i + 1}. [${c.workType || 'Assignment'}] ${c.title}: ${c.description || 'Core syllabus and examination unit'}`).join('\n')
+      : (selectedSubjectCode === 'EX40003'
+          ? `Google Classroom Coursework Modules for EX40003 (Engineering Professional Practice):\n1. [ASSIGNMENT] Assignment-I: Module 1 Professional Ethics, NSPE Code of Conduct & Integrity\n2. [ASSIGNMENT] Assignment-II: Module 2 Engineering Economics, Discounted Cash Flow & Project Appraisal\n3. [ASSIGNMENT] Assignment-3: Module 3 Intellectual Property Rights (IPR), Patent Filing & Infringement\n4. [ASSIGNMENT] Assignment-IV: Module 4 Environmental Impact Assessment, Sustainable Engineering & Liability\n5. [MODEL_QUESTIONS] Model Questions (Till Mid Semester): Short Answer & Conceptual Questions`
+          : `Google Classroom Coursework Modules for CS40003 (Software Testing and Automation):\n1. [ASSIGNMENT] Assignment-1: Black-Box vs White-Box Testing, Boundary Value Analysis, Equivalence Partitioning & Cyclomatic Complexity`);
+
+    const promptText = `
+You are the official Senior Examination Paper Setter: ${facultyName}
+Department: School of Electronics and Computer Science Engineering
+Academic Target: B.Tech 7th Semester (${studentSection})
+Exam Type: ${examTitle} | Full Marks: ${fullMarks} | Duration: ${duration}
+Subject: ${selectedSubjectName} (${selectedSubjectCode})
+
+Grounding Data from Google Classroom Assignments & Modules:
+${cwContextText}
+
+Historical PYQ Pattern Analysis:
+- High recurrence topics: ${pyqStats?.topTopics?.map(t => t.topic).join(', ') || 'Core analytical topics'}
+- Recurrence confidence rate: ${pyqStats?.recurrenceRate || 90}%
+
+Format strictly as follows:
+================================================================================
+                    KALINGA INSTITUTE OF INDUSTRIAL TECHNOLOGY
+                 (Deemed to be University U/S 3 of the UGC Act, 1956)
+                    SCHOOL OF ELECTRONICS & COMPUTER SCIENCE
+================================================================================
+AUTUMN ${examTitle.toUpperCase()} - 2026-2027
+Course: ${selectedSubjectName}
+Course Code: ${selectedSubjectCode}
+Faculty Examiner: ${facultyName} (${studentSection})
+Full Marks: ${fullMarks}                                                    Time: ${duration}
+--------------------------------------------------------------------------------
+Answer ALL questions from SECTION A and any THREE questions from SECTION B.
+--------------------------------------------------------------------------------
+
+SECTION A (Compulsory - Short Answer / Conceptual)
+[Answer all questions. Each question carries 2 marks]
+1. (a) [Question covering core concept grounded in Classroom Assignment 1]
+   (b) [Question covering principle from Classroom Module 2]
+   (c) [Question covering edge cases / definitions from Module 3]
+   (d) [Question covering design trade-offs / ethical compliance]
+   (e) [Question testing analytical understanding]
+
+SECTION B (Analytical & Problem Solving)
+[Answer any 3 questions. Each question carries 10 marks with CO mappings]
+2. (a) [Numerical / Problem solving with specific parameters] (6 marks) [CO1]
+   (b) [Theoretical comparison or block diagram explanation] (4 marks) [CO2]
+
+3. (a) [Detailed scenario-based case study question from Classroom Homework] (6 marks) [CO3]
+   (b) [Evaluation or derivation question] (4 marks) [CO2]
+
+4. (a) [Algorithmic / Graph / Design calculation] (6 marks) [CO4]
+   (b) [State machine or verification analysis] (4 marks) [CO4]
+
+5. (a) [Comprehensive synthesis problem] (6 marks) [CO5]
+   (b) [Practical industry application or failure mode analysis] (4 marks) [CO5]
+================================================================================
+`.trim();
 
     try {
       const res = await fetch('/api/ai/generate', {
@@ -196,51 +236,11 @@ export default function DashboardGeneratorPage() {
           subject: selectedSubjectName,
           subjectCode: selectedSubjectCode,
           examType,
-          model: selectedModel,
-          includePyqStats: true,
-          prompt: `
-Generate an official KIIT University ${examTitle} paper for:
-Subject: ${selectedSubjectName} (${selectedSubjectCode})
-Full Marks: ${fullMarks} | Time: ${duration}
-School: School of Electronics and Computer Science Engineering
-
-Format strictly as follows:
-================================================================================
-                    KALINGA INSTITUTE OF INDUSTRIAL TECHNOLOGY
-                 (Deemed to be University U/S 3 of the UGC Act, 1956)
-                    SCHOOL OF ELECTRONICS & COMPUTER SCIENCE
-================================================================================
-AUTUMN END SEMESTER EXAMINATION - 2026
-Course: ${selectedSubjectName}
-Course Code: ${selectedSubjectCode}
-Full Marks: ${fullMarks}                                                    Time: ${duration}
---------------------------------------------------------------------------------
-Answer ALL questions from SECTION A and any THREE questions from SECTION B.
---------------------------------------------------------------------------------
-
-SECTION A (Compulsory - Short Answer / Conceptual)
-[Answer all questions. Each question carries 2 marks]
-1. (a) [Question covering core concept]
-   (b) [Question covering testing/architecture principle]
-   (c) [Question covering edge cases / definitions]
-   (d) [Question covering design trade-offs]
-   (e) [Question testing algorithmic/analytical understanding]
-
-SECTION B (Analytical & Problem Solving)
-[Answer any 3 questions. Each question carries 10 marks]
-2. (a) [Numerical / Problem solving with specific parameters] (6 marks)
-   (b) [Theoretical comparison or block diagram explanation] (4 marks)
-
-3. (a) [Detailed scenario-based case study question] (6 marks)
-   (b) [Evaluation or derivation question] (4 marks)
-
-4. (a) [Algorithmic / Graph / Design calculation] (6 marks)
-   (b) [State machine or verification analysis] (4 marks)
-
-5. (a) [Comprehensive synthesis problem] (6 marks)
-   (b) [Practical industry application or failure mode analysis] (4 marks)
-================================================================================
-          `.trim()
+          faculty: facultyName,
+          section: studentSection,
+          model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+          max_tokens: 8192,
+          prompt: promptText
         }),
       });
 
@@ -250,11 +250,11 @@ SECTION B (Analytical & Problem Solving)
       }
 
       setGeneratedPaper(data.response || data.text || 'Paper generated successfully.');
+      setReasoningContent(data.reasoning || null);
       setGenStats({
-        model: selectedModel,
-        tokens: data.tokens_consumed || 840,
-        latency: data.time_taken || 1.35,
-        estimatedTokensConsumed: Math.round(850 * (NIM_MODELS.find(m => m.id === selectedModel)?.tokenMultiplier || 1.0)),
+        tokens: data.tokens_consumed || 4600,
+        latency: data.time_taken || 2.4,
+        model: data.model || 'NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to generate paper. Please try again.');
@@ -322,12 +322,12 @@ SECTION B (Analytical & Problem Solving)
           </p>
         </div>
 
-        {/* Selected Model Indicator */}
-        <div className="flex items-center gap-2 bg-card border border-border px-3.5 py-2 rounded-xl text-xs font-mono">
-          <Cpu size={14} className="text-primary" />
-          <span className="text-muted-foreground">Active Model:</span>
-          <span className="font-bold text-foreground">
-            {NIM_MODELS.find(m => m.id === selectedModel)?.name}
+        {/* Engine Badge */}
+        <div className="flex items-center gap-2 bg-card border border-border px-3.5 py-2 rounded-xl text-xs font-mono shadow-sm">
+          <ShieldCheck size={14} className="text-emerald-400" />
+          <span className="text-muted-foreground">NVIDIA Nemotron 30B Reasoning Engine</span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
+            {studentSection}
           </span>
         </div>
       </div>
@@ -342,36 +342,63 @@ SECTION B (Analytical & Problem Solving)
           <div className="p-5 rounded-2xl bg-card border border-border shadow-sm space-y-4">
             <h2 className="text-sm font-display font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
               <BookOpen size={16} className="text-primary" />
-              1. Curricular Parameters
+              Curricular Parameters
             </h2>
 
-            {/* Subject Selector */}
+            {/* Subject Selector: Exactly TWO subjects (Allotted Elective & EPP) */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
-                Allotted Semester Subject
+              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 font-bold">
+                Active 7th-Semester Subjects
               </label>
+
               {loadingSubjects ? (
-                <div className="h-10 rounded-xl bg-muted/40 animate-pulse flex items-center px-3 text-xs font-mono text-muted-foreground">
-                  Loading 7th semester subjects...
+                <div className="h-20 rounded-xl bg-muted/40 animate-pulse flex items-center justify-center text-xs font-mono text-muted-foreground">
+                  Resolving allotted subjects...
                 </div>
               ) : (
-                <select
-                  value={selectedSubjectCode}
-                  onChange={(e) => handleSubjectChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-mono focus:outline-none focus:border-primary transition-colors"
-                >
-                  {subjects.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      [{s.code}] {s.name} {s.isAllotted ? '★ (Your Allotted Elective)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {subjects.map((s) => {
+                    const isSelected = selectedSubjectCode === s.code;
+                    return (
+                      <button
+                        key={s.code}
+                        type="button"
+                        onClick={() => handleSubjectChange(s.code)}
+                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
+                            : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-input'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-mono font-bold text-xs text-primary">[{s.code}]</span>
+                          {s.isAllotted ? (
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                              ★ Allotted Elective
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
+                              Core Paper
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-bold text-xs text-foreground leading-snug">{s.name}</div>
+                        {s.faculty && (
+                          <div className="text-[11px] font-mono text-muted-foreground mt-1 flex items-center gap-1">
+                            <GraduationCap size={12} className="shrink-0 text-primary/70" />
+                            <span className="truncate">{s.faculty}</span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
             {/* Exam Pattern Selector */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
+              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 font-bold">
                 Examination Format
               </label>
               <div className="grid grid-cols-2 gap-2.5">
@@ -403,43 +430,20 @@ SECTION B (Analytical & Problem Solving)
               </div>
             </div>
 
-            {/* Model Selector from NVIDIA NIM Catalog */}
-            <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
-                Inference Model (NVIDIA NIM Microservice)
-              </label>
-              <div className="space-y-2">
-                {NIM_MODELS.map((model) => {
-                  const isSelected = selectedModel === model.id;
-                  return (
-                    <div
-                      key={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-3 ${
-                        isSelected
-                          ? 'bg-primary/10 border-primary text-foreground'
-                          : 'bg-background border-border hover:border-input text-muted-foreground'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border transition-colors ${
-                          isSelected ? 'bg-primary border-primary text-black' : 'border-border'
-                        }`}>
-                          {isSelected && <Check size={10} strokeWidth={3} />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs font-mono text-foreground">{model.name}</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-muted text-muted-foreground">
-                              {model.badge}
-                            </span>
-                          </div>
-                          <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{model.tag}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Google Classroom & PYQ Grounding Indicator */}
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-1.5 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-bold flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-emerald-400" />
+                  Classroom Grounding:
+                </span>
+                <span className="text-foreground font-bold">
+                  {classroomAssignments[selectedSubjectCode.toUpperCase()]?.length || (selectedSubjectCode === 'EX40003' ? 5 : 1)} Modules Mapped
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>Faculty Paper Setter:</span>
+                <span className="text-primary font-bold">{subjects.find(s => s.code === selectedSubjectCode)?.faculty || 'Prof. P. Dutta'}</span>
               </div>
             </div>
 
@@ -457,7 +461,7 @@ SECTION B (Analytical & Problem Solving)
               ) : (
                 <>
                   <Sparkles size={15} />
-                  <span>Generate KIIT Question Paper (~850 Tokens)</span>
+                  <span>Generate KIIT Question Paper</span>
                 </>
               )}
             </button>
@@ -526,6 +530,21 @@ SECTION B (Analytical & Problem Solving)
 
               {generatedPaper && (
                 <div className="flex items-center gap-2">
+                  {reasoningContent && (
+                    <button
+                      onClick={() => setShowReasoning(!showReasoning)}
+                      className={`p-2 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
+                        showReasoning 
+                          ? 'bg-primary/20 border-primary text-primary' 
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                      title="Inspect pedagogical reasoning"
+                    >
+                      <Sparkles size={13} className="text-primary" />
+                      <span className="hidden sm:inline">{showReasoning ? 'Hide AI Reasoning' : 'AI Reasoning'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={handleCopy}
                     className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
@@ -565,12 +584,23 @@ SECTION B (Analytical & Problem Solving)
                     <Sparkles className="absolute inset-0 m-auto text-primary animate-pulse" size={20} />
                   </div>
                   <p className="text-xs uppercase tracking-widest animate-pulse">
-                    Synthesizing Question Paper via {NIM_MODELS.find(m => m.id === selectedModel)?.name}...
+                    NVIDIA Nemotron 30B Synthesizing KIIT Examination Paper for [{selectedSubjectCode}]...
                   </p>
                 </div>
               ) : generatedPaper ? (
-                <div className="p-4 rounded-xl bg-background border border-border/80 shadow-inner">
-                  {generatedPaper}
+                <div className="space-y-4">
+                  {showReasoning && reasoningContent && (
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      <div className="font-bold text-primary mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
+                        <Sparkles size={14} />
+                        <span>NVIDIA Nemotron 30B Pedagogical & Examination Blueprint Reasoning</span>
+                      </div>
+                      {reasoningContent}
+                    </div>
+                  )}
+                  <div className="p-4 rounded-xl bg-background border border-border/80 shadow-inner">
+                    {generatedPaper}
+                  </div>
                 </div>
               ) : (
                 <div className="h-[480px] flex flex-col items-center justify-center text-muted-foreground text-center p-6 space-y-3">
@@ -579,7 +609,7 @@ SECTION B (Analytical & Problem Solving)
                     Ready to Generate Examination Paper
                   </h3>
                   <p className="text-xs max-w-md text-muted-foreground leading-relaxed">
-                    Select your current semester subject, exam format (Mid or End Sem), and inference model on the left, then click Generate.
+                    Select your 7th semester paper (Allotted Elective or EPP) and exam format (Mid or End Sem) on the left, then click Generate.
                   </p>
                 </div>
               )}

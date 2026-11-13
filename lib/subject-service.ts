@@ -315,6 +315,28 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
   `;
   const attMap = new Map(attendanceRows.map(a => [a.courseCode.toUpperCase(), a.percentage]));
 
+  // Normalize student's group (e.g. ECS GROUP-03)
+  let normalizedGroup = (student.section || 'ECS GROUP-03').trim();
+  const gMatch = normalizedGroup.match(/^G0?(\d+)$/i);
+  if (gMatch) {
+    normalizedGroup = `ECS GROUP-${gMatch[1].padStart(2, '0')}`;
+  } else {
+    const match = normalizedGroup.match(/ECSc?0?(\d+)/i);
+    if (match) {
+      normalizedGroup = `ECS GROUP-${match[1].padStart(2, '0')}`;
+    } else {
+      const dMatch = normalizedGroup.match(/^0?([1-7])$/);
+      if (dMatch) normalizedGroup = `ECS GROUP-${dMatch[1].padStart(2, '0')}`;
+    }
+  }
+
+  // Fetch section schedule slots to resolve professors dynamically per section
+  const sectionSlots = await db.$queryRaw<any[]>`
+    SELECT DISTINCT "subjectCode", "subject", "faculty", "room"
+    FROM "CourseSchedule"
+    WHERE "group" = ${normalizedGroup};
+  `;
+
   // Build current semester subject list
   const currentSemesterSubjects: EnrolledSubject[] = [];
 
@@ -327,11 +349,25 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
       if (pct !== null) {
         status = pct >= 75 ? 'NORMAL' : pct >= 60 ? 'WARNING' : 'CRITICAL';
       }
+
+      // Dynamically resolve section professor from student timetable
+      const matchedSlot = sectionSlots.find(s => 
+        (s.subjectCode && s.subjectCode.toUpperCase() === code.toUpperCase()) ||
+        (code === 'EX40003' && s.subject && /enpp|epp|professional/i.test(s.subject)) ||
+        (code === 'HS40001' && s.subject && /enpp|epp|economics/i.test(s.subject)) ||
+        (code === 'TP40001' && s.subject && /t&p|placement/i.test(s.subject)) ||
+        (code === 'EC47001' && s.subject && /project/i.test(s.subject)) ||
+        (code === 'MN40001' && s.subject && /minor/i.test(s.subject))
+      );
+
+      const sectionFaculty = matchedSlot?.faculty || subj.faculty || 'School Faculty';
+      const sectionRoom = matchedSlot?.room || subj.classroom || 'Lecture Hall';
+
       currentSemesterSubjects.push({
         ...subj,
         isElective: false,
-        allottedFaculty: subj.faculty,
-        allottedRoom: subj.classroom,
+        allottedFaculty: sectionFaculty,
+        allottedRoom: sectionRoom,
         attendancePercentage: pct,
         attendanceStatus: status
       });
@@ -346,11 +382,20 @@ export async function getStudentEnrolledSubjects(userId: string): Promise<Studen
     if (pct !== null) {
       status = pct >= 75 ? 'NORMAL' : pct >= 60 ? 'WARNING' : 'CRITICAL';
     }
+
+    const electiveFaculty = student.electiveFaculty || 
+      (student.electiveSection && ELECTIVE_SECTION_MAP[student.electiveSection]?.defaultFaculty) ||
+      'Prof. Proshikshya Mukherjee';
+
+    const electiveRoom = student.electiveRoom || 
+      (student.electiveSection && ELECTIVE_SECTION_MAP[student.electiveSection]?.defaultRoom) ||
+      'CL-A-06';
+
     currentSemesterSubjects.push({
       ...electiveSubj,
       isElective: true,
-      allottedFaculty: student.electiveFaculty || electiveSubj.faculty,
-      allottedRoom: student.electiveRoom || electiveSubj.classroom,
+      allottedFaculty: electiveFaculty,
+      allottedRoom: electiveRoom,
       electiveSection: student.electiveSection || undefined,
       attendancePercentage: pct,
       attendanceStatus: status

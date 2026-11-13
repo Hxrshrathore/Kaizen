@@ -11,7 +11,7 @@ import { GoogleGenAI } from "@google/genai";
 export type TaskWeight = "light" | "medium" | "heavy" | "vision" | "batch";
 
 export interface ModelConfig {
-  provider: "local" | "gemini" | "openrouter";
+  provider: "local" | "gemini" | "openrouter" | "nvidia";
   model: string;
   maxTokens: number;
   costPer1kTokens: number;
@@ -20,7 +20,7 @@ export interface ModelConfig {
 export interface RouterResult {
   text: string;
   model: string;
-  provider: "local" | "gemini" | "openrouter";
+  provider: "local" | "gemini" | "openrouter" | "nvidia";
   latencyMs: number;
   costEst: number;
 }
@@ -32,17 +32,20 @@ export const MODEL_CASCADE: Record<TaskWeight, ModelConfig[]> = {
     { provider: "openrouter", model: "openrouter/free", maxTokens: 1024, costPer1kTokens: 0 },
   ],
   medium: [
+    { provider: "nvidia", model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", maxTokens: 8192, costPer1kTokens: 0 },
     { provider: "gemini", model: "gemini-flash-lite-latest", maxTokens: 2048, costPer1kTokens: 0 },
     { provider: "local", model: "kaizen-tutor-3b", maxTokens: 2048, costPer1kTokens: 0 },
     { provider: "gemini", model: "gemini-2.5-flash", maxTokens: 2048, costPer1kTokens: 0 },
     { provider: "openrouter", model: "openrouter/free", maxTokens: 4096, costPer1kTokens: 0 },
   ],
   heavy: [
+    { provider: "nvidia", model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", maxTokens: 8192, costPer1kTokens: 0 },
     { provider: "gemini", model: "gemini-2.5-flash", maxTokens: 8192, costPer1kTokens: 0.075 },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct", maxTokens: 8192, costPer1kTokens: 0.12 },
     { provider: "gemini", model: "gemini-pro-latest", maxTokens: 8192, costPer1kTokens: 0.30 },
   ],
   vision: [
+    { provider: "nvidia", model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", maxTokens: 4096, costPer1kTokens: 0 },
     { provider: "gemini", model: "gemini-flash-lite-latest", maxTokens: 4096, costPer1kTokens: 0 },
     { provider: "gemini", model: "gemini-2.5-flash", maxTokens: 8192, costPer1kTokens: 0.075 },
   ],
@@ -142,6 +145,50 @@ async function callOpenRouter(modelName: string, prompt: string, systemPrompt?: 
 }
 
 /**
+ * Executes prompt against NVIDIA NIM API
+ */
+async function callNvidiaNim(modelName: string, prompt: string, systemPrompt?: string, maxTokens: number = 8192): Promise<string> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) {
+    throw new Error("NVIDIA_API_KEY is not configured");
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+  messages.push({ role: "user", content: prompt });
+
+  const resp = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.6,
+      top_p: 0.95
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`NVIDIA NIM (${modelName}) failed [${resp.status}]: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error("NVIDIA NIM returned empty content");
+  }
+  return text.trim();
+}
+
+/**
  * Priority Cascade Dispatcher
  * Automatically cascades through models until one succeeds.
  */
@@ -159,7 +206,9 @@ export async function routeToModel(options: {
   for (const config of cascade) {
     try {
       let text = "";
-      if (config.provider === "local") {
+      if (config.provider === "nvidia") {
+        text = await callNvidiaNim(config.model, options.prompt, options.systemPrompt, config.maxTokens);
+      } else if (config.provider === "local") {
         text = await callLocalBackend(options.prompt, config.maxTokens);
       } else if (config.provider === "gemini") {
         text = await callGemini(config.model, options.prompt, options.systemPrompt);

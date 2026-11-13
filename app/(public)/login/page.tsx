@@ -60,7 +60,7 @@ function LoginInterface() {
     googleAuthUrl.searchParams.set('client_id', clientId);
     googleAuthUrl.searchParams.set('redirect_uri', 'http://localhost:3000/api/auth/callback/google');
     googleAuthUrl.searchParams.set('response_type', 'code');
-    googleAuthUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/fitness.activity.read');
+    googleAuthUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/fitness.activity.read');
     googleAuthUrl.searchParams.set('access_type', 'offline');
     googleAuthUrl.searchParams.set('prompt', 'consent');
 

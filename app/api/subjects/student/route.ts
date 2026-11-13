@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifySession } from '@/lib/auth';
+import { db } from '@/lib/prisma';
 import { 
   getStudentEnrolledSubjects, 
   getStudentSchedule, 
@@ -79,6 +80,45 @@ export async function GET(req: Request) {
       console.warn('Classroom tasks fetch warning:', e);
     }
 
+    // 5. Fetch live Google Classroom assignments for mapped subjects
+    const classroomCourseworkBySubject: Record<string, any[]> = {};
+    try {
+      const userRecord = await db.user.findUnique({
+        where: { id: userId },
+        select: { accessToken: true, classroomMappings: true }
+      });
+
+      if (userRecord?.accessToken && userRecord.classroomMappings?.length > 0) {
+        for (const mapping of userRecord.classroomMappings) {
+          try {
+            const cwResp = await fetch(`https://classroom.googleapis.com/v1/courses/${mapping.courseId}/courseWork`, {
+              headers: { Authorization: `Bearer ${userRecord.accessToken}` },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (cwResp.ok) {
+              const cwData = await cwResp.json();
+              if (cwData.courseWork && cwData.courseWork.length > 0) {
+                classroomCourseworkBySubject[mapping.subjectCode.toUpperCase()] = cwData.courseWork.map((cw: any) => ({
+                  id: cw.id,
+                  title: cw.title,
+                  description: cw.description,
+                  workType: cw.workType,
+                  materials: cw.materials?.map((m: any) => ({
+                    title: m.driveFile?.driveFile?.title || m.link?.title || m.youtubeVideo?.title,
+                    type: m.driveFile ? 'driveFile' : m.link ? 'link' : 'video'
+                  })) || []
+                }));
+              }
+            }
+          } catch {
+            // timeout or transient network
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Classroom coursework fetch error:', e);
+    }
+
     return NextResponse.json({
       success: true,
       student: enrollment.student,
@@ -89,6 +129,7 @@ export async function GET(req: Request) {
       schedule: scheduleResult.schedule,
       allottedElective: scheduleResult.allottedElective,
       classroomTasks,
+      classroomCourseworkBySubject,
       pyqsBySubject,
       lastAttendanceReport
     });
