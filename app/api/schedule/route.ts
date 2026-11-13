@@ -4,6 +4,7 @@ import { verifySession } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { getAcademicInbox } from '@/lib/mail-service';
 import { getStudentEnrolledSubjects, ELECTIVE_SECTION_MAP } from '@/lib/subject-service';
+import { getClassroomData } from '@/lib/classroom';
 
 // Helper to normalize ECS group (supports G1-G7, ECSc1-ECSc7, ECS GROUP-01-07)
 function normalizeGroup(section: string): string {
@@ -210,6 +211,59 @@ export async function GET(req: Request) {
       }
     } catch (e) {
       console.warn('Academic items fetch warning in /api/schedule:', e);
+    }
+
+    // 3b. Fetch live Google Classroom assignments & real submission status
+    try {
+      const classroomData = await getClassroomData(userId);
+      if (classroomData && classroomData.courses) {
+        const hiddenSet = new Set(classroomData.hiddenCourseIds || []);
+        // Only include active 7th semester courses
+        const activeCourses = classroomData.courses.filter((c: any) => !hiddenSet.has(c.id));
+
+        const classroomAssignments: any[] = [];
+        for (const course of activeCourses) {
+          for (const cw of course.assignments || []) {
+            let deadline: string | null = null;
+            if (cw.dueDate) {
+              const y = cw.dueDate.year;
+              const m = String(cw.dueDate.month).padStart(2, '0');
+              const d = String(cw.dueDate.day).padStart(2, '0');
+              const hh = String(cw.dueTime?.hours || 23).padStart(2, '0');
+              const mm = String(cw.dueTime?.minutes || 59).padStart(2, '0');
+              deadline = `${y}-${m}-${d}T${hh}:${mm}:00.000Z`;
+            }
+
+            const courseCode = course.classification?.matchedSubjectCode || course.section || 'ACADEMIC';
+            const courseTitle = course.classification?.matchedSubjectName || course.name;
+
+            classroomAssignments.push({
+              id: `gc-${course.id}-${cw.id}`,
+              title: cw.title,
+              category: 'CLASSROOM',
+              urgency: cw.isLate ? 'HIGH' : 'MEDIUM',
+              courseCode,
+              deadline,
+              takeaway: cw.description ? cw.description.slice(0, 160) : `Official Google Classroom assignment for ${courseTitle}`,
+              actionItems: cw.isSubmitted ? ['Assignment submitted & turned in'] : ['Complete and submit on Google Classroom'],
+              sender: course.name,
+              source: 'Google Classroom',
+              isSubmitted: cw.isSubmitted,
+              submissionState: cw.submissionState,
+              isLate: cw.isLate,
+              assignedGrade: cw.assignedGrade,
+              maxPoints: cw.maxPoints,
+              alternateLink: cw.submissionLink || cw.alternateLink
+            });
+          }
+        }
+
+        if (classroomAssignments.length > 0) {
+          academicItems = [...classroomAssignments, ...academicItems];
+        }
+      }
+    } catch (classErr) {
+      console.warn('Google Classroom integration warning in /api/schedule:', classErr);
     }
 
     // 4. Fetch all available groups in database

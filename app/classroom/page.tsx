@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   BookOpen, Calendar, Clock, ChevronRight, Loader2, 
-  ExternalLink, FileText, AlertCircle, ArrowLeft, EyeOff, Eye
+  ExternalLink, FileText, AlertCircle, ArrowLeft, EyeOff, Eye,
+  Sparkles, CheckCircle2, AlertTriangle, Check, X, Filter,
+  Layers, RefreshCw, GraduationCap
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -24,6 +26,27 @@ interface Assignment {
     hours: number;
     minutes: number;
   };
+  maxPoints?: number | null;
+  isSubmitted: boolean;
+  submissionState: string;
+  isLate: boolean;
+  assignedGrade?: number | null;
+  submissionLink?: string | null;
+}
+
+interface CourseClassification {
+  category: 'CURRENT_SEMESTER' | 'PREVIOUS_SEMESTER' | 'AMBIGUOUS';
+  recommendedActive: boolean;
+  matchedSubjectCode: string | null;
+  matchedSubjectName: string | null;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  reason: string;
+}
+
+interface CourseStats {
+  total: number;
+  submitted: number;
+  pending: number;
 }
 
 interface Course {
@@ -33,6 +56,20 @@ interface Course {
   descriptionHeading?: string;
   alternateLink: string;
   assignments: Assignment[];
+  stats: CourseStats;
+  classification: CourseClassification;
+}
+
+interface ClassroomSummary {
+  totalCourses: number;
+  activeCount: number;
+  hiddenCount: number;
+  recommendedActiveCount: number;
+  recommendedHiddenCount: number;
+  hasUnfilteredPastCourses: boolean;
+  unfilteredPastCount: number;
+  recommendedActiveIds: string[];
+  recommendedHiddenIds: string[];
 }
 
 // --- ANIMATION WRAPPERS ---
@@ -40,67 +77,202 @@ const MotionDiv = motion.div as any;
 
 // --- COMPONENTS ---
 
-const CourseCard = ({ course, index, onClick }: { course: Course; index: number; onClick: () => void }) => (
-  <MotionDiv
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.1 }}
-    whileHover={{ y: -5, borderColor: '#ccff00' }}
-    className="bg-card border border-border p-6 flex flex-col justify-between cursor-pointer group transition-all h-full"
-    onClick={onClick}
-  >
-    <div>
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-primary/10 border border-primary/20 rounded-sm">
-          <BookOpen className="text-primary" size={20} />
-        </div>
-        <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">{course.section || 'General'}</span>
-      </div>
-      <h3 className="text-xl font-display font-bold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">{course.name}</h3>
-      <p className="text-muted-foreground text-xs font-mono mb-4 line-clamp-1">{course.descriptionHeading || 'No description'}</p>
-    </div>
-    
-    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-      <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-        {course.assignments.length} {course.assignments.length === 1 ? 'Assignment' : 'Assignments'}
-      </span>
-      <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
-    </div>
-  </MotionDiv>
-);
-
-const AssignmentItem = ({ assignment, index }: { assignment: Assignment; index: number }) => {
-  const formatDueDate = (due?: Assignment['dueDate']) => {
-    if (!due) return 'No due date';
-    const monthName = new Date(2000, due.month - 1).toLocaleString('default', { month: 'short' });
-    return `${due.day} ${monthName} ${due.year}`;
-  };
+const CourseCard = ({ 
+  course, 
+  index, 
+  isHidden, 
+  onClick 
+}: { 
+  course: Course; 
+  index: number; 
+  isHidden: boolean; 
+  onClick: () => void 
+}) => {
+  const isCurrentSem = course.classification?.category === 'CURRENT_SEMESTER';
+  const isAmbiguous = course.classification?.category === 'AMBIGUOUS';
+  const isPast = course.classification?.category === 'PREVIOUS_SEMESTER';
+  const stats = course.stats || { total: course.assignments.length, submitted: 0, pending: course.assignments.length };
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, x: -10 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className="flex items-center justify-between p-4 bg-[#151518] border border-border hover:border-input transition-colors"
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.05, 0.4) }}
+      whileHover={{ y: -4, borderColor: isCurrentSem ? '#ccff00' : '#444' }}
+      className={`bg-card border p-6 flex flex-col justify-between cursor-pointer group transition-all h-full rounded-xl relative overflow-hidden ${
+        isHidden 
+          ? 'opacity-50 border-border/40 grayscale' 
+          : isCurrentSem 
+            ? 'border-border hover:border-primary shadow-sm hover:shadow-primary/5' 
+            : 'border-border/60 hover:border-border'
+      }`}
+      onClick={onClick}
     >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-accent flex items-center justify-center shrink-0">
-          <FileText size={18} className="text-muted-foreground" />
+      {/* Top classification indicator bar */}
+      <div className={`absolute top-0 left-0 right-0 h-1 ${
+        isCurrentSem ? 'bg-primary' : isAmbiguous ? 'bg-amber-500' : 'bg-muted-foreground/30'
+      }`} />
+
+      <div>
+        {/* Header Badges */}
+        <div className="flex justify-between items-start gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {course.classification?.matchedSubjectCode && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/30">
+                {course.classification.matchedSubjectCode}
+              </span>
+            )}
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest bg-muted px-2 py-0.5 rounded border border-border">
+              {course.section || 'General'}
+            </span>
+          </div>
+
+          <div>
+            {isCurrentSem ? (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                7th Sem Active
+              </span>
+            ) : isAmbiguous ? (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                Needs Review
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                Previous Sem
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Course Title */}
+        <h3 className="text-lg font-display font-bold text-foreground mb-1.5 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+          {course.name}
+        </h3>
+
+        {/* Reason / Subtitle */}
+        <p className="text-muted-foreground text-xs font-mono mb-4 line-clamp-2 leading-relaxed">
+          {course.classification?.reason || course.descriptionHeading || 'KIIT Academic Coursework'}
+        </p>
+      </div>
+
+      {/* Footer stats */}
+      <div className="pt-3 border-t border-border flex items-center justify-between mt-auto">
+        <div className="flex items-center gap-2">
+          {stats.total === 0 ? (
+            <span className="text-[10px] text-muted-foreground font-mono">No Assignments</span>
+          ) : stats.pending === 0 ? (
+            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
+              <CheckCircle2 size={10} /> All {stats.total} Submitted
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[10px] font-mono">
+              <span className="text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                {stats.pending} Pending
+              </span>
+              <span className="text-muted-foreground">
+                • {stats.submitted} Turned In
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 text-muted-foreground group-hover:text-primary text-xs font-mono transition-colors">
+          <span>View</span>
+          <ChevronRight size={14} />
+        </div>
+      </div>
+    </MotionDiv>
+  );
+};
+
+const AssignmentItem = ({ assignment, index }: { assignment: Assignment; index: number }) => {
+  const formatDueDate = (due?: Assignment['dueDate'], time?: Assignment['dueTime']) => {
+    if (!due) return 'No due date';
+    const monthName = new Date(2000, due.month - 1).toLocaleString('default', { month: 'short' });
+    const timeStr = time ? ` @ ${String(time.hours).padStart(2, '0')}:${String(time.minutes || 0).padStart(2, '0')}` : '';
+    return `${due.day} ${monthName} ${due.year}${timeStr}`;
+  };
+
+  const isTurnedIn = assignment.isSubmitted;
+  const isLate = assignment.isLate;
+
+  return (
+    <MotionDiv
+      initial={{ opacity: 0, x: -8 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.3) }}
+      className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+        isTurnedIn 
+          ? 'bg-emerald-950/10 border-emerald-500/20' 
+          : isLate 
+            ? 'bg-rose-950/10 border-rose-500/20' 
+            : 'bg-card border-border hover:border-input'
+      }`}
+    >
+      <div className="flex items-start gap-3.5">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+          isTurnedIn 
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+            : isLate 
+              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' 
+              : 'bg-muted text-muted-foreground border border-border'
+        }`}>
+          {isTurnedIn ? <Check size={18} strokeWidth={2.5} /> : isLate ? <AlertCircle size={18} /> : <FileText size={18} />}
+        </div>
+
         <div>
-          <h4 className="text-sm font-medium text-foreground line-clamp-1">{assignment.title}</h4>
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1 uppercase tracking-wider">
-            <Calendar size={10} /> {formatDueDate(assignment.dueDate)}
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h4 className="text-sm font-semibold text-foreground line-clamp-1">
+              {assignment.title}
+            </h4>
+
+            {/* Submission Status Badge */}
+            {isTurnedIn ? (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <CheckCircle2 size={10} />
+                Turned In
+                {assignment.assignedGrade !== null && assignment.assignedGrade !== undefined && (
+                  <span className="text-foreground ml-1">({assignment.assignedGrade} pts)</span>
+                )}
+              </span>
+            ) : isLate ? (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                <AlertTriangle size={10} />
+                Late / Missing
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                <Clock size={10} />
+                Pending Submission
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Calendar size={11} />
+              {formatDueDate(assignment.dueDate, assignment.dueTime)}
+            </span>
+            {assignment.maxPoints !== null && assignment.maxPoints !== undefined && (
+              <span>• Max Points: {assignment.maxPoints}</span>
+            )}
           </div>
         </div>
       </div>
+
       <a 
-        href={assignment.alternateLink} 
+        href={assignment.submissionLink || assignment.alternateLink} 
         target="_blank" 
         rel="noopener noreferrer"
-        className="text-primary hover:text-foreground p-2 transition-colors"
+        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+          isTurnedIn 
+            ? 'bg-muted hover:bg-card text-muted-foreground hover:text-foreground border border-border' 
+            : 'bg-primary text-black hover:bg-primary/90 shadow-sm'
+        }`}
       >
-        <ExternalLink size={16} />
+        <span>{isTurnedIn ? 'View Submission' : 'Submit on Classroom'}</span>
+        <ExternalLink size={12} />
       </a>
     </MotionDiv>
   );
@@ -117,27 +289,166 @@ export default function ClassroomPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [summary, setSummary] = useState<ClassroomSummary | null>(null);
+  const [filterTab, setFilterTab] = useState<'ALL_ACTIVE' | 'PENDING' | 'TURNED_IN'>('ALL_ACTIVE');
+
+  // Confirmation Modal State
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [selectedForActive, setSelectedForActive] = useState<Set<string>>(new Set());
+  const [confirmSaving, setConfirmSaving] = useState(false);
+
+  // Fetch Classroom Data
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/classroom');
+      const data = await res.json();
+      
+      if (res.ok) {
+        setCourses(data.courses || []);
+        const hiddenSet = new Set<string>(data.hiddenCourseIds || []);
+        setHiddenCourseIds(hiddenSet);
+        setSummary(data.summary || null);
+
+        // Pre-populate modal selection with recommended active courses
+        const activeIds = (data.courses || [])
+          .filter((c: Course) => !hiddenSet.has(c.id))
+          .map((c: Course) => c.id);
+        
+        // If nothing is hidden yet, recommend 7th sem active courses
+        if (hiddenSet.size === 0 && data.summary?.recommendedActiveIds) {
+          setSelectedForActive(new Set(data.summary.recommendedActiveIds));
+        } else {
+          setSelectedForActive(new Set(activeIds));
+        }
+      } else {
+        setError(data.error || 'Failed to fetch data');
+      }
+    } catch (err: any) {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch('/api/classroom');
-        const data = await res.json();
-        
-        if (res.ok) {
-          setCourses(data.courses);
-          setHiddenCourseIds(new Set(data.hiddenCourseIds || []));
-        } else {
-          setError(data.error || 'Failed to fetch data');
-        }
-      } catch (err) {
-        setError('Network error. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchData();
   }, []);
+
+  // Open modal and pre-populate recommendations
+  const openConfirmModal = () => {
+    if (summary?.recommendedActiveIds) {
+      // Pre-select recommended 7th sem courses
+      setSelectedForActive(new Set(summary.recommendedActiveIds));
+    } else {
+      const rec = courses
+        .filter(c => c.classification?.recommendedActive)
+        .map(c => c.id);
+      setSelectedForActive(new Set(rec));
+    }
+    setIsConfirmModalOpen(true);
+  };
+
+  // Toggle course in confirmation modal
+  const toggleCourseInModal = (courseId: string) => {
+    setSelectedForActive(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) {
+        next.delete(courseId);
+      } else {
+        next.add(courseId);
+      }
+      return next;
+    });
+  };
+
+  // Select all recommended 7th sem courses
+  const selectAllRecommended = () => {
+    const recIds = courses
+      .filter(c => c.classification?.recommendedActive)
+      .map(c => c.id);
+    setSelectedForActive(new Set(recIds));
+  };
+
+  // Select all courses
+  const selectAll = () => {
+    setSelectedForActive(new Set(courses.map(c => c.id)));
+  };
+
+  // Deselect all
+  const clearAll = () => {
+    setSelectedForActive(new Set());
+  };
+
+  // Save confirmed active classrooms
+  const handleSaveActiveConfirmation = async () => {
+    try {
+      setConfirmSaving(true);
+      const activeCourseIds = Array.from(selectedForActive);
+      const hiddenCourseIdsToSave = courses
+        .filter(c => !selectedForActive.has(c.id))
+        .map(c => c.id);
+
+      const res = await fetch('/api/classroom/confirm-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activeCourseIds,
+          hiddenCourseIds: hiddenCourseIdsToSave,
+        })
+      });
+
+      const resData = await res.json();
+      if (res.ok) {
+        setHiddenCourseIds(new Set(resData.hiddenCourseIds || hiddenCourseIdsToSave));
+        setIsConfirmModalOpen(false);
+        // Refresh to update summary stats
+        await fetchData();
+      } else {
+        alert(resData.error || 'Failed to save configuration');
+      }
+    } catch (err: any) {
+      alert('Error saving active classrooms: ' + err.message);
+    } finally {
+      setConfirmSaving(false);
+    }
+  };
+
+  // Single course hide / unhide toggle
+  const handleToggleHideCourse = async (courseId: string) => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    const isHidden = hiddenCourseIds.has(courseId);
+    try {
+      const res = await fetch(`/api/classroom/hide${isHidden ? `?courseId=${courseId}` : ''}`, {
+        method: isHidden ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: isHidden ? undefined : JSON.stringify({ courseId })
+      });
+      if (res.ok) {
+        const next = new Set(hiddenCourseIds);
+        if (isHidden) next.delete(courseId);
+        else next.add(courseId);
+        setHiddenCourseIds(next);
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Filter courses for display
+  const displayedCourses = useMemo(() => {
+    return courses.filter(course => {
+      const isHidden = hiddenCourseIds.has(course.id);
+      if (!showHidden && isHidden) return false;
+      return true;
+    });
+  }, [courses, hiddenCourseIds, showHidden]);
+
+  // Count active vs hidden
+  const activeCount = courses.filter(c => !hiddenCourseIds.has(c.id)).length;
+  const hiddenCount = hiddenCourseIds.size;
 
   if (loading) {
     return (
@@ -146,14 +457,14 @@ export default function ClassroomPage() {
           <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin" />
           <Loader2 className="absolute inset-0 m-auto text-primary/50 animate-pulse" size={24} />
         </div>
-        <p className="text-xs uppercase tracking-[0.3em] animate-pulse">Syncing Neural Link to Google Classroom...</p>
+        <p className="text-xs uppercase tracking-[0.3em] animate-pulse">Syncing Google Classroom &amp; Submissions...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto mt-20 p-8 border border-red-900/30 bg-red-900/5 text-center">
+      <div className="max-w-md mx-auto mt-20 p-8 border border-red-900/30 bg-red-900/5 text-center rounded-2xl">
         <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
         <h2 className="text-xl font-display font-bold text-foreground mb-2 tracking-tight uppercase">Connection Error</h2>
         <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
@@ -164,7 +475,7 @@ export default function ClassroomPage() {
         <div className="flex flex-col gap-3">
           <button 
             onClick={() => router.push('/login')}
-            className="w-full bg-white text-black font-bold h-12 flex items-center justify-center gap-2 hover:bg-[#e0e0e0] transition-all uppercase tracking-widest text-xs"
+            className="w-full bg-white text-black font-bold h-12 flex items-center justify-center gap-2 hover:bg-[#e0e0e0] transition-all uppercase tracking-widest text-xs rounded-xl"
           >
             Re-Authenticate
           </button>
@@ -179,79 +490,155 @@ export default function ClassroomPage() {
     );
   }
 
+  // Split courses for modal
+  const recommended7thSemCourses = courses.filter(c => c.classification?.recommendedActive);
+  const ambiguousCourses = courses.filter(c => c.classification?.category === 'AMBIGUOUS');
+  const pastSemesterCourses = courses.filter(c => c.classification?.category === 'PREVIOUS_SEMESTER');
+
   return (
     <div className="max-w-7xl mx-auto pt-8 pb-32 px-4">
       
       {/* Navigation Header */}
-      <div className="mb-12 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
           <button 
             onClick={() => selectedCourse ? setSelectedCourse(null) : router.push('/dashboard')}
-            className="p-2 border border-border bg-card hover:border-primary text-muted-foreground hover:text-primary transition-all"
+            className="p-2.5 border border-border bg-card hover:border-primary text-muted-foreground hover:text-primary transition-all rounded-xl"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl md:text-5xl font-display font-bold text-foreground uppercase tracking-tight">
-              {selectedCourse ? 'Course' : 'Google'} <span className="text-primary">{selectedCourse ? 'Details' : 'Classroom'}</span>
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground uppercase tracking-tight">
+                {selectedCourse ? selectedCourse.name : 'Google Classroom'}
+              </h1>
+              {!selectedCourse && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                  7th Semester
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground font-mono text-xs uppercase tracking-[0.2em] mt-1">
-              {selectedCourse ? selectedCourse.name : `${courses.length} Total Courses Connected`}
+              {selectedCourse 
+                ? (selectedCourse.section || 'Active Coursework') 
+                : `${activeCount} Active 7th-Sem Courses • ${hiddenCount} Hidden Past Courses`}
             </p>
           </div>
         </div>
 
         {!selectedCourse && (
-          <button
-            onClick={() => setShowHidden(!showHidden)}
-            className={`flex items-center gap-2 px-4 py-2 border font-mono text-xs uppercase tracking-widest transition-all ${
-              showHidden 
-                ? 'bg-primary/10 border-primary/30 text-primary' 
-                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-input'
-            }`}
-          >
-            {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-            {showHidden ? 'Hide Hidden' : 'Show Hidden'}
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Auto-Detect 7th Sem Classrooms Button */}
+            <button
+              onClick={openConfirmModal}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+            >
+              <Sparkles size={14} />
+              <span>Auto-Detect 7th Sem</span>
+            </button>
+
+            {/* Toggle Show Hidden */}
+            <button
+              onClick={() => setShowHidden(!showHidden)}
+              className={`flex items-center gap-2 px-3.5 py-2 border rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
+                showHidden 
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                  : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-input'
+              }`}
+            >
+              {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+              <span>{showHidden ? 'Showing All' : `Hidden (${hiddenCount})`}</span>
+            </button>
+
+            {/* Refresh Sync */}
+            <button
+              onClick={fetchData}
+              className="p-2 border border-border bg-card rounded-xl text-muted-foreground hover:text-primary hover:border-primary transition-all"
+              title="Refresh Classroom Data"
+            >
+              <RefreshCw size={15} />
+            </button>
+          </div>
         )}
       </div>
 
+      {/* Alert Banner: Prompt when past semester courses are still visible */}
+      {!selectedCourse && summary?.hasUnfilteredPastCourses && !showHidden && (
+        <MotionDiv
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 p-4 rounded-2xl bg-amber-500/[0.07] border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">
+                {summary.unfilteredPastCount} Previous Semester Classrooms Detected
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                University professors rarely archive past courses. Auto-detect your active 7th semester papers so completed 5th/6th sem assignments don't clutter your view.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={openConfirmModal}
+            className="px-4 py-2 rounded-xl bg-amber-400 text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-amber-300 transition-colors shrink-0 shadow-sm"
+          >
+            Review &amp; Auto-Filter
+          </button>
+        </MotionDiv>
+      )}
+
+      {/* Main Content Area */}
       <AnimatePresence mode="wait">
-        {!selectedCourse ? (() => {
-          const visibleCourses = courses.filter(c => showHidden || !hiddenCourseIds.has(c.id));
-          return (
+        {!selectedCourse ? (
           <MotionDiv
             key="grid"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="space-y-6"
           >
-            {visibleCourses.length > 0 ? (
-              visibleCourses.map((course, idx) => (
-                <div key={course.id} className="relative h-full">
-                  {hiddenCourseIds.has(course.id) && (
-                    <div className="absolute -top-2 -right-2 z-10 bg-red-900 text-foreground text-[9px] px-2 py-1 font-mono uppercase tracking-widest border border-red-500/30">
-                      Hidden
-                    </div>
-                  )}
-                  <div className={hiddenCourseIds.has(course.id) ? 'opacity-50 grayscale h-full' : 'h-full'}>
+            {displayedCourses.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {displayedCourses.map((course, idx) => (
+                  <div key={course.id} className="relative h-full">
+                    {hiddenCourseIds.has(course.id) && (
+                      <div className="absolute top-2 right-2 z-10 bg-muted/90 backdrop-blur-sm text-muted-foreground text-[9px] px-2 py-0.5 font-mono uppercase tracking-widest rounded border border-border">
+                        Hidden
+                      </div>
+                    )}
                     <CourseCard 
                       course={course} 
                       index={idx} 
+                      isHidden={hiddenCourseIds.has(course.id)}
                       onClick={() => setSelectedCourse(course)} 
                     />
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
-              <div className="col-span-full py-32 text-center border border-dashed border-border">
-                <BookOpen className="text-[#222] mx-auto mb-4" size={64} />
-                <p className="text-muted-foreground font-mono uppercase tracking-[0.2em]">No Courses Displayed</p>
+              <div className="py-24 text-center border-2 border-dashed border-border rounded-2xl p-8">
+                <GraduationCap className="text-muted-foreground/30 mx-auto mb-4" size={48} />
+                <h3 className="text-lg font-display font-bold text-foreground uppercase tracking-tight mb-1">
+                  No Active Courses Displayed
+                </h3>
+                <p className="text-xs font-mono text-muted-foreground max-w-md mx-auto mb-6">
+                  All courses may currently be hidden. Click below to auto-detect your 7th semester classrooms or toggle &quot;Showing All&quot;.
+                </p>
+                <button
+                  onClick={openConfirmModal}
+                  className="px-4 py-2 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all shadow-sm"
+                >
+                  Configure Active Classrooms
+                </button>
               </div>
             )}
           </MotionDiv>
-        );})() : (
+        ) : (
           <MotionDiv
             key="detail"
             initial={{ opacity: 0, x: 20 }}
@@ -261,61 +648,72 @@ export default function ClassroomPage() {
           >
             {/* Sidebar / Info */}
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-card border border-border p-8">
-                <div className="text-[10px] text-primary font-mono uppercase tracking-[0.3em] mb-4">Course Protocol</div>
-                <h2 className="text-2xl font-display font-bold text-foreground mb-6 uppercase leading-tight">{selectedCourse.name}</h2>
+              <div className="bg-card border border-border p-6 rounded-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] text-primary font-mono uppercase tracking-[0.2em] font-bold">
+                    Course Protocol
+                  </span>
+                  {selectedCourse.classification?.matchedSubjectCode && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                      {selectedCourse.classification.matchedSubjectCode}
+                    </span>
+                  )}
+                </div>
+
+                <h2 className="text-xl font-display font-bold text-foreground mb-3 leading-tight">
+                  {selectedCourse.name}
+                </h2>
+
+                <p className="text-xs font-mono text-muted-foreground mb-6 leading-relaxed">
+                  {selectedCourse.classification?.reason || selectedCourse.descriptionHeading || 'Enrolled Academic Coursework'}
+                </p>
                 
-                <div className="space-y-4 mb-8">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground font-mono uppercase">Section</span>
-                    <span className="text-foreground font-mono">{selectedCourse.section || 'N/A'}</span>
+                <div className="space-y-3 mb-6 p-4 rounded-xl bg-muted/30 border border-border text-xs font-mono">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground uppercase">Section</span>
+                    <span className="text-foreground font-bold">{selectedCourse.section || 'General'}</span>
                   </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground font-mono uppercase">Assignments</span>
-                    <span className="text-foreground font-mono">{selectedCourse.assignments.length}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground uppercase">Total Work</span>
+                    <span className="text-foreground font-bold">{selectedCourse.assignments.length} Assignments</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground uppercase">Turned In</span>
+                    <span className="text-emerald-400 font-bold">{selectedCourse.stats?.submitted || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground uppercase">Pending Submission</span>
+                    <span className="text-amber-400 font-bold">{selectedCourse.stats?.pending || 0}</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2.5">
                   <a 
                     href={selectedCourse.alternateLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full h-12 bg-white text-black font-bold flex items-center justify-center gap-2 hover:bg-[#e0e0e0] transition-all uppercase tracking-widest text-[10px]"
+                    className="w-full h-11 bg-white text-black font-bold flex items-center justify-center gap-2 hover:bg-[#e0e0e0] transition-all uppercase tracking-widest text-xs rounded-xl"
                   >
                     Open in Classroom <ExternalLink size={14} />
                   </a>
 
                   <button
-                    onClick={async () => {
-                      if (actionLoading) return;
-                      setActionLoading(true);
-                      const isHidden = hiddenCourseIds.has(selectedCourse.id);
-                      try {
-                        const res = await fetch(`/api/classroom/hide${isHidden ? `?courseId=${selectedCourse.id}` : ''}`, {
-                          method: isHidden ? 'DELETE' : 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: isHidden ? undefined : JSON.stringify({ courseId: selectedCourse.id })
-                        });
-                        if (res.ok) {
-                          const newHidden = new Set(hiddenCourseIds);
-                          if (isHidden) newHidden.delete(selectedCourse.id);
-                          else newHidden.add(selectedCourse.id);
-                          setHiddenCourseIds(newHidden);
-                        }
-                      } finally {
-                        setActionLoading(false);
-                      }
-                    }}
+                    onClick={() => handleToggleHideCourse(selectedCourse.id)}
                     disabled={actionLoading}
-                    className={`w-full h-10 border font-bold flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-[10px] ${
+                    className={`w-full h-10 border font-bold flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-[11px] rounded-xl ${
                       hiddenCourseIds.has(selectedCourse.id)
                         ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-                        : 'bg-[#151518] border-input text-muted-foreground hover:text-foreground hover:border-[#555]'
+                        : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-input'
                     }`}
                   >
-                    {actionLoading ? <Loader2 className="animate-spin" size={14} /> : (hiddenCourseIds.has(selectedCourse.id) ? <Eye size={14} /> : <EyeOff size={14} />)}
-                    {hiddenCourseIds.has(selectedCourse.id) ? 'Unhide Course' : 'Hide from Dashboard'}
+                    {actionLoading ? (
+                      <Loader2 className="animate-spin" size={14} />
+                    ) : hiddenCourseIds.has(selectedCourse.id) ? (
+                      <Eye size={14} />
+                    ) : (
+                      <EyeOff size={14} />
+                    )}
+                    <span>{hiddenCourseIds.has(selectedCourse.id) ? 'Unhide Course' : 'Hide from 7th Sem View'}</span>
                   </button>
                 </div>
               </div>
@@ -323,32 +721,333 @@ export default function ClassroomPage() {
 
             {/* Assignments List */}
             <div className="lg:col-span-8">
-              <div className="bg-card border border-border overflow-hidden">
-                <div className="p-6 border-b border-border flex items-center justify-between bg-muted">
-                  <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium font-display leading-none">CourseWork Assignments</h3>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                    <span className="text-[10px] text-muted-foreground font-mono font-bold uppercase tracking-widest leading-none">Live Feed</span>
+              <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/20">
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-sm uppercase tracking-wider text-foreground font-bold font-display leading-none">
+                      Coursework &amp; Submissions
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-muted text-muted-foreground border border-border">
+                      {selectedCourse.assignments.length} Total
+                    </span>
+                  </div>
+
+                  {/* Submission Filter Tabs */}
+                  <div className="flex items-center gap-1.5 text-xs font-mono">
+                    <button
+                      onClick={() => setFilterTab('ALL_ACTIVE')}
+                      className={`px-2.5 py-1 rounded-lg transition-colors ${
+                        filterTab === 'ALL_ACTIVE' ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setFilterTab('PENDING')}
+                      className={`px-2.5 py-1 rounded-lg transition-colors ${
+                        filterTab === 'PENDING' ? 'bg-amber-400 text-black font-bold' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Pending ({selectedCourse.stats?.pending || 0})
+                    </button>
+                    <button
+                      onClick={() => setFilterTab('TURNED_IN')}
+                      className={`px-2.5 py-1 rounded-lg transition-colors ${
+                        filterTab === 'TURNED_IN' ? 'bg-emerald-400 text-black font-bold' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Turned In ({selectedCourse.stats?.submitted || 0})
+                    </button>
                   </div>
                 </div>
                 
-                <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  {selectedCourse.assignments.length > 0 ? (
-                    selectedCourse.assignments.map((assignment, idx) => (
+                <div className="p-5 space-y-3 max-h-[72vh] overflow-y-auto custom-scrollbar">
+                  {(() => {
+                    const filteredWork = selectedCourse.assignments.filter(a => {
+                      if (filterTab === 'PENDING') return !a.isSubmitted;
+                      if (filterTab === 'TURNED_IN') return a.isSubmitted;
+                      return true;
+                    });
+
+                    if (filteredWork.length === 0) {
+                      return (
+                        <div className="py-16 text-center text-muted-foreground font-mono text-xs">
+                          <CheckCircle2 className="mx-auto mb-3 text-emerald-400/40" size={36} />
+                          <p>
+                            {filterTab === 'PENDING' 
+                              ? 'All assignments in this course are submitted!' 
+                              : filterTab === 'TURNED_IN' 
+                                ? 'No submitted assignments in this filter.' 
+                                : 'No assignments posted for this classroom.'}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return filteredWork.map((assignment, idx) => (
                       <AssignmentItem key={assignment.id} assignment={assignment} index={idx} />
-                    ))
-                  ) : (
-                    <div className="py-12 text-center opacity-30">
-                      <FileText className="mx-auto mb-4" size={48} />
-                      <p className="text-sm font-mono uppercase tracking-widest">No assignments posted</p>
-                    </div>
-                  )}
+                    ));
+                  })()}
                 </div>
               </div>
             </div>
           </MotionDiv>
         )}
       </AnimatePresence>
+
+      {/* ── INTERACTIVE 7TH SEMESTER CONFIRMATION MODAL ── */}
+      <AnimatePresence>
+        {isConfirmModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <MotionDiv
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-card border border-border w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-border flex items-start justify-between gap-4 bg-muted/20">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="text-primary" size={18} />
+                    <h2 className="text-xl font-display font-bold text-foreground">
+                      Auto-Detect &amp; Confirm 7th Semester Classrooms
+                    </h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono leading-relaxed">
+                    Review and confirm which classrooms belong to your active 7th semester. Historical and unselected courses will be hidden from your schedule and dashboard.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="p-2 text-muted-foreground hover:text-foreground rounded-lg border border-border hover:border-input transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Quick Action Buttons */}
+              <div className="px-6 py-3 border-b border-border bg-muted/10 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
+                <span className="text-muted-foreground">
+                  Quick Select:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={selectAllRecommended}
+                    className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors font-bold"
+                  >
+                    Recommended (7th Sem Only)
+                  </button>
+                  <button
+                    onClick={selectAll}
+                    className="px-2.5 py-1 rounded-lg bg-card border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={clearAll}
+                    className="px-2.5 py-1 rounded-lg bg-card border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body: Scrollable Course Categories */}
+              <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                
+                {/* 1. Recommended 7th Sem Classrooms */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
+                    <h3 className="text-xs uppercase font-mono font-bold tracking-wider text-emerald-400">
+                      Recommended 7th-Semester Classrooms ({recommended7thSemCourses.length})
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    {recommended7thSemCourses.map(course => {
+                      const isSelected = selectedForActive.has(course.id);
+                      return (
+                        <div
+                          key={course.id}
+                          onClick={() => toggleCourseInModal(course.id)}
+                          className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                            isSelected 
+                              ? 'bg-emerald-950/15 border-emerald-500/40 text-foreground' 
+                              : 'bg-card border-border/70 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                              isSelected ? 'bg-primary border-primary text-black' : 'border-border'
+                            }`}>
+                              {isSelected && <Check size={13} strokeWidth={3} />}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-foreground">{course.name}</span>
+                                {course.classification?.matchedSubjectCode && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                                    {course.classification.matchedSubjectCode}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                                {course.classification?.reason}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                            {course.assignments.length} assignments
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Ambiguous / Review Needed Classrooms */}
+                {ambiguousCourses.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle size={16} className="text-amber-400" />
+                      <h3 className="text-xs uppercase font-mono font-bold tracking-wider text-amber-400">
+                        Needs Confirmation / Ambiguous ({ambiguousCourses.length})
+                      </h3>
+                    </div>
+
+                    <div className="space-y-2">
+                      {ambiguousCourses.map(course => {
+                        const isSelected = selectedForActive.has(course.id);
+                        return (
+                          <div
+                            key={course.id}
+                            onClick={() => toggleCourseInModal(course.id)}
+                            className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                              isSelected 
+                                ? 'bg-amber-950/20 border-amber-500/40 text-foreground' 
+                                : 'bg-card border-border/70 hover:border-border'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                                isSelected ? 'bg-amber-400 border-amber-400 text-black' : 'border-border'
+                              }`}>
+                                {isSelected && <Check size={13} strokeWidth={3} />}
+                              </div>
+
+                              <div>
+                                <span className="font-semibold text-sm text-foreground">{course.name}</span>
+                                <p className="text-[11px] font-mono text-amber-400/80 mt-0.5">
+                                  {course.classification?.reason}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                              {course.assignments.length} assignments
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Previous Semester & Backlog Classrooms (Will be hidden) */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Layers size={16} className="text-muted-foreground" />
+                    <h3 className="text-xs uppercase font-mono font-bold tracking-wider text-muted-foreground">
+                      Previous Semesters &amp; Inactive Classrooms ({pastSemesterCourses.length})
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    {pastSemesterCourses.map(course => {
+                      const isSelected = selectedForActive.has(course.id);
+                      return (
+                        <div
+                          key={course.id}
+                          onClick={() => toggleCourseInModal(course.id)}
+                          className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                            isSelected 
+                              ? 'bg-card border-primary/30 text-foreground' 
+                              : 'bg-muted/10 border-border/40 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                              isSelected ? 'bg-primary border-primary text-black' : 'border-border'
+                            }`}>
+                              {isSelected && <Check size={13} strokeWidth={3} />}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-foreground">{course.name}</span>
+                                <span className="text-[9px] font-mono text-muted-foreground uppercase px-1.5 py-0.2 rounded bg-muted">
+                                  {course.section || 'Past Sem'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                                {course.classification?.reason}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                            {course.assignments.length} assignments
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-xs font-mono text-muted-foreground">
+                  <span className="text-primary font-bold">{selectedForActive.size}</span> Active Classrooms Selected •{' '}
+                  <span className="text-foreground">{courses.length - selectedForActive.size}</span> will be hidden
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setIsConfirmModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-border text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveActiveConfirmation}
+                    disabled={confirmSaving}
+                    className="px-5 py-2 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all flex items-center gap-2 shadow-sm shadow-primary/20"
+                  >
+                    {confirmSaving ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        <span>Confirm &amp; Sync Active Classrooms</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </MotionDiv>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

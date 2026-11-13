@@ -38,6 +38,12 @@ interface AcademicItem {
   source: string;
   day?: string;
   isCompleted?: boolean;
+  isSubmitted?: boolean;
+  submissionState?: string;
+  isLate?: boolean;
+  assignedGrade?: number | null;
+  maxPoints?: number | null;
+  alternateLink?: string | null;
   attendanceData?: {
     reportDate: string;
     rollNumber?: string;
@@ -192,12 +198,17 @@ export default function SchedulerPage() {
         fetch('/api/attendance')
       ]);
 
+      let allAcademicItems: AcademicItem[] = [];
+
       if (schedRes.status === 'fulfilled' && schedRes.value.ok) {
         const sdata = await schedRes.value.json();
         if (sdata.schedule) setSchedule(sdata.schedule);
         if (sdata.normalizedGroup) setActiveGroup(sdata.normalizedGroup);
         if (sdata.allottedElective) setAllottedElective(sdata.allottedElective);
         if (sdata.lastAttendanceReport) setAttendanceReport(sdata.lastAttendanceReport);
+        if (sdata.academicItems && sdata.academicItems.length > 0) {
+          allAcademicItems = [...sdata.academicItems];
+        }
       }
 
       if (subjRes.status === 'fulfilled' && subjRes.value.ok) {
@@ -242,7 +253,24 @@ export default function SchedulerPage() {
         }
       }
 
-      setAcademicItems(emailItems);
+      // Merge email items avoiding duplicate titles with live classroom assignments
+      const existingTitles = new Set(allAcademicItems.map(i => i.title.toLowerCase().trim()));
+      for (const item of emailItems) {
+        if (!existingTitles.has(item.title.toLowerCase().trim())) {
+          allAcademicItems.push(item);
+        }
+      }
+
+      setAcademicItems(allAcademicItems);
+
+      // Auto initialize completed state for turned in assignments
+      const autoCompleted: Record<string, boolean> = {};
+      for (const item of allAcademicItems) {
+        if (item.isSubmitted) {
+          autoCompleted[item.id] = true;
+        }
+      }
+      setCompletedItems(prev => ({ ...autoCompleted, ...prev }));
       setLastSyncedText('Just now');
       if (forceSync) {
         showToast('Schedule & attendance synchronized with Google Classroom & @kiit.ac.in!');
@@ -837,6 +865,15 @@ export default function SchedulerPage() {
                               }`}>
                                 {isExam ? 'EXAMINATION' : 'ASSIGNMENT'}
                               </span>
+                              {item.isSubmitted ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                  ✓ Turned In
+                                </span>
+                              ) : item.category === 'CLASSROOM' ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                  Pending Submission
+                                </span>
+                              ) : null}
                               {item.courseCode && (
                                 <span className="text-[10px] font-mono text-muted-foreground">
                                   {item.courseCode}
@@ -862,6 +899,18 @@ export default function SchedulerPage() {
                         </div>
 
                         <div className="flex items-center gap-2 self-end sm:self-center">
+                          {item.alternateLink && (
+                            <a
+                              href={item.alternateLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-mono border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                              title="Open in Google Classroom"
+                            >
+                              <span>Classroom</span>
+                              <ExternalLink size={11} />
+                            </a>
+                          )}
                           <button
                             onClick={() => handleToggleComplete(item.id)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-colors font-bold ${
@@ -1114,6 +1163,15 @@ export default function SchedulerPage() {
                         }`}>
                           {item.category}
                         </span>
+                        {item.isSubmitted ? (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                            ✓ Turned In
+                          </span>
+                        ) : item.category === 'CLASSROOM' ? (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                            Pending
+                          </span>
+                        ) : null}
                         <span className="text-[10px] font-mono text-muted-foreground">
                           {item.sender}
                         </span>
@@ -1141,17 +1199,30 @@ export default function SchedulerPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleToggleComplete(item.id)}
-                      className={`p-2 rounded-lg border transition-colors shrink-0 ${
-                        isDone 
-                          ? 'bg-primary border-primary text-black' 
-                          : 'border-border hover:border-primary/60 text-muted-foreground hover:text-foreground'
-                      }`}
-                      title={isDone ? 'Mark Pending' : 'Mark Completed'}
-                    >
-                      <Check size={14} />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.alternateLink && (
+                        <a
+                          href={item.alternateLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg border border-border hover:border-input text-muted-foreground hover:text-foreground transition-colors"
+                          title="Open in Google Classroom"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleToggleComplete(item.id)}
+                        className={`p-2 rounded-lg border transition-colors ${
+                          isDone 
+                            ? 'bg-primary border-primary text-black' 
+                            : 'border-border hover:border-primary/60 text-muted-foreground hover:text-foreground'
+                        }`}
+                        title={isDone ? 'Mark Pending' : 'Mark Completed'}
+                      >
+                        <Check size={14} />
+                      </button>
+                    </div>
                   </div>
                 );
               })

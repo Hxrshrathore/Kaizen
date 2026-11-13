@@ -22,7 +22,10 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       courses: classroomData.courses,
-      hiddenCourseIds: classroomData.hiddenCourseIds 
+      hiddenCourseIds: classroomData.hiddenCourseIds,
+      studentProfile: classroomData.studentProfile,
+      enrolledSubjects: classroomData.enrolledSubjects,
+      summary: classroomData.summary
     });
 
   } catch (error: any) {
