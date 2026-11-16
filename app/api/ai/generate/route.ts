@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { ensureBackendRunning } from "@/lib/backend-manager";
 import { GoogleGenAI } from "@google/genai";
+import { 
+  CandidateQuestion, 
+  solveCombinatorialExamination, 
+  formatCombinatorialExaminerPrompt 
+} from "@/lib/exam-combinatorial-engine";
 
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
 
@@ -20,13 +25,15 @@ function textToSparse(text: string) {
 async function retrieveVectorGrounding(
   queryText: string,
   subjectCode?: string,
-  subject?: string
-): Promise<{ groundingText: string; count: number }> {
+  subject?: string,
+  examType: "mid_sem" | "end_sem" = "end_sem"
+): Promise<{ groundingText: string; count: number; blueprint?: any }> {
   const upstashUrl = process.env.UPSTASH_VECTOR_REST_URL;
   const upstashToken = process.env.UPSTASH_VECTOR_REST_TOKEN;
   const geminiKey = process.env.GEMINI_API_KEY;
 
-  const retrievedQuestions: string[] = [];
+  const candidates: CandidateQuestion[] = [];
+  const seenTexts = new Set<string>();
 
   const isEpp = /ex40003|hs40001/i.test(subjectCode || "") || /professional|economics/i.test(subject || "");
   const isTesting = /cs40003/i.test(subjectCode || "") || /testing|automation/i.test(subject || "");
@@ -47,7 +54,7 @@ async function retrieveVectorGrounding(
         const queryBody: any = {
           vector,
           sparseVector,
-          topK: 10,
+          topK: 12,
           includeMetadata: true,
         };
         if (subjectCode) {
@@ -68,8 +75,20 @@ async function retrieveVectorGrounding(
           if (Array.isArray(queryData.result)) {
             for (const item of queryData.result) {
               const q = item.metadata?.question;
-              if (q && !retrievedQuestions.includes(q)) {
-                retrievedQuestions.push(q);
+              if (q && !seenTexts.has(q)) {
+                seenTexts.add(q);
+                candidates.push({
+                  id: item.id || `vec_${candidates.length}`,
+                  text: q,
+                  marks: Number(item.metadata?.marks) || 10,
+                  co: (item.metadata?.co as any) || "CO1",
+                  bloomLevel: (item.metadata?.bloomLevel as any) || "L3_APPLY",
+                  topic: item.metadata?.module || item.metadata?.topic || subject || "Core Topic",
+                  module: item.metadata?.module || "Curriculum",
+                  recurrenceScore: Number(item.score) || 0.85,
+                  year: item.metadata?.year,
+                  source: item.metadata?.source,
+                });
               }
             }
           }
@@ -92,50 +111,45 @@ async function retrieveVectorGrounding(
         ...dbFilter,
         status: "APPROVED",
       },
-      take: 12,
+      take: 15,
       orderBy: { createdAt: "desc" },
     });
 
     for (const q of dbQuestions) {
       const qText = q.correctedText || q.rawOcrText;
-      if (qText && !retrievedQuestions.includes(qText)) {
-        retrievedQuestions.push(qText);
+      if (qText && !seenTexts.has(qText)) {
+        seenTexts.add(qText);
+        candidates.push({
+          id: q.id,
+          text: qText,
+          marks: 10,
+          co: "CO2",
+          bloomLevel: "L3_APPLY",
+          topic: q.subject || subject || "Curriculum",
+          module: q.sourcePdf || "Approved Question Bank",
+          recurrenceScore: 0.88,
+          year: q.year || undefined,
+          source: q.sourcePdf || undefined,
+        });
       }
     }
   } catch (dbErr) {
     console.warn("NeonDB question bank query warning:", dbErr);
   }
 
-  if (retrievedQuestions.length === 0) return { groundingText: "", count: 0 };
+  if (candidates.length === 0) return { groundingText: "", count: 0 };
 
-  const analyticalGuidance = isEpp
-    ? "incorporate the multi-faceted questions from the retrieved question bank above (e.g., NSPE Code of Ethics & Conflict of Interest scenario, Engineering Economics NPV / Discounted Cash Flow calculation at MARR, Indian Patents Act 1970 patentability criteria & infringement analysis, Professional Negligence & Strict vs Absolute Tort Liability, Indian Contract Act 1872 / Tendering & Dispute Arbitration)."
-    : isTesting
-    ? "incorporate the multi-faceted questions (e.g., Prime Number BVC/Robust table, Bret Pettichord Schools of Testing / Block Diagram, Regression Testing Prioritization, Static vs Dynamic Testing, V-Diagram Verification/Validation)."
-    : "incorporate multi-faceted analytical questions directly synthesized from the approved question bank above.";
+  // 3. Run Constrained Combinatorial Optimization Engine
+  const blueprint = solveCombinatorialExamination(
+    candidates,
+    subjectCode || (isEpp ? "EX40003" : "CS40003"),
+    subject || (isEpp ? "Engineering Professional Practice" : "Software Testing and Automation"),
+    examType
+  );
 
-  const groundingText = `
-================================================================================
-VERIFIED DEPARTMENT QUESTION BANK GROUNDING (UPSTASH VECTOR DB & NEONDB)
-Subject Code: ${subjectCode || "EX40003"} | Subject: ${subject || "Engineering Professional Practice"}
-Retrieved ${retrievedQuestions.length} Approved Department Questions:
+  const groundingText = formatCombinatorialExaminerPrompt(blueprint);
 
-${retrievedQuestions
-  .map(
-    (q, idx) => `[Question Bank #${idx + 1}] (Standard 5 Marks Topic)
-${q}`
-  )
-  .join("\n\n")}
-
-MANDATORY EXAMINATION GENERATION INSTRUCTIONS:
-1. Ground both SECTION A (Compulsory Short Answer / 2 marks each) and SECTION B (Analytical / 10 marks each) in the questions and concepts above.
-2. For SECTION B, ${analyticalGuidance}
-3. Ensure authentic KIIT Autonomous Examination styling: Header, Course Code, Time: 3.0 Hours, Full Marks: 60, Section A (Questions 1(a)-1(e)), and Section B (Questions 2-5 with [CO1]-[CO5] tags).
-4. Strictly do NOT output any section placeholders, temporary draft marks, or 'ECS GROUP-03'.
-================================================================================
-`;
-
-  return { groundingText, count: retrievedQuestions.length };
+  return { groundingText, count: candidates.length, blueprint };
 }
 
 export async function POST(request: Request) {
@@ -158,13 +172,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // ── 0. VECTOR DB GROUNDING (Upstash Vector + NeonDB RAG Retrieval) ──
+    // ── 0. VECTOR DB GROUNDING (Upstash Vector + NeonDB + Combinatorial ML Optimization) ──
     let vectorGroundingContext = "";
     let vectorGroundingCount = 0;
+    let combinatorialBlueprint: any = null;
     try {
-      const ragResult = await retrieveVectorGrounding(prompt, subjectCode, subject);
+      const ragResult = await retrieveVectorGrounding(
+        prompt, 
+        subjectCode, 
+        subject, 
+        examType === "mid_sem" ? "mid_sem" : "end_sem"
+      );
       vectorGroundingContext = ragResult.groundingText;
       vectorGroundingCount = ragResult.count;
+      combinatorialBlueprint = ragResult.blueprint;
     } catch (ragErr) {
       console.warn("Vector DB retrieval error:", ragErr);
     }
@@ -250,6 +271,7 @@ export async function POST(request: Request) {
             provider: "nvidia_nim",
             vector_grounded: vectorGroundingCount > 0,
             vector_grounding_count: vectorGroundingCount,
+            combinatorial_blueprint: combinatorialBlueprint,
           });
         } else {
           const errBody = await nimResp.text();
@@ -293,6 +315,7 @@ export async function POST(request: Request) {
             provider: "gemini",
             vector_grounded: vectorGroundingCount > 0,
             vector_grounding_count: vectorGroundingCount,
+            combinatorial_blueprint: combinatorialBlueprint,
           });
         } catch (geminiModelErr: any) {
           console.warn(`Gemini model ${geminiModel} failed:`, geminiModelErr.message);
