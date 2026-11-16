@@ -167,8 +167,9 @@ export async function POST(request: Request) {
       faculty = "",
       section = "",
       classroomContext = "",
-      model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-      max_tokens = 8192 
+      model = "nvidia/nemotron-3.5-bolt-e4b",
+      max_tokens = 8192,
+      stream = false
     } = body;
 
     if (!prompt) {
@@ -257,6 +258,7 @@ export async function POST(request: Request) {
             temperature: isBolt ? 0.7 : 0.6,
             top_p: 0.95,
             max_tokens: effectiveMaxTokens,
+            stream: Boolean(stream),
           };
 
           if (isBolt) {
@@ -270,13 +272,24 @@ export async function POST(request: Request) {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              Accept: stream ? "text/event-stream" : "application/json",
               Authorization: `Bearer ${nvidiaKey.trim()}`,
             },
             body: JSON.stringify(nimPayload),
-            signal: AbortSignal.timeout(45000),
+            signal: AbortSignal.timeout(60000),
           });
 
           if (nimResp.ok) {
+            if (stream && nimResp.body) {
+              return new Response(nimResp.body, {
+                headers: {
+                  "Content-Type": "text/event-stream; charset=utf-8",
+                  "Cache-Control": "no-cache, no-transform",
+                  "Connection": "keep-alive",
+                },
+              });
+            }
+
             const nimData = await nimResp.json();
             const choice = nimData.choices?.[0];
             const rawText = choice?.message?.content || "";

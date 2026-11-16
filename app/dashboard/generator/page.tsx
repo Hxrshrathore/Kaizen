@@ -48,7 +48,10 @@ export default function DashboardGeneratorPage() {
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [generatedPaper, setGeneratedPaper] = useState<string | null>(null);
   const [reasoningContent, setReasoningContent] = useState<string | null>(null);
-  const [showReasoning, setShowReasoning] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(true);
+  const [reasoningExpanded, setReasoningExpanded] = useState<boolean>(true);
+  const [isThinkingComplete, setIsThinkingComplete] = useState<boolean>(false);
+  const [thinkingDuration, setThinkingDuration] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
@@ -188,6 +191,10 @@ export default function DashboardGeneratorPage() {
     setGeneratedPaper(null);
     setReasoningContent(null);
     setGenStats(null);
+    setShowReasoning(true);
+    setReasoningExpanded(true);
+    setIsThinkingComplete(false);
+    const startTime = Date.now();
 
     const examTitle = examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination';
     const fullMarks = examType === 'mid_sem' ? 20 : 50;
@@ -299,29 +306,85 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
           section: studentSection,
           model: 'nvidia/nemotron-3.5-bolt-e4b',
           max_tokens: 8192,
+          stream: true,
           prompt: promptText
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Paper generation failed');
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Paper generation failed');
       }
 
-      const consumed = data.tokens_consumed || 4600;
-      const cleanPaper = (data.response || data.text || 'Paper generated successfully.')
-        .replace(/\s*\(?ECS GROUP-03\)?/gi, '')
-        .trim();
-      setGeneratedPaper(cleanPaper);
-      setReasoningContent(data.reasoning || null);
-      if (data.reasoning) {
-        setShowReasoning(true);
+      const contentType = res.headers.get('content-type') || '';
+      let accumulatedReasoning = '';
+      let accumulatedPaper = '';
+
+      if (contentType.includes('text/event-stream') && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            const payloadStr = trimmed.slice(6);
+            if (payloadStr === '[DONE]') continue;
+
+            try {
+              const chunk = JSON.parse(payloadStr);
+              const delta = chunk.choices?.[0]?.delta;
+              if (delta) {
+                if (delta.reasoning_content) {
+                  accumulatedReasoning += delta.reasoning_content;
+                  setReasoningContent(accumulatedReasoning);
+                }
+                if (delta.content) {
+                  accumulatedPaper += delta.content;
+                  if (!isThinkingComplete && accumulatedReasoning) {
+                    setIsThinkingComplete(true);
+                  }
+                  setGeneratedPaper(accumulatedPaper.replace(/\s*\(?ECS GROUP-03\)?/gi, ''));
+                }
+              }
+            } catch {}
+          }
+        }
+      } else {
+        const data = await res.json();
+        accumulatedPaper = (data.response || data.text || '').replace(/\s*\(?ECS GROUP-03\)?/gi, '').trim();
+        accumulatedReasoning = data.reasoning || '';
+        setGeneratedPaper(accumulatedPaper);
+        setReasoningContent(accumulatedReasoning || null);
       }
+
+      const latencySec = parseFloat(((Date.now() - startTime) / 1000).toFixed(1));
+      const consumed = Math.round((accumulatedPaper.length + accumulatedReasoning.length) / 4) || 4600;
+
+      setThinkingDuration(latencySec);
+      setGeneratedPaper(accumulatedPaper);
+      setReasoningContent(accumulatedReasoning || null);
+      setShowReasoning(true);
+      setIsThinkingComplete(true);
       setGenStats({
         tokens: consumed,
-        latency: data.time_taken || 2.4,
-        model: data.model || 'NVIDIA Nemotron 3.5 Bolt (Thinking)',
+        latency: latencySec,
+        model: 'NVIDIA Nemotron 3.5 Bolt (Live Stream)',
       });
+
+      // Auto-collapse animation: Give user 850ms to see "Thought for Xs • 5 Steps Verified",
+      // then smoothly collapse the reasoning blueprint into the banner and reveal the paper sheet!
+      setTimeout(() => {
+        setReasoningExpanded(false);
+      }, 850);
 
       // Synchronize consumed tokens with Header Quota Bar and LocalStorage
       if (typeof window !== 'undefined') {
@@ -428,60 +491,38 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
   };
 
   return (
-    <div className="max-w-7xl mx-auto pt-6 pb-24 px-4 sm:px-6">
+    <div className="h-[calc(100vh-4rem)] p-2.5 sm:p-4 flex flex-col overflow-hidden max-w-[1700px] mx-auto w-full">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
-              <Sparkles size={11} />
-              Neural RAG • KIIT Curricular Engine
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
-            AI Question Paper Generator
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground font-mono mt-1">
-            Generate official examination papers formatted strictly to KIIT University marking standards.
-          </p>
-        </div>
+      {/* Main Grid: Controls vs Output - Locked to viewport height */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 overflow-hidden">
 
-        {/* Engine Badge */}
-        <div className="flex items-center gap-2 bg-card border border-border px-3.5 py-2 rounded-xl text-xs font-mono shadow-sm">
-          <ShieldCheck size={14} className="text-emerald-400" />
-          <span className="text-muted-foreground">NVIDIA Nemotron 3.5 Bolt Reasoning Engine</span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-            {studentSection}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Grid: Controls vs Output */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        {/* Left Column: Form Controls (5 cols) */}
-        <div className="lg:col-span-5 space-y-5">
+        {/* Left Column: Fixed / Sticky Curricular Control Panel (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar space-y-3 pr-1">
           
           {/* Card: Configuration */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-sm space-y-4">
-            <h2 className="text-sm font-display font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-              <BookOpen size={16} className="text-primary" />
-              Curricular Parameters
-            </h2>
+          <div className="p-4 rounded-2xl bg-card border border-border shadow-sm space-y-3.5 shrink-0">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-mono font-bold uppercase tracking-[0.16em] text-foreground flex items-center gap-2">
+                <BookOpen size={14} className="text-primary" />
+                Curricular Parameters
+              </h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/60 uppercase tracking-wider">
+                Autonomous
+              </span>
+            </div>
 
             {/* Subject Selector: Exactly TWO subjects (Allotted Elective & EPP) */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 font-bold">
+              <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-[0.12em] mb-1.5 font-bold">
                 Active {semLabel} Subjects
               </label>
 
               {loadingSubjects ? (
-                <div className="h-20 rounded-xl bg-muted/40 animate-pulse flex items-center justify-center text-xs font-mono text-muted-foreground">
+                <div className="h-16 rounded-xl bg-muted/40 animate-pulse flex items-center justify-center text-xs font-mono text-muted-foreground">
                   Resolving allotted subjects...
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-2.5">
+                <div className="grid grid-cols-1 gap-2">
                   {subjects.map((s) => {
                     const isSelected = selectedSubjectCode === s.code;
                     return (
@@ -489,28 +530,28 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         key={s.code}
                         type="button"
                         onClick={() => handleSubjectChange(s.code)}
-                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                        className={`p-3 rounded-xl border text-left transition-all ${
                           isSelected
                             ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
-                            : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-input'
+                            : 'bg-background/80 border-border text-muted-foreground hover:text-foreground hover:border-input'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-mono font-bold text-xs text-primary">[{s.code}]</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono font-bold text-xs text-primary tracking-wide">[{s.code}]</span>
                           {s.isAllotted ? (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase tracking-wider">
                               ★ Allotted Elective
                             </span>
                           ) : (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold uppercase tracking-wider">
                               Core Paper
                             </span>
                           )}
                         </div>
-                        <div className="font-bold text-xs text-foreground leading-snug">{s.name}</div>
+                        <div className="font-bold text-xs text-foreground leading-snug tracking-tight">{s.name}</div>
                         {s.faculty && (
-                          <div className="text-[11px] font-mono text-muted-foreground mt-1 flex items-center gap-1">
-                            <GraduationCap size={12} className="shrink-0 text-primary/70" />
+                          <div className="text-[10px] font-mono text-muted-foreground mt-1 flex items-center gap-1">
+                            <GraduationCap size={11} className="shrink-0 text-primary/70" />
                             <span className="truncate">{s.faculty}</span>
                           </div>
                         )}
@@ -523,51 +564,51 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
             {/* Exam Pattern Selector */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 font-bold">
+              <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-[0.12em] mb-1.5 font-bold">
                 Examination Format
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setExamType('mid_sem')}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
                     examType === 'mid_sem'
                       ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
-                      : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                      : 'bg-background/80 border-border text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <div className="font-bold text-xs font-mono text-foreground">Mid-Semester</div>
-                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">20 Marks • 1.5 Hours</div>
+                  <div className="font-bold text-xs font-mono text-foreground uppercase tracking-wider">Mid-Semester</div>
+                  <div className="text-[10px] font-mono text-muted-foreground mt-0.5">20 Marks • 1.5 Hours</div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setExamType('end_sem')}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
                     examType === 'end_sem'
                       ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
-                      : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                      : 'bg-background/80 border-border text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <div className="font-bold text-xs font-mono text-foreground">End-Semester</div>
-                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">50 Marks • 2.5 Hours</div>
+                  <div className="font-bold text-xs font-mono text-foreground uppercase tracking-wider">End-Semester</div>
+                  <div className="text-[10px] font-mono text-muted-foreground mt-0.5">50 Marks • 2.5 Hours</div>
                 </button>
               </div>
             </div>
 
             {/* Google Classroom & PYQ Grounding Indicator */}
-            <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-1.5 text-xs font-mono">
+            <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1.5 text-xs font-mono">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground font-bold flex items-center gap-1.5">
+                <span className="text-muted-foreground font-bold flex items-center gap-1.5 text-[11px]">
                   <CheckCircle2 size={13} className="text-emerald-400" />
-                  Classroom Grounding:
+                  Classroom Modules:
                 </span>
-                <span className="text-foreground font-bold">
-                  {classroomAssignments[selectedSubjectCode.toUpperCase()]?.length || (selectedSubjectCode === 'EX40003' ? 5 : 1)} Modules Mapped
+                <span className="text-foreground font-bold text-[11px]">
+                  {classroomAssignments[selectedSubjectCode.toUpperCase()]?.length || (selectedSubjectCode === 'EX40003' ? 5 : 1)} Ingested
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>Faculty Paper Setter:</span>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Faculty Examiner:</span>
                 <span className="text-primary font-bold">{subjects.find(s => s.code === selectedSubjectCode)?.faculty || 'Prof. P. Dutta'}</span>
               </div>
             </div>
@@ -576,7 +617,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
             <button
               onClick={() => handleGenerate()}
               disabled={loading}
-              className="w-full h-11 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-50"
+              className="w-full h-11 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-[0.16em] hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -601,10 +642,10 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
           {/* Card: Statistical Recurrence & PYQ Intelligence */}
           {pyqStats && (
-            <div className="p-5 rounded-2xl bg-card border border-border shadow-sm space-y-3">
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-sm space-y-2.5 shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-                  <BarChart3 size={14} className="text-emerald-400" />
+                <h3 className="text-xs font-mono font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-2">
+                  <BarChart3 size={13} className="text-emerald-400" />
                   Statistical PYQ Recurrence
                 </h3>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
@@ -612,18 +653,14 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </span>
               </div>
 
-              <p className="text-[11px] font-mono text-muted-foreground">
-                Synthesized from {pyqStats.sampleCount} archived KIIT Autumn/Spring examination questions for [{selectedSubjectCode}].
-              </p>
-
               <div className="space-y-2 pt-1">
                 {pyqStats.topTopics.map((top, idx) => (
                   <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-foreground truncate max-w-[240px]">{top.topic}</span>
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span className="text-foreground truncate max-w-[200px]">{top.topic}</span>
                       <span className="text-emerald-400 font-bold">{top.prob}% Recurrence</span>
                     </div>
-                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
                       <div 
                         className="h-full bg-emerald-400 rounded-full transition-all duration-500" 
                         style={{ width: `${top.prob}%` }} 
@@ -637,128 +674,165 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
         </div>
 
-        {/* Right Column: Generated Paper Preview (7 cols) */}
-        <div className="lg:col-span-7">
-          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm min-h-[640px] flex flex-col">
-            
-            {/* Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border mb-4">
-              <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-                <FileText size={15} className="text-primary" />
-                <span className="font-bold text-foreground">Official Examination Paper</span>
-                {genStats && (
-                  <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px]">
-                    {genStats.tokens} tokens • {genStats.latency}s
-                  </span>
-                )}
-              </div>
-
-              {generatedPaper && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
-                  <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setPaperViewMode('sheet')}
-                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-                        paperViewMode === 'sheet'
-                          ? 'bg-primary text-black font-bold shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Official KIIT Examination Paper View"
-                    >
-                      <Eye size={12} />
-                      <span className="hidden sm:inline">Paper Sheet</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaperViewMode('raw')}
-                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-                        paperViewMode === 'raw'
-                          ? 'bg-primary text-black font-bold shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Raw text view"
-                    >
-                      <Code size={12} />
-                      <span className="hidden sm:inline">Raw Text</span>
-                    </button>
-                  </div>
-
-                  {reasoningContent && (
-                    <button
-                      onClick={() => setShowReasoning(!showReasoning)}
-                      className={`p-2 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
-                        showReasoning 
-                          ? 'bg-primary/20 border-primary text-primary' 
-                          : 'border-border text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Inspect pedagogical reasoning"
-                    >
-                      <Sparkles size={13} className="text-primary" />
-                      <span className="hidden sm:inline">{showReasoning ? 'Hide AI Reasoning' : 'AI Reasoning'}</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleCopy}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
-                    title="Copy to clipboard"
-                  >
-                    {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                    <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
-
-                  <button
-                    onClick={handleDownload}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
-                    title="Download as text"
-                  >
-                    <Download size={13} />
-                    <span className="hidden sm:inline">Export</span>
-                  </button>
-
-                  <button
-                    onClick={handlePrint}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
-                    title="Print question paper"
-                  >
-                    <Printer size={13} />
-                    <span className="hidden sm:inline">Print</span>
-                  </button>
-                </div>
+        {/* Right Column: Generated Paper Preview & Live Generative Stage (8 cols) */}
+        <div className="lg:col-span-8 flex flex-col h-full min-h-0 bg-card border border-border shadow-sm rounded-2xl p-3.5 sm:p-4 overflow-hidden">
+          
+          {/* Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border mb-3 shrink-0">
+            <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+              <FileText size={15} className="text-primary" />
+              <span className="font-bold text-foreground uppercase tracking-[0.14em]">Official Examination Paper</span>
+              {genStats && (
+                <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px] font-mono">
+                  {genStats.tokens} tokens • {genStats.latency}s
+                </span>
               )}
             </div>
 
-            {/* Paper Output Container */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar leading-relaxed text-foreground select-text">
-              {loading ? (
-                <div className="min-h-[520px] w-full flex items-center justify-center p-2">
+            {generatedPaper && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
+                <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setPaperViewMode('sheet')}
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                      paperViewMode === 'sheet'
+                        ? 'bg-primary text-black font-bold shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Official KIIT Examination Paper View"
+                  >
+                    <Eye size={12} />
+                    <span className="hidden sm:inline">Paper Sheet</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaperViewMode('raw')}
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                      paperViewMode === 'raw'
+                        ? 'bg-primary text-black font-bold shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Raw text view"
+                  >
+                    <Code size={12} />
+                    <span className="hidden sm:inline">Raw Text</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowReasoning(true);
+                    setReasoningExpanded(!reasoningExpanded);
+                  }}
+                  className={`p-2 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
+                    reasoningExpanded 
+                      ? 'bg-primary/20 border-primary text-primary' 
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                  title="Inspect pedagogical reasoning"
+                >
+                  <Sparkles size={13} className="text-primary" />
+                  <span className="hidden sm:inline">{reasoningExpanded ? 'Hide AI Reasoning' : 'AI Reasoning'}</span>
+                </button>
+
+                <button
+                  onClick={handleCopy}
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  title="Copy to clipboard"
+                >
+                  {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+
+                <button
+                  onClick={handleDownload}
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  title="Download as text"
+                >
+                  <Download size={13} />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  title="Print question paper"
+                >
+                  <Printer size={13} />
+                  <span className="hidden sm:inline">Print</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Paper Output Container - Fits perfectly in viewport without page scroll */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
+            {loading ? (
+              <div className="flex-1 min-h-0 flex flex-col items-center justify-start py-2 px-1 overflow-hidden">
+                {/* Dynamic MorphOrb in Thinking Mode: moves UP with smooth spring */}
+                <motion.div
+                  initial={{ y: 60, scale: 0.95, opacity: 0.8 }}
+                  animate={{ y: 0, scale: 0.75, opacity: 1 }}
+                  transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                  className="shrink-0 -mb-6 pointer-events-none"
+                >
                   <MorphOrb
-                    autoStartText={`Synthesize official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode} (${selectedSubjectName})`}
+                    autoStartText={`Synthesize official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode}`}
                     labels={[
-                      "Analyzing Syllabus & Historical PYQs",
-                      "Solving Constrained Knapsack Model",
-                      "Querying NVIDIA Nemotron 3.5 Engine",
-                      "Synthesizing KIIT Examination Blueprint",
+                      "Streaming Live Reasoning Traces",
+                      "NVIDIA Nemotron 3.5 Bolt Inference",
+                      "Synthesizing Examination Blueprint",
                       "Validating CO & Bloom's Taxonomy",
                     ]}
-                    answerTitle="KIIT Paper Ready"
-                    placeholder={`Instruct NVIDIA Nemotron 3.5 for ${selectedSubjectCode}...`}
-                    onSubmit={async () => {
-                      return "Paper synthesized successfully.";
-                    }}
+                    answerTitle="Synthesizing Exam Paper..."
                   />
-                </div>
-              ) : generatedPaper ? (
-                <div className="space-y-4">
-                  {showReasoning && reasoningContent && (
-                    <AiReasoningView
-                      reasoning={reasoningContent}
-                      modelName="NVIDIA Nemotron 3.5 Bolt"
-                    />
-                  )}
+                </motion.div>
 
+                {/* Live AI Reasoning Cognitive Trace Ladder - Direct streaming from NVIDIA Nemotron */}
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.15 }}
+                  className="w-full max-w-3xl flex-1 min-h-0 flex flex-col overflow-hidden pt-2"
+                >
+                  <AiReasoningView
+                    reasoning={reasoningContent}
+                    isLive={true}
+                    isComplete={isThinkingComplete}
+                    modelName="NVIDIA Nemotron 3.5 Bolt"
+                    subjectCode={selectedSubjectCode}
+                    subjectName={selectedSubjectName}
+                    examType={examType}
+                    isExpanded={reasoningExpanded}
+                    onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                  />
+                </motion.div>
+              </div>
+            ) : generatedPaper ? (
+              <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                {showReasoning && (
+                  <AiReasoningView
+                    reasoning={reasoningContent}
+                    modelName="NVIDIA Nemotron 3.5 Bolt"
+                    isLive={false}
+                    isComplete={true}
+                    durationSeconds={thinkingDuration || genStats?.latency || 11.4}
+                    subjectCode={selectedSubjectCode}
+                    subjectName={selectedSubjectName}
+                    examType={examType}
+                    isExpanded={reasoningExpanded}
+                    onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                  />
+                )}
+
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  className="flex-1"
+                >
                   {paperViewMode === 'sheet' ? (
                     <QuestionPaperSheet
                       content={generatedPaper}
@@ -774,42 +848,47 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                       {generatedPaper}
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="min-h-[520px] w-full flex flex-col items-center justify-center p-4">
-                  <div className="text-center mb-3 max-w-lg">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-mono text-primary mb-2 shadow-sm">
-                      <Sparkles size={12} className="text-primary animate-pulse" />
-                      <span>NVIDIA Nemotron 3.5 Generative Microservice</span>
-                    </div>
-                    <h3 className="font-display font-bold text-foreground text-base sm:text-lg">
-                      Autonomous Examination Paper Synthesizer
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Enter custom pedagogical instructions below or click <span className="text-primary font-semibold">&quot;Generate Paper&quot;</span> to synthesize the official KIIT Autonomous paper for <span className="font-mono text-primary font-bold">[{selectedSubjectCode}]</span>.
-                    </p>
+                </motion.div>
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4">
+                <motion.div
+                  initial={{ scale: 0.96, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="w-full flex flex-col items-center justify-center max-w-lg text-center"
+                >
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-3 shadow-sm uppercase tracking-[0.16em]">
+                    <Sparkles size={12} className="text-primary animate-pulse" />
+                    <span>Autonomous Examination Generator</span>
                   </div>
+                  <h3 className="font-mono text-sm sm:text-base font-bold uppercase tracking-[0.16em] text-foreground">
+                    KIIT Paper Synthesizer
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-mono mt-1.5 leading-relaxed tracking-wide mb-6">
+                    Click <span className="text-primary font-bold">&quot;Generate KIIT Question Paper&quot;</span> or instruct the model below to synthesize camera-ready examination questions.
+                  </p>
+
                   <div className="w-full flex justify-center">
                     <MorphOrb
-                      placeholder={`Instruct NVIDIA Nemotron 3.5 for ${selectedSubjectCode} (e.g. Focus on Contracts & Torts)...`}
+                      placeholder={`Instruct NVIDIA Nemotron for ${selectedSubjectCode}...`}
                       labels={[
-                        "Analyzing Syllabus & Historical PYQs",
-                        "Solving Constrained Knapsack Model",
-                        "Querying NVIDIA Nemotron 3.5 Engine",
-                        "Synthesizing KIIT Examination Blueprint",
+                        "Streaming Live Reasoning Traces",
+                        "NVIDIA Nemotron 3.5 Bolt Inference",
+                        "Synthesizing Examination Blueprint",
+                        "Validating CO & Bloom's Taxonomy",
                       ]}
-                      answerTitle="KIIT Paper Ready"
+                      answerTitle="Ready to Synthesize"
                       onSubmit={async (userText) => {
                         await handleGenerate(userText);
-                        return "Paper synthesized successfully.";
+                        return "Synthesizing official KIIT Examination Paper...";
                       }}
                     />
                   </div>
-                </div>
-              )}
-            </div>
-
+                </motion.div>
+              </div>
+            )}
           </div>
+
         </div>
 
       </div>

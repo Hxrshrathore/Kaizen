@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { Menu, Bell, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -31,10 +32,21 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [user, setUser] = useState<UserProfile | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+
+  const getPageTitle = (path: string) => {
+    if (path.includes('/dashboard/generator')) return 'AI Question Paper Generator';
+    if (path.includes('/dashboard/advisor')) return 'Academic Co-Pilot & Advisor';
+    if (path.includes('/dashboard/pyq')) return 'Autonomous PYQ Intelligence';
+    if (path.includes('/dashboard/classroom')) return 'Google Classroom Coursework';
+    if (path.includes('/dashboard/profile')) return 'Academic Profile';
+    if (path.includes('/dashboard/evaluator')) return 'Paper Evaluator & Grading';
+    return 'Kaizen Academic Suite';
+  };
 
   // Restore sidebar pinned preference
   useEffect(() => {
@@ -96,21 +108,38 @@ export default function DashboardLayout({
       >
         
         {/* Header */}
-        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-20 sticky top-0">
-          <div className="flex items-center gap-4">
+        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-3 md:px-6 z-20 sticky top-0 shrink-0">
+          {/* Left: Mobile Menu & Dynamic Page Title */}
+          <div className="flex items-center gap-3 min-w-0">
             <button 
               onClick={() => setSidebarOpen(true)} 
               className="md:hidden text-muted-foreground hover:text-foreground transition-colors p-1"
             >
-              <Menu size={22} />
+              <Menu size={20} />
             </button>
             
-            {/* Real-Time AI Token Quota & Priority Cascade Indicator */}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse" />
+              <h1 className="text-xs sm:text-sm font-mono font-bold uppercase tracking-[0.16em] text-foreground truncate">
+                {getPageTitle(pathname)}
+              </h1>
+              <span className="hidden xl:inline-block text-[10px] font-mono text-muted-foreground/60 tracking-wider">
+                // KIIT Autonomous
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Real-Time AI Token Quota & Priority Cascade Indicator */}
+          <div className="hidden md:flex items-center justify-center flex-1 max-w-md mx-auto px-4">
             <ModelQuotaBar />
           </div>
 
-          <div className="flex items-center gap-3">
-            <ThemeToggle variant="square" className="w-10 h-10 rounded-xl" />
+          {/* Right: Controls & User Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <div className="md:hidden">
+              <ModelQuotaBar />
+            </div>
+            <ThemeToggle variant="square" className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl" />
             <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors group">
               <Bell size={18} />
               <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full ring-2 ring-background group-hover:scale-110 transition-transform" />
