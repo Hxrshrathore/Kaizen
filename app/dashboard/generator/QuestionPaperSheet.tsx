@@ -288,8 +288,8 @@ export function QuestionPaperSheet({
       {/* Compulsory Instruction Banner */}
       <div className="relative z-10 my-2 border-y border-slate-800 bg-slate-50 py-1.5 px-3 text-center font-serif text-xs sm:text-sm font-semibold italic text-slate-800">
         {examType === 'mid_sem'
-          ? 'Answer any FOUR questions including Question No. 1 which is COMPULSORY.'
-          : 'Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.'}
+          ? 'Answer any 4 questions including Question No. 1 which is COMPULSORY.'
+          : 'Answer any 5 questions including Question No. 1 which is COMPULSORY.'}
       </div>
 
       {/* Formatted Examination Body */}

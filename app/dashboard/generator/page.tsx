@@ -200,7 +200,7 @@ export default function DashboardGeneratorPage() {
           : `Google Classroom Coursework Modules for CS40003 (Software Testing and Automation):\n1. [ASSIGNMENT] Assignment-1: Black-Box vs White-Box Testing, Boundary Value Analysis, Equivalence Partitioning & Cyclomatic Complexity`);
 
     const endSemInstructions = `
-Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.
+Answer any 5 questions including Question No. 1 which is COMPULSORY.
 --------------------------------------------------------------------------------
 
 QUESTION NO. 1 (COMPULSORY)
@@ -406,8 +406,8 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
             </div>
             <div class="instruction">
               ${examType === 'end_sem'
-                ? 'Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.'
-                : 'Answer any FOUR questions including Question No. 1 which is COMPULSORY.'}
+                ? 'Answer any 5 questions including Question No. 1 which is COMPULSORY.'
+                : 'Answer any 4 questions including Question No. 1 which is COMPULSORY.'}
             </div>
             <div style="white-space: pre-wrap; font-size: 10.5pt; line-height: 1.5; margin-top: 12px;">
               ${generatedPaper}

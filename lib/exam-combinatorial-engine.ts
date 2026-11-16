@@ -428,7 +428,7 @@ KAIZEN ML COMBINATORIAL EXAMINATION BLUEPRINT (OFFICIAL KIIT AUTONOMOUS PATTERN)
 Target: AUTUMN END SEMESTER EXAMINATION | Full Marks: 50 | Time: 2 Hours 30 Minutes
 Course: ${blueprint.subjectName} (${blueprint.subjectCode})
 Structure: Total 8 Questions (Q1 to Q8) across 4 Sections
-Instructions: Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.
+Instructions: Answer any 5 questions including Question No. 1 which is COMPULSORY.
 ================================================================================
 
 QUESTION NO. 1 (COMPULSORY: 5 Sub-Questions x 2 Marks = 10 Marks):
@@ -453,7 +453,7 @@ Synthetic Variant: ${p.perturbedVariant}`).join("\n\n")}
 
 MANDATORY KIIT AUTONOMOUS FORMATTING CONSTRAINTS:
 1. Header MUST state: Full Marks: 50 | Time: 2 Hours 30 Minutes.
-2. Instructions MUST state: "Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections."
+2. Instructions MUST state: "Answer any 5 questions including Question No. 1 which is COMPULSORY."
 3. Every Section B question MUST have its explicit [CO] outcome tag (e.g., [CO1], [CO2]).
 4. Total questions in paper MUST be exactly 8 (Q1 to Q8).
 5. Strictly do NOT output any section draft markers, temporary labels, or 'ECS GROUP-03'.
@@ -467,7 +467,7 @@ MANDATORY KIIT AUTONOMOUS FORMATTING CONSTRAINTS:
 KAIZEN ML COMBINATORIAL EXAMINATION BLUEPRINT (OFFICIAL KIIT AUTONOMOUS PATTERN)
 Target: MID SEMESTER EXAMINATION | Full Marks: 20 | Time: 1.5 Hours
 Course: ${blueprint.subjectName} (${blueprint.subjectCode})
-Instructions: Answer any FOUR questions including Question No. 1 which is COMPULSORY.
+Instructions: Answer any 4 questions including Question No. 1 which is COMPULSORY.
 ================================================================================
 
 QUESTION NO. 1 (COMPULSORY: 5 Sub-Questions x 1 Mark = 5 Marks):
@@ -481,7 +481,7 @@ ${q.subParts.map(sp => `  ${sp.partLabel} [${sp.marks} Marks] [${sp.co}]
 
 MANDATORY KIIT AUTONOMOUS FORMATTING CONSTRAINTS:
 1. Header MUST state: Full Marks: 20 | Time: 1.5 Hours.
-2. Instructions MUST state: "Answer any FOUR questions including Question No. 1 which is COMPULSORY."
+2. Instructions MUST state: "Answer any 4 questions including Question No. 1 which is COMPULSORY."
 3. Total questions in paper MUST be exactly 5 (Q1 to Q5).
 4. Strictly do NOT output any section draft markers, temporary labels, or 'ECS GROUP-03'.
 ================================================================================
