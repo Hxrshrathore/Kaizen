@@ -39,3 +39,4 @@ async function getCourseDetails() {
 }
 
 getCourseDetails().catch(console.error).finally(() => prisma.$disconnect());
+

@@ -293,7 +293,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
           examType,
           faculty: facultyName,
           section: studentSection,
-          model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+          model: 'nvidia/nemotron-3.5-bolt-e4b',
           max_tokens: 8192,
           prompt: promptText
         }),
@@ -313,7 +313,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
       setGenStats({
         tokens: consumed,
         latency: data.time_taken || 2.4,
-        model: data.model || 'NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)',
+        model: data.model || 'NVIDIA Nemotron 3.5 Bolt (Thinking)',
       });
 
       // Synchronize consumed tokens with Header Quota Bar and LocalStorage
@@ -443,7 +443,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         {/* Engine Badge */}
         <div className="flex items-center gap-2 bg-card border border-border px-3.5 py-2 rounded-xl text-xs font-mono shadow-sm">
           <ShieldCheck size={14} className="text-emerald-400" />
-          <span className="text-muted-foreground">NVIDIA Nemotron 30B Reasoning Engine</span>
+          <span className="text-muted-foreground">NVIDIA Nemotron 3.5 Bolt Reasoning Engine</span>
           <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
             {studentSection}
           </span>
@@ -732,7 +732,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                     <Sparkles className="absolute inset-0 m-auto text-primary animate-pulse" size={20} />
                   </div>
                   <p className="text-xs uppercase tracking-widest animate-pulse font-mono">
-                    NVIDIA Nemotron 30B Synthesizing KIIT Examination Paper for [{selectedSubjectCode}]...
+                    NVIDIA Nemotron 3.5 Bolt Synthesizing KIIT Examination Paper for [{selectedSubjectCode}]...
                   </p>
                 </div>
               ) : generatedPaper ? (
@@ -741,7 +741,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                     <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
                       <div className="font-bold text-primary mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
                         <Sparkles size={14} />
-                        <span>NVIDIA Nemotron 30B Pedagogical &amp; Examination Blueprint Reasoning</span>
+                        <span>NVIDIA Nemotron 3.5 Pedagogical &amp; Examination Blueprint Reasoning</span>
                       </div>
                       {reasoningContent}
                     </div>

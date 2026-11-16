@@ -41,7 +41,8 @@ async function retrieveVectorGrounding(
   // 1. Query Upstash Vector DB
   if (upstashUrl && upstashToken && geminiKey) {
     try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const cleanGeminiKey = geminiKey.trim();
+      const ai = new GoogleGenAI({ apiKey: cleanGeminiKey });
       const embRes = await ai.models.embedContent({
         model: "gemini-embedding-001",
         contents: `${subject || ""} ${subjectCode || ""} examination questions: ${queryText.slice(0, 300)}`,
@@ -57,7 +58,9 @@ async function retrieveVectorGrounding(
           topK: 12,
           includeMetadata: true,
         };
-        if (subjectCode) {
+        if (isEpp) {
+          queryBody.filter = `subjectCode = 'EX40003' OR subjectCode = 'HS40001'`;
+        } else if (subjectCode) {
           queryBody.filter = `subjectCode = '${subjectCode}'`;
         }
 
@@ -228,97 +231,135 @@ export async function POST(request: Request) {
     const isNimModel = model.includes("nemotron") || model.includes("deepseek") || model.includes("kimi") || model.includes("minimax") || model.includes("nvidia");
 
     if (nvidiaKey && isNimModel) {
-      try {
-        // Map frontend IDs to official NIM microservice names
-        const nimModelMap: Record<string, string> = {
-          "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-          "nemotron-3-nano-omni-30b": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-          "nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
-          "deepseek-v4.1-flash": "deepseek-ai/deepseek-v4.1-flash",
-          "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
-        };
-        const targetNimModel = nimModelMap[model] || "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
-        const effectiveMaxTokens = Math.max(max_tokens || 8192, 6144);
+      // Map frontend IDs to official NIM microservice names
+      const nimModelMap: Record<string, string> = {
+        "nvidia/nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
+        "nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        "nemotron-3-nano-omni-30b": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        "deepseek-v4.1-flash": "deepseek-ai/deepseek-v4.1-flash",
+        "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
+      };
+      const requestedNimModel = nimModelMap[model] || "nvidia/nemotron-3.5-bolt-e4b";
+      const nimCandidates = [
+        requestedNimModel,
+        ...(requestedNimModel !== "nvidia/nemotron-3.5-bolt-e4b" ? ["nvidia/nemotron-3.5-bolt-e4b"] : [])
+      ];
 
-        const nimResp = await fetch(`${NVIDIA_API_BASE}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${nvidiaKey}`,
-          },
-          body: JSON.stringify({
+      for (const targetNimModel of nimCandidates) {
+        try {
+          const effectiveMaxTokens = Math.max(max_tokens || 8192, 6144);
+          const isBolt = targetNimModel.includes("bolt");
+
+          const nimPayload: any = {
             model: targetNimModel,
             messages: [{ role: "user", content: effectivePrompt }],
-            temperature: 0.6,
+            temperature: isBolt ? 0.7 : 0.6,
             top_p: 0.95,
             max_tokens: effectiveMaxTokens,
-          }),
-          signal: AbortSignal.timeout(10000),
-        });
+          };
 
-        if (nimResp.ok) {
-          const nimData = await nimResp.json();
-          const choice = nimData.choices?.[0];
-          const rawText = choice?.message?.content || "";
-          const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
-          const reasoningContent = choice?.message?.reasoning_content || "";
-          return NextResponse.json({
-            response: generatedText,
-            reasoning: reasoningContent,
-            model: "NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)",
-            tokens_consumed: nimData.usage?.total_tokens || Math.round((effectivePrompt.length + generatedText.length) / 4),
-            time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
-            provider: "nvidia_nim",
-            vector_grounded: vectorGroundingCount > 0,
-            vector_grounding_count: vectorGroundingCount,
-            combinatorial_blueprint: combinatorialBlueprint,
+          if (isBolt) {
+            nimPayload.seed = 42;
+            nimPayload.chat_template_kwargs = { enable_thinking: true };
+          } else if (targetNimModel.includes("reasoning")) {
+            nimPayload.reasoning_budget = 4096;
+          }
+
+          const nimResp = await fetch(`${NVIDIA_API_BASE}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${nvidiaKey.trim()}`,
+            },
+            body: JSON.stringify(nimPayload),
+            signal: AbortSignal.timeout(45000),
           });
-        } else {
-          const errBody = await nimResp.text();
-          console.warn(`NVIDIA NIM returned HTTP ${nimResp.status}:`, errBody);
+
+          if (nimResp.ok) {
+            const nimData = await nimResp.json();
+            const choice = nimData.choices?.[0];
+            const rawText = choice?.message?.content || "";
+            const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
+            const reasoningContent = choice?.message?.reasoning_content || "";
+
+            if (generatedText.trim().length > 50) {
+              const displayName = isBolt
+                ? "NVIDIA Nemotron 3.5 Bolt (E4B)"
+                : "NVIDIA Nemotron 3 Nano Omni 30B (Reasoning)";
+
+              return NextResponse.json({
+                response: generatedText,
+                reasoning: reasoningContent,
+                model: displayName,
+                tokens_consumed: nimData.usage?.total_tokens || Math.round((effectivePrompt.length + generatedText.length) / 4),
+                time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
+                provider: "nvidia_nim",
+                vector_grounded: vectorGroundingCount > 0,
+                vector_grounding_count: vectorGroundingCount,
+                combinatorial_blueprint: combinatorialBlueprint,
+              });
+            }
+          } else {
+            const errBody = await nimResp.text();
+            console.warn(`NVIDIA NIM returned HTTP ${nimResp.status} for ${targetNimModel}:`, errBody);
+          }
+        } catch (nimErr) {
+          console.warn(`NVIDIA NIM call failed for ${targetNimModel}, trying next:`, nimErr);
         }
-      } catch (nimErr) {
-        console.warn("NVIDIA NIM call failed, falling back to Gemini:", nimErr);
       }
     }
 
-    // ── 3. GEMINI 3.5 FLASH LITE CLOUD ENGINE (High Throughput Fallback - 500 RPD) ──
+    // ── 3. GEMINI FLASH LITE CLOUD ENGINE (High Throughput Fallback - 500 RPD) ──
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
-      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const cleanGeminiKey = geminiKey.trim();
+      const ai = new GoogleGenAI({ apiKey: cleanGeminiKey });
       
       const targetGeminiModels = [
+        "gemini-flash-lite-latest",
         "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
       ];
 
       for (const geminiModel of targetGeminiModels) {
-        try {
-          const geminiResp = await ai.models.generateContent({
-            model: geminiModel,
-            contents: { role: "user", parts: [{ text: effectivePrompt }] },
-            config: {
-              temperature: 0.65,
-              maxOutputTokens: max_tokens,
-            },
-          });
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const geminiResp = await ai.models.generateContent({
+              model: geminiModel,
+              contents: { role: "user", parts: [{ text: effectivePrompt }] },
+              config: {
+                temperature: 0.65,
+                maxOutputTokens: max_tokens,
+              },
+            });
 
-          const rawText = geminiResp.text || "";
-          const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
-          return NextResponse.json({
-            response: generatedText,
-            model: `Gemini (${geminiModel})`,
-            tokens_consumed: Math.round((effectivePrompt.length + generatedText.length) / 4),
-            time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
-            provider: "gemini",
-            vector_grounded: vectorGroundingCount > 0,
-            vector_grounding_count: vectorGroundingCount,
-            combinatorial_blueprint: combinatorialBlueprint,
-          });
-        } catch (geminiModelErr: any) {
-          console.warn(`Gemini model ${geminiModel} failed:`, geminiModelErr.message);
+            const rawText = geminiResp.text || "";
+            const generatedText = rawText.replace(/\s*\(?ECS GROUP-03\)?/gi, "");
+            if (generatedText.trim().length > 50) {
+              return NextResponse.json({
+                response: generatedText,
+                model: `Gemini (${geminiModel})`,
+                tokens_consumed: Math.round((effectivePrompt.length + generatedText.length) / 4),
+                time_taken: parseFloat(((Date.now() - startTime) / 1000).toFixed(2)),
+                provider: "gemini",
+                vector_grounded: vectorGroundingCount > 0,
+                vector_grounding_count: vectorGroundingCount,
+                combinatorial_blueprint: combinatorialBlueprint,
+              });
+            }
+          } catch (geminiModelErr: any) {
+            const is503 = geminiModelErr.message?.includes("503") || geminiModelErr.message?.includes("high demand");
+            if (is503 && attempt === 0) {
+              console.warn(`Gemini model ${geminiModel} hit 503, retrying in 1.2s...`);
+              await new Promise((r) => setTimeout(r, 1200));
+              continue;
+            }
+            console.warn(`Gemini model ${geminiModel} attempt ${attempt + 1} failed:`, geminiModelErr.message);
+            break;
+          }
         }
       }
     }
