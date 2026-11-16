@@ -28,6 +28,9 @@ async function retrieveVectorGrounding(
 
   const retrievedQuestions: string[] = [];
 
+  const isEpp = /ex40003|hs40001/i.test(subjectCode || "") || /professional|economics/i.test(subject || "");
+  const isTesting = /cs40003/i.test(subjectCode || "") || /testing|automation/i.test(subject || "");
+
   // 1. Query Upstash Vector DB
   if (upstashUrl && upstashToken && geminiKey) {
     try {
@@ -44,7 +47,7 @@ async function retrieveVectorGrounding(
         const queryBody: any = {
           vector,
           sparseVector,
-          topK: 8,
+          topK: 10,
           includeMetadata: true,
         };
         if (subjectCode) {
@@ -80,12 +83,16 @@ async function retrieveVectorGrounding(
   // 2. Query NeonDB OcrQuestion table as reliable dual grounding
   try {
     const { prisma } = await import("@/lib/prisma");
+    const dbFilter: any = isEpp
+      ? { OR: [{ subjectCode: "EX40003" }, { subjectCode: "HS40001" }, { subject: { contains: "Professional", mode: "insensitive" } }] }
+      : (subjectCode ? { subjectCode } : {});
+
     const dbQuestions = await prisma.ocrQuestion.findMany({
       where: {
-        ...(subjectCode ? { subjectCode } : {}),
+        ...dbFilter,
         status: "APPROVED",
       },
-      take: 10,
+      take: 12,
       orderBy: { createdAt: "desc" },
     });
 
@@ -101,10 +108,16 @@ async function retrieveVectorGrounding(
 
   if (retrievedQuestions.length === 0) return { groundingText: "", count: 0 };
 
+  const analyticalGuidance = isEpp
+    ? "incorporate the multi-faceted questions from the retrieved question bank above (e.g., NSPE Code of Ethics & Conflict of Interest scenario, Engineering Economics NPV / Discounted Cash Flow calculation at MARR, Indian Patents Act 1970 patentability criteria & infringement analysis, Professional Negligence & Strict vs Absolute Tort Liability, Indian Contract Act 1872 / Tendering & Dispute Arbitration)."
+    : isTesting
+    ? "incorporate the multi-faceted questions (e.g., Prime Number BVC/Robust table, Bret Pettichord Schools of Testing / Block Diagram, Regression Testing Prioritization, Static vs Dynamic Testing, V-Diagram Verification/Validation)."
+    : "incorporate multi-faceted analytical questions directly synthesized from the approved question bank above.";
+
   const groundingText = `
 ================================================================================
 VERIFIED DEPARTMENT QUESTION BANK GROUNDING (UPSTASH VECTOR DB & NEONDB)
-Subject Code: ${subjectCode || "CS40003"} | Subject: ${subject || "Software Testing and Automation"}
+Subject Code: ${subjectCode || "EX40003"} | Subject: ${subject || "Engineering Professional Practice"}
 Retrieved ${retrievedQuestions.length} Approved Department Questions:
 
 ${retrievedQuestions
@@ -116,8 +129,9 @@ ${q}`
 
 MANDATORY EXAMINATION GENERATION INSTRUCTIONS:
 1. Ground both SECTION A (Compulsory Short Answer / 2 marks each) and SECTION B (Analytical / 10 marks each) in the questions and concepts above.
-2. For SECTION B, incorporate the multi-faceted questions (e.g., Prime Number BVC/Robust table, Bret Pettichord Schools of Testing / Block Diagram, Regression Testing Prioritization, Static vs Dynamic Testing, V-Diagram Verification/Validation).
+2. For SECTION B, ${analyticalGuidance}
 3. Ensure authentic KIIT Autonomous Examination styling: Header, Course Code, Time: 3.0 Hours, Full Marks: 60, Section A (Questions 1(a)-1(e)), and Section B (Questions 2-5 with [CO1]-[CO5] tags).
+4. Strictly do NOT output any section placeholders, temporary draft marks, or 'ECS GROUP-03'.
 ================================================================================
 `;
 
@@ -255,6 +269,7 @@ export async function POST(request: Request) {
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
+        "gemini-2.5-flash",
       ];
 
       for (const geminiModel of targetGeminiModels) {

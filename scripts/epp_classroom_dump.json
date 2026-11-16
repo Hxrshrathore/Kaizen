@@ -1,0 +1,540 @@
+{
+  "courseWork": [
+    {
+      "courseId": "798417072045",
+      "id": "891650075941",
+      "title": "Assignment-3",
+      "description": "Write in an A4 size page, scan it and upload the PDF file in your Google Class Room.\nAlso submit the hard copy on 2nd November 2026 positively.",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1gNKRnGpkuiJ2ndu7pHBZBRnz2MCHJ3zI",
+              "title": "EPP_Assignment 3.docx",
+              "alternateLink": "https://drive.google.com/file/d/1gNKRnGpkuiJ2ndu7pHBZBRnz2MCHJ3zI/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMEIkHAWH-Ie50l_doFLOeZvB_a7frCCR3LepGUrDtFrempKA8F4WlEDjqrz4-v784M5mV3FojTC4P4IyNnelwH068M6v5-Zg7x-6mrW5FByNL-oQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/a/ODkxNjUwMDc1OTQx/details",
+      "creationTime": "2026-10-12T16:17:20.670Z",
+      "updateTime": "2026-11-03T10:47:23.670Z",
+      "dueDate": {
+        "year": 2027,
+        "month": 11,
+        "day": 2
+      },
+      "dueTime": {
+        "hours": 18,
+        "minutes": 29
+      },
+      "maxPoints": 100,
+      "workType": "ASSIGNMENT",
+      "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "890670566809",
+      "title": "Assignment-IV",
+      "description": "Write in an A4 size page, scan it and upload the PDF file in your Google Class Room.\nAlso submit the hard copy on 9th November 2026 positively.",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1yDXsFg2adjSaNEJlh5UF6EBpcDch6I0b",
+              "title": "Assignment IV.docx",
+              "alternateLink": "https://drive.google.com/file/d/1yDXsFg2adjSaNEJlh5UF6EBpcDch6I0b/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMTlqMbdfDbYjz7TJEXGE3C8lQgnFVQT7b_Tth2Amx0F7syEHE7jqkfW9uLMUY4MvWWn1joNHnTIiXWZC1IrigzBRngkhN90FdUdzHmmJVAloFAsw=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/a/ODkwNjcwNTY2ODA5/details",
+      "creationTime": "2026-10-29T06:49:20.393Z",
+      "updateTime": "2026-10-29T06:52:11.935Z",
+      "dueDate": {
+        "year": 2026,
+        "month": 11,
+        "day": 9
+      },
+      "dueTime": {
+        "hours": 18,
+        "minutes": 29
+      },
+      "maxPoints": 100,
+      "workType": "ASSIGNMENT",
+      "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "856125415839",
+      "title": "Assignment-II",
+      "description": "Write in an A4 size page, scan it and upload the PDF file in your Google Class Room.\nAlso submit the hard copy in the next class.",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1m219oKUvH9MKruBgP7yxPjuelD4Pzn9d",
+              "title": "Assignment Module 2.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1m219oKUvH9MKruBgP7yxPjuelD4Pzn9d/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPQ1fJG5ita80cP70ujo5LO9kt_pLoYIX-eGctieVsWPzn34YxqCVIp0t_d_aksFAk_dBNC1J7IonLt6onjWdhfUe_MWu4XaxiDCAcRXmq8LcloqQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/a/ODU2MTI1NDE1ODM5/details",
+      "creationTime": "2026-08-25T10:15:18.010Z",
+      "updateTime": "2026-10-12T14:29:01.936Z",
+      "dueDate": {
+        "year": 2026,
+        "month": 9,
+        "day": 5
+      },
+      "dueTime": {
+        "hours": 18,
+        "minutes": 29
+      },
+      "maxPoints": 100,
+      "workType": "ASSIGNMENT",
+      "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "871646018860",
+      "title": "Assignment-I",
+      "description": "Write in an A4 size page, scan it and upload the PDF file in your Google Class Room.\nAlso submit the hard copy in the next class.",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1Uttfm3PjVjvpx4aq9fWln3S06zhWgkSK",
+              "title": "Assignment Module 1.docx",
+              "alternateLink": "https://drive.google.com/file/d/1Uttfm3PjVjvpx4aq9fWln3S06zhWgkSK/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPCGhWvDpu1vaqw6gSOMwBNHWG3SyeRopgmUKX73tf3is5gR0dwaOg8YfYHaq1UmiNdESMRjrF_-RlVmvsb0Ermrr75WLzVg8sn5Gv5oXMP9HXlJQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/a/ODcxNjQ2MDE4ODYw/details",
+      "creationTime": "2026-08-04T09:52:21.275Z",
+      "updateTime": "2026-10-12T14:28:46.854Z",
+      "dueDate": {
+        "year": 2026,
+        "month": 8,
+        "day": 10
+      },
+      "dueTime": {
+        "hours": 18,
+        "minutes": 29
+      },
+      "maxPoints": 10,
+      "workType": "ASSIGNMENT",
+      "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "872593487411",
+      "title": "Model Questions (Till Mid Semester)",
+      "description": "Model Questions",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1rFT_ayx-EVVvMZEDj2g9aJKzAG9F9UGm",
+              "title": "Model Questions(Till Mid Semester).pdf",
+              "alternateLink": "https://drive.google.com/file/d/1rFT_ayx-EVVvMZEDj2g9aJKzAG9F9UGm/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMPatq8eLNt-UqDpXcfZK3CMF23Tq9rAtD-f0Z7XrmxPbB1ltJOjg8yV-y5P_R1YdmBopfRWgG0UXV_Ihz8uSrr1mNPINFr0A-QGDSJphQ9tV-zCQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/sa/ODcyNTkzNDg3NDEx/details",
+      "creationTime": "2026-09-02T07:15:02.128Z",
+      "updateTime": "2026-09-02T07:16:22.844Z",
+      "maxPoints": 100,
+      "workType": "SHORT_ANSWER_QUESTION",
+      "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+      "creatorUserId": "103650467979465325195"
+    }
+  ],
+  "materials": [
+    {
+      "courseId": "798417072045",
+      "id": "890693421795",
+      "title": "Course Materials",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1ONra0VV0FsOCKvc6j4JQuSlAyyDQ12fi",
+              "title": "Lecture 14. Intellectual Property Rights .pdf",
+              "alternateLink": "https://drive.google.com/file/d/1ONra0VV0FsOCKvc6j4JQuSlAyyDQ12fi/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOVidiI-Y3zT1szUGykIF3bnkpN2XLdexC_1Tng-op5v8lQZHSpUKqUuWQLVg0XZOO5GegyBUCWDxe-h54mbzv1SSBFDPU3XozoaT66xC0RRH5xVA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1zvbKgOM18xi62KJxdZ4uWIy2zjYszhQ_",
+              "title": "LECTURE 15 Indian-Contract-Act.pptx",
+              "alternateLink": "https://drive.google.com/file/d/1zvbKgOM18xi62KJxdZ4uWIy2zjYszhQ_/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOGtm-5sSCs5ouW80GCnEgSYNrorZCxdBaSJ8GofH7g6xRtRhJ6TEf_z-wGgrD18DkiEptiBqzWBPpO2vvJeQmgBzuZx1yGQjEL9KrSJ4LgW7TTtA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1Obg9oB2ip4vgPLvZBOc-m0Rx56_KLydi",
+              "title": "LECTURE 16 ENVIRONMENT AND HUMAN HEALTH.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1Obg9oB2ip4vgPLvZBOc-m0Rx56_KLydi/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPcFM5x1LV5PJFRdPbsV1G7t1ciac5jx5Hkyfef9mo0LqZyKo-RXqvNB7sLS-H6Uctw5raPZ1-LLaNPnGe8gOzHIrBS6OdA7hoxrAjBsScakeBqHg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "12cSotRZmWbNV1-bnrNdoJyGKD8nWp4GY",
+              "title": "LECTURE 17. Cognition.pdf",
+              "alternateLink": "https://drive.google.com/file/d/12cSotRZmWbNV1-bnrNdoJyGKD8nWp4GY/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOA_ARNWyehIB-eezJdT3yhNvotO-pT7QU9tbmpIw3kLVF1oCTj-27Y-UpLD4sMVain6bEWj3UnGxCtoAULgBju54CRq4Ja8LKeClWaE6rhySxygg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1fa-yV0HEfL2Q2S-FbbSMZ_flditD3eco",
+              "title": "LECTURE 18 Working in Teams.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1fa-yV0HEfL2Q2S-FbbSMZ_flditD3eco/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOv5ZsiDF4Op27geRhi3wx8-A9winxivUv2Hfy1_Ox5N6Ac5brdAS8c-L1f1R6Y7e-re8Hbo6ulSbKrXffN2jZ6-lmOj0d9Lz6djVe1xbX_aITQWw=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1ktokeCQyhJseQKFf3CYoWUrNY-NvUp9_",
+              "title": "LECTURE 19  Interacting with Stakeholders.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1ktokeCQyhJseQKFf3CYoWUrNY-NvUp9_/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOfa7ll1z27pn7gniCaY4sXkpWCGtiuHUnUdcSLhels4FzQ7I_efwKSzPwxH8oOMJvJ1Kw9KR9NNLzPKe_YDIrIXBZG9mR__UGtDzv-FYFOGXYZKg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1AXxj7EKTICSC_nm0UsA0C5-x_CIXnEKb",
+              "title": "LECTURE 20 . Multi-Cultural Environment.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1AXxj7EKTICSC_nm0UsA0C5-x_CIXnEKb/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBM7hh4WwU_CjZ-llCa9vGBaTN33YnJwKVl4Ha1SbbQfzmgHqi1lfrhJ7cKYzJ43RTr1zopkZd_ZTNwexnM0C0IuMeGUEEORN6ym1CaLQBTWBXR-MA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1Uvgb-lMiIO1QUUfhYiA0JnEChGOrQWMg",
+              "title": "LECTURE 21 Conflict.pptm",
+              "alternateLink": "https://drive.google.com/file/d/1Uvgb-lMiIO1QUUfhYiA0JnEChGOrQWMg/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPJ2t_vVssD4XbEEjZ8KwNPHh_g6np0BUbwPhhxtrBvZ3BMOxi54BgGNFW_k-xil2FFtm1FRWj5Qy5rRF3SQ5QSWOmlfQWUft5uvmbxiuGrPkkcDQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODkwNjkzNDIxNzk1/details",
+      "creationTime": "2026-10-30T04:01:43.771Z",
+      "updateTime": "2026-10-30T04:02:31.704Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "891815325816",
+      "title": "Rest Post Midsemester Materials",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1jsHUtaMZGoE6x_lvkmNL6HlyiShdj6-0",
+              "title": "Cost Volume.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1jsHUtaMZGoE6x_lvkmNL6HlyiShdj6-0/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMHNcjneVt1j7MCWQ4SevFu-lqLzzf3Ba4mlZqMV92SilVfKdRRl6jypnTZ23Zq18QX9lLZo-5laPZF-ixIvDdL2AXWgC1SSZ_LYtkz9H7O9F6-LA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1V55SrExZdl4gEIDiDMKWEY2xDov8fWRS",
+              "title": "Lecture 12. Code of Ethics.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1V55SrExZdl4gEIDiDMKWEY2xDov8fWRS/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPEcGrD-JmEIyNfAW5jEs4HWbsWp6-8wL34lQfHVLFA4fHSoG38TdVXnj8HLAYOcBqGCYnwydMmeIR4Byo09akughcnBT1ulEENd8nPiGLXbR0zMA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1Z2PXLz236BiqBFmTgssxQo2zLdOHGchO",
+              "title": "Lecture 13 Legal forms of Business organization .pdf",
+              "alternateLink": "https://drive.google.com/file/d/1Z2PXLz236BiqBFmTgssxQo2zLdOHGchO/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMc8JMz9tf42wqSpjacGOMe7Vx-eAcVocSSmzh39fuTs8DMLn4LkQDj64fQRAxLsjvak81DyIEBycxanRpH_zNmD4sz2YzPX_9cR1i2dklvNLUoCA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1gcvvad5DUq08QCMX82XMSGldnkONEUSu",
+              "title": "Lecture 14. Intellectual Property Rights  (1).pdf",
+              "alternateLink": "https://drive.google.com/file/d/1gcvvad5DUq08QCMX82XMSGldnkONEUSu/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPU8HFDH6TwOdZlntn7gz0LDt3TX-jjKzb-raLt-2EOkzT29ZLdSU-GjoAGfsqh2BWEC68kBQa3iNB0qSXavXbd6HN5nrPudmZSqIrgkhqaPTRLeA=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1pVTGjouRK7YgRnkYFBa4O1c67vilumvR",
+              "title": "Lecture 14. Intellectual Property Rights .pdf",
+              "alternateLink": "https://drive.google.com/file/d/1pVTGjouRK7YgRnkYFBa4O1c67vilumvR/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBO_mYyvDQpFSJYzfrc3n_wkR8EgQcjZCoFgfaXIx5vkljzCPrCBnPwmGZVoppAz-OcCeW-f0-81MOMuaBH2BWhqDb2M4nbM6clBYHPhGVKtHEsKgg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1rOTz1-uhJXWagY7qgUonQ9VpSV8XBbbt",
+              "title": "LECTURE 19  Interacting with Stakeholders.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1rOTz1-uhJXWagY7qgUonQ9VpSV8XBbbt/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMO9SXjMUk0XJBwDYZ2bnhUKvDq0nFYYTpA0IY-pwnKFuyZtT7QU27fRu7XWk3a3B8aS6o4OATJuKSkBOIyKdFUOQFL06trKU6bmIqozr8IY261sg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "12JdBV-Qnfuc_AnoHA-UePcF_pBePFPvf",
+              "title": "LECTURE 21 Conflict.pptm",
+              "alternateLink": "https://drive.google.com/file/d/12JdBV-Qnfuc_AnoHA-UePcF_pBePFPvf/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMhMi3-D2jKCJ1h50cDTb8To4g_EeNrQoM_eNoda5j1Yk7-nLwNW-ILFwljxQGow-5nnzh2aGw79N2S20PupaqNGfkf15YE_tOL90_DMLOBm6VOzw=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        },
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1ts2NhMrsWE3h3WV29Bhzp9vseCOIlX_r",
+              "title": "Leture 11 Moral and Ethics.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1ts2NhMrsWE3h3WV29Bhzp9vseCOIlX_r/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMS9SUmoBOwv2uKtpvPepgV4z-om8BGt-evRfboDsv0Mp1er-q3AIntN0JAszmOYfT3sPVEHWWz2nNW8_1a1ezZFSPzAc4ri10JwxsqcFaKXcSQww=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODkxODE1MzI1ODE2/details",
+      "creationTime": "2026-10-13T10:13:38.179Z",
+      "updateTime": "2026-10-13T10:14:07.342Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "873350309732",
+      "title": "3rd Module, 1st section",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1jhqhCVOOrrs3L6mZ8eUicDGUuo7WgB5V",
+              "title": "Lecture 10 EPP.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1jhqhCVOOrrs3L6mZ8eUicDGUuo7WgB5V/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOrC-Fti6PuaYaosALV3Q6-MUETNM5wMNIBAS8Hfx4ZUsK_MATUqKf-ax-C7NTIereZQXngPJI75Y1PdA3PXPnYUehSh-Nhy_hH9GIH6YfBZMs-4A=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODczMzUwMzA5NzMy/details",
+      "creationTime": "2026-09-23T10:13:05.503Z",
+      "updateTime": "2026-09-23T10:22:33.422Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "878471335806",
+      "title": "Module II",
+      "description": "Module II Notes",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1-Q9mfKwDQn5XNDgP0Y5KY99fvKMc3Am-",
+              "title": "Module-II.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1-Q9mfKwDQn5XNDgP0Y5KY99fvKMc3Am-/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPJ9cFLLVycsbAV69Cb-sUx0LnfWkIHlDYnnljpwe4aUnNW62o24tiAHRbpnHzpDdQXlWU_G6uzBmylZ2wuMybLeOJg5Y6YvL48rNQ12MiPv1h2KQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODc4NDcxMzM1ODA2/details",
+      "creationTime": "2026-09-09T12:36:12.918Z",
+      "updateTime": "2026-09-09T12:37:12.229Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "855616071379",
+      "title": "Lesson Plan",
+      "description": "Course Handout",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1FO9netAi5hKVqgxPtKSjHqgRf7zDfRNC",
+              "title": "COURSE HANDOUT_EPP.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1FO9netAi5hKVqgxPtKSjHqgRf7zDfRNC/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPtQiWyqNM3Hu3EwuHeLasvuFz_Ut4YhhjCKouoF1K0AR6BHv2eqZfbBzVub2dNm-QPqrHKRKVKJkrlvUiJSYcvH2nTvSmxpQmR7T3egxNwi-cwSw=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODU1NjE2MDcxMzc5/details",
+      "creationTime": "2026-07-21T09:46:33.030Z",
+      "updateTime": "2026-09-02T07:17:18.692Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "856125268084",
+      "title": "Previous year Question Solution",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1LOhggzDjSEAnGFMCgl6-8cqMfnE06Ztl",
+              "title": "EPP Midsem Solution.pdf",
+              "alternateLink": "https://drive.google.com/file/d/1LOhggzDjSEAnGFMCgl6-8cqMfnE06Ztl/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBPYo2_R4VXhKkeeyoX6pkRrTolvsf4MQ0cZnnsAf8htFbXAiTmwesm_72AhSwKR9humqxcdgXil9yzzknXJzseVdvzpesVp_Xvi9ieG1nhc2laEWQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODU2MTI1MjY4MDg0/details",
+      "creationTime": "2026-08-25T10:21:39.428Z",
+      "updateTime": "2026-08-25T10:22:07.993Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "874947645919",
+      "title": "Lecture 3",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1OGaP4HVfpGlkNUqsykEvI6ieprZBFzvT",
+              "title": "LECTURE 3.ppt",
+              "alternateLink": "https://drive.google.com/file/d/1OGaP4HVfpGlkNUqsykEvI6ieprZBFzvT/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBMH0G-zXbx2a1jVX3wJVq7pxCM7SAwSi0ftf6D87kicPMnyG4GEpx5vcS1fIJqIQZQajvs20b0x7wTU3OAzHZwehmWdwDkzRvuSNYTswawNsmpSfQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODc0OTQ3NjQ1OTE5/details",
+      "creationTime": "2026-08-18T10:31:13.795Z",
+      "updateTime": "2026-08-18T10:31:44.299Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "869112661131",
+      "title": "Lecture 2",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1GbmNtBNBDTf9V9VfVZ0RJakDnrUFHSgk",
+              "title": "LECTURE 2.ppt",
+              "alternateLink": "https://drive.google.com/file/d/1GbmNtBNBDTf9V9VfVZ0RJakDnrUFHSgk/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBOJB84igVZp3w6qxrw7-fzrQ0VqSQMZr6Yv8JTTCt4WS7ID1M6Ryrj8lLTSDS8f37YuduUfmVXcAnwQreOV1VyPFIcqUIYT3TDE-hYggPn-6hh9wQ=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODY5MTEyNjYxMTMx/details",
+      "creationTime": "2026-08-11T09:44:13.495Z",
+      "updateTime": "2026-08-11T09:44:54.179Z",
+      "creatorUserId": "103650467979465325195"
+    },
+    {
+      "courseId": "798417072045",
+      "id": "855711625637",
+      "title": "Engineering and Engineer\n",
+      "materials": [
+        {
+          "driveFile": {
+            "driveFile": {
+              "id": "1yJnTKOY4qV1rZT9x2eyRE12fIXfRYGbX",
+              "title": "LECTURE 1.pptx",
+              "alternateLink": "https://drive.google.com/file/d/1yJnTKOY4qV1rZT9x2eyRE12fIXfRYGbX/view?usp=drive_web",
+              "thumbnailUrl": "https://lh3.googleusercontent.com/drive-storage/AJQWtBNuSf67TjaJZKZeCE4ZJCBzuLqvZlhzUeh2kr59dhXMNEIUXEClDeSNSH3PdqT-Z906mAap7jR0446QA8zJZjvhzefaydQl4m5CObxkrQauOphUmg=s200"
+            },
+            "shareMode": "VIEW"
+          }
+        }
+      ],
+      "state": "PUBLISHED",
+      "alternateLink": "https://classroom.google.com/c/Nzk4NDE3MDcyMDQ1/m/ODU1NzExNjI1NjM3/details",
+      "creationTime": "2026-07-29T09:45:44.670Z",
+      "updateTime": "2026-07-29T09:46:31.872Z",
+      "creatorUserId": "103650467979465325195"
+    }
+  ]
+}
