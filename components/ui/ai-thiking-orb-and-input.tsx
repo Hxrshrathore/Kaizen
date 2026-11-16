@@ -1086,7 +1086,9 @@ export const MorphOrb = React.forwardRef<MorphOrbHandle, MorphOrbProps>(function
         <span key={"c" + lbl.n} className="mo-lab mo-in">{labelInner(lbl.cur)}</span>
       </div>
 
-      <button type="button" className="mo-reset" onClick={onReset}>{DEFAULT_COPY.reset}</button>
+      {phase === "answered" && (
+        <button type="button" className="mo-reset" onClick={onReset}>{DEFAULT_COPY.reset}</button>
+      )}
 
       <div className="mo-live" ref={liveRef} role="status" aria-live="polite" />
 

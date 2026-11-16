@@ -784,18 +784,21 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
             {generatedPaper ? (
               <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-y-auto custom-scrollbar pr-1">
                 {showReasoning && (
-                  <AiReasoningView
-                    reasoning={reasoningContent}
-                    modelName="NVIDIA Nemotron 3.5 Bolt"
-                    isLive={false}
-                    isComplete={true}
-                    durationSeconds={thinkingDuration || genStats?.latency || 11.4}
-                    subjectCode={selectedSubjectCode}
-                    subjectName={selectedSubjectName}
-                    examType={examType}
-                    isExpanded={reasoningExpanded}
-                    onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
-                  />
+                  <div className="w-full shrink-0">
+                    <AiReasoningView
+                      reasoning={reasoningContent}
+                      modelName="NVIDIA Nemotron 3.5 Bolt"
+                      isLive={false}
+                      isComplete={true}
+                      durationSeconds={thinkingDuration || genStats?.latency || 11.4}
+                      subjectCode={selectedSubjectCode}
+                      subjectName={selectedSubjectName}
+                      examType={examType}
+                      isExpanded={reasoningExpanded}
+                      onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                      isFloatingOverlay={false}
+                    />
+                  </div>
                 )}
 
                 <motion.div
@@ -822,13 +825,11 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </motion.div>
               </div>
             ) : (
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-                {/* Dynamic MorphOrb Stage: Seamlessly stays mounted, animates upward when generating */}
-                <div className={`w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col items-center justify-center shrink-0 ${
-                  loading ? 'h-[170px] -mb-1' : 'flex-1'
-                }`}>
+              <div className="flex-1 min-h-0 w-full h-full relative overflow-hidden flex items-center justify-center">
+                {/* Background Layer: Centered MorphOrb & Ambient Stage */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto">
                   {!loading && (
-                    <div className="text-center mb-4 max-w-lg px-2">
+                    <div className="text-center mb-4 max-w-lg px-2 z-10">
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-2.5 shadow-sm uppercase tracking-[0.16em]">
                         <Sparkles size={12} className="text-primary animate-pulse" />
                         <span>Autonomous Examination Generator</span>
@@ -842,7 +843,8 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                     </div>
                   )}
 
-                  <div className="w-full flex justify-center">
+                  {/* MorphOrb is ALWAYS Centered in the stage container */}
+                  <div className="w-full h-full flex items-center justify-center">
                     <MorphOrb
                       ref={morphOrbRef}
                       placeholder={`Instruct NVIDIA Nemotron for ${selectedSubjectCode}...`}
@@ -865,15 +867,29 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                   </div>
                 </div>
 
-                {/* Live Reasoning View: Dynamically fills 100% of the remaining height with no cut off text */}
+                {/* Foreground Floating Layer: iOS 26 Liquid Glass Reasoning Window */}
                 <AnimatePresence>
                   {loading && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                      className="flex-1 min-h-0 w-full flex flex-col overflow-hidden pb-1"
+                      key="live-reasoning-window"
+                      layout
+                      initial={{ opacity: 0, y: 36, scale: 0.98 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        top: reasoningExpanded ? 10 : "auto",
+                        bottom: 10,
+                        height: reasoningExpanded ? "calc(100% - 20px)" : 52,
+                      }}
+                      exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                        mass: 0.85,
+                      }}
+                      className="absolute inset-x-2 sm:inset-x-3.5 z-30 flex flex-col"
                     >
                       <AiReasoningView
                         reasoning={reasoningContent}
@@ -885,6 +901,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         examType={examType}
                         isExpanded={reasoningExpanded}
                         onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                        isFloatingOverlay={true}
                       />
                     </motion.div>
                   )}

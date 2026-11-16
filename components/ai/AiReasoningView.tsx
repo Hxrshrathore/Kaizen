@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, Copy, Check, ChevronDown, ChevronUp, 
   BrainCircuit, ShieldCheck, CheckCircle2, Clock, 
-  Cpu, Layers, Award
+  Cpu, Layers, Award, Minimize2, Maximize2
 } from "lucide-react";
 
 export interface AiReasoningStep {
@@ -27,6 +27,7 @@ interface AiReasoningViewProps {
   examType?: "mid_sem" | "end_sem";
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  isFloatingOverlay?: boolean;
 }
 
 /**
@@ -68,7 +69,11 @@ function renderInlineFormatted(text: string) {
 
 /**
  * Formats structured thinking traces from NVIDIA Nemotron 3.5 Bolt
- * Features live progressive streaming, timer, and smooth auto-collapse accordion.
+ * Features:
+ * - iOS 26 Liquid Frosted Glass Aesthetic (backdrop-blur-3xl, deep obsidian sheen, specular rim highlight)
+ * - Animated de-expansion pinning cleanly to the bottom dock
+ * - Full-height expansion overlapping the centered orb
+ * - Live progressive streaming, stopwatch timer, and zero text cut-off
  */
 export function AiReasoningView({
   reasoning,
@@ -81,16 +86,18 @@ export function AiReasoningView({
   examType = "end_sem",
   isExpanded: controlledExpanded,
   onToggleExpand,
+  isFloatingOverlay = true,
 }: AiReasoningViewProps) {
   const [internalExpanded, setInternalExpanded] = useState(true);
   const [copied, setCopied] = useState(false);
   const [liveSeconds, setLiveSeconds] = useState(0);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
 
   const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
 
-  const toggleExpand = () => {
+  const toggleExpand = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (onToggleExpand) {
       onToggleExpand();
     } else {
@@ -120,7 +127,6 @@ export function AiReasoningView({
   useEffect(() => {
     if (!isLive) return;
 
-    // Advance steps gracefully over the typical 12-second window
     const timeouts = [
       setTimeout(() => setActiveStepIndex(1), 1800),
       setTimeout(() => setActiveStepIndex(2), 4200),
@@ -130,14 +136,6 @@ export function AiReasoningView({
 
     return () => timeouts.forEach(clearTimeout);
   }, [isLive]);
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const copyText = reasoning || defaultSteps.map(s => `## ${s.title}\n${s.bullets.map(b => `- ${b}`).join('\n')}`).join('\n\n');
-    navigator.clipboard.writeText(copyText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const isMid = examType === "mid_sem";
   const marks = isMid ? 20 : 50;
@@ -240,51 +238,63 @@ export function AiReasoningView({
 
   const hasCustomReasoning = customReasoningBlocks.length > 0;
   const displaySeconds = liveSeconds > 0 ? liveSeconds : (durationSeconds || 11.4);
-  const scrollEndRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll when reasoning updates
   useEffect(() => {
-    if (isLive && scrollEndRef.current) {
+    if (isLive && scrollEndRef.current && isExpanded) {
       scrollEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [reasoning, activeStepIndex, isLive]);
+  }, [reasoning, activeStepIndex, isLive, isExpanded]);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const copyText = reasoning || defaultSteps.map(s => `## ${s.title}\n${s.bullets.map(b => `- ${b}`).join('\n')}`).join('\n\n');
+    navigator.clipboard.writeText(copyText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div 
-      ref={containerRef}
-      className={`rounded-2xl border transition-all duration-300 shadow-sm overflow-hidden flex flex-col ${
-        isLive 
-          ? "border-primary/40 bg-card/90 ring-1 ring-primary/30 shadow-primary/5 flex-1 min-h-0 w-full h-full" 
-          : "border-border bg-card/70 backdrop-blur-md hover:border-primary/30 shrink-0"
-      }`}
+      className={`relative w-full rounded-2xl sm:rounded-3xl flex flex-col overflow-hidden transition-all duration-300
+        backdrop-blur-3xl bg-[#090b10]/80 dark:bg-[#07080d]/85
+        border border-white/15 dark:border-white/12
+        shadow-[0_24px_64px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.22)]
+        before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/35 before:to-transparent before:pointer-events-none
+        after:absolute after:inset-0 after:rounded-[inherit] after:pointer-events-none after:bg-[radial-gradient(ellipse_at_top,rgba(204,255,0,0.06),transparent_65%)]
+        ${isFloatingOverlay ? "h-full" : isExpanded ? "max-h-[460px] min-h-[200px]" : "h-[52px]"}
+      `}
     >
-      {/* ────────────────── TOP BANNER / ACCORDION HEADER ────────────────── */}
+      {/* ────────────────── TOP BANNER / BAR HEADER ────────────────── */}
       <div 
         onClick={toggleExpand}
-        className="flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 cursor-pointer select-none transition-colors border-b border-border/60 shrink-0"
+        className={`flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 cursor-pointer select-none transition-colors border-b border-white/10 shrink-0 ${
+          isExpanded ? "bg-white/[0.03] hover:bg-white/[0.06]" : "h-full bg-white/[0.04] hover:bg-white/[0.08]"
+        }`}
       >
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Animated Brain Icon */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          {/* Animated Brain Icon with glowing ring */}
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
             isLive 
-              ? "bg-primary/20 text-primary border border-primary/40 animate-pulse shadow-sm shadow-primary/20" 
-              : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+              ? "bg-primary/20 text-primary border border-primary/40 shadow-sm shadow-primary/25 animate-pulse" 
+              : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/15"
           }`}>
             <BrainCircuit size={17} className={isLive ? "animate-pulse" : ""} />
           </div>
 
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
-                {modelName} Reasoning
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+                {modelName}
               </span>
 
               {isLive ? (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/15 text-primary border border-primary/30 animate-pulse">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/20 text-primary border border-primary/30 animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
                   Thinking for {displaySeconds}s...
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   <CheckCircle2 size={11} className="text-emerald-400" />
                   Thought for {displaySeconds}s • 5 Steps Verified
                 </span>
@@ -292,9 +302,9 @@ export function AiReasoningView({
             </div>
 
             {/* Subtext Pills */}
-            <div className="hidden sm:flex items-center gap-2 mt-1 text-[11px] font-mono text-muted-foreground">
+            <div className="hidden sm:flex items-center gap-2 mt-0.5 text-[10px] font-mono text-muted-foreground">
               <span className="flex items-center gap-1 text-emerald-400">
-                <ShieldCheck size={12} /> KIIT Autonomous Regs
+                <ShieldCheck size={11} /> KIIT Autonomous Regs
               </span>
               <span>•</span>
               <span>Bloom&apos;s Taxonomy</span>
@@ -311,7 +321,7 @@ export function AiReasoningView({
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground border border-border transition-colors shadow-sm"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground border border-white/10 transition-colors shadow-sm"
             title="Copy Reasoning CoT"
           >
             {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -320,170 +330,168 @@ export function AiReasoningView({
 
           <button
             type="button"
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={isExpanded ? "Collapse Reasoning" : "Expand Reasoning"}
+            onClick={toggleExpand}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground border border-white/10 text-[11px] font-mono transition-colors"
+            aria-label={isExpanded ? "Collapse to bottom" : "Expand Reasoning"}
+            title={isExpanded ? "De-expand & tie to bottom" : "Expand Live Reasoning Over Stage"}
           >
-            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {isExpanded ? (
+              <>
+                <ChevronDown size={14} className="text-primary" />
+                <span className="hidden md:inline text-[10px]">De-expand</span>
+              </>
+            ) : (
+              <>
+                <ChevronUp size={14} className="text-primary" />
+                <span className="hidden md:inline text-[10px]">Expand Live Traces</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* ────────────────── EXPANDABLE DETAILED CONTENT ────────────────── */}
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className={isLive ? "flex-1 min-h-0 flex flex-col overflow-hidden" : "overflow-hidden"}
-          >
-            <div className={`p-4 sm:p-5 space-y-3.5 overflow-y-auto custom-scrollbar text-xs leading-relaxed text-muted-foreground font-sans border-t border-border/40 bg-background/30 ${
-              isLive ? "flex-1 min-h-0" : "max-h-[380px]"
-            }`}>
-              
-              {/* Header Note */}
-              <div className="flex items-center justify-between pb-2 border-b border-border/40 text-[11px] font-mono">
-                <div className="flex items-center gap-1.5 text-primary">
-                  <Sparkles size={13} />
-                  <span className="font-bold">Generative Chain-of-Thought (CoT) Verification Ladder</span>
-                </div>
-                <div className="text-muted-foreground">
-                  Status: {isLive ? <span className="text-primary animate-pulse font-bold">Synthesizing...</span> : <span className="text-emerald-400 font-bold">Audit Complete</span>}
-                </div>
-              </div>
+      {/* ────────────────── EXPANDED REASONING CONTENT ────────────────── */}
+      {isExpanded && (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Subheader bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-black/20 text-[10px] sm:text-[11px] font-mono text-muted-foreground shrink-0">
+            <div className="flex items-center gap-1.5 text-primary">
+              <Sparkles size={12} />
+              <span className="font-bold">Generative Chain-of-Thought (CoT) Verification Ladder</span>
+            </div>
+            <div className="text-[10px]">
+              Status: {isLive ? <span className="text-primary animate-pulse font-bold">Synthesizing...</span> : <span className="text-emerald-400 font-bold">Audit Complete</span>}
+            </div>
+          </div>
 
-              {/* Render custom LLM reasoning if present, otherwise render rich interactive default steps */}
-              {hasCustomReasoning ? (
-                <div className="space-y-3">
-                  {customReasoningBlocks.map((block, idx) => {
-                    if (block.type === "header") {
-                      return (
-                        <div key={idx} className="flex items-center gap-2 text-xs font-mono font-medium text-primary/90 italic pb-1">
-                          <Sparkles size={13} className="text-primary flex-shrink-0" />
-                          <span>{renderInlineFormatted(block.content)}</span>
-                        </div>
-                      );
-                    }
-
-                    if (block.type === "step") {
-                      return (
-                        <div
-                          key={idx}
-                          className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border/80 hover:border-primary/30 transition-all mt-3 first:mt-0"
-                        >
-                          <div className="w-6 h-6 rounded-md bg-primary/15 text-primary border border-primary/30 flex items-center justify-center font-mono font-bold text-xs flex-shrink-0">
-                            {block.stepNum}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-xs font-bold text-foreground font-mono tracking-wide">
-                              {block.title}
-                            </h4>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (block.type === "bullet") {
-                      return (
-                        <div key={idx} className="flex items-start gap-2.5 pl-4 sm:pl-7 text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary/70 mt-1.5 flex-shrink-0" />
-                          <div className="flex-1 leading-relaxed">
-                            {renderInlineFormatted(block.content)}
-                          </div>
-                        </div>
-                      );
-                    }
-
+          {/* Scrollable Traces Area - dynamically stretches with zero cut-off */}
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3.5 sm:p-5 space-y-3.5 text-xs text-muted-foreground font-sans">
+            
+            {hasCustomReasoning ? (
+              <div className="space-y-3">
+                {customReasoningBlocks.map((block, idx) => {
+                  if (block.type === "header") {
                     return (
-                      <p key={idx} className="pl-4 sm:pl-7 text-xs leading-relaxed text-muted-foreground/90">
-                        {renderInlineFormatted(block.content)}
-                      </p>
+                      <div key={idx} className="flex items-center gap-2 text-xs font-mono font-medium text-primary/90 italic pb-1">
+                        <Sparkles size={13} className="text-primary flex-shrink-0" />
+                        <span>{renderInlineFormatted(block.content)}</span>
+                      </div>
                     );
-                  })}
-                </div>
-              ) : (
-                /* Default Animated Step Ladder */
-                <div className="space-y-3">
-                  {defaultSteps.map((step, idx) => {
-                    const isStepActive = step.status === "active";
-                    const isStepCompleted = step.status === "completed";
-                    const isStepPending = step.status === "pending";
+                  }
 
+                  if (block.type === "step") {
                     return (
                       <div
-                        key={step.id}
-                        className={`p-3.5 rounded-xl border transition-all duration-300 ${
-                          isStepActive
-                            ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20 shadow-sm"
-                            : isStepCompleted
-                            ? "bg-muted/30 border-border/80 hover:border-border"
-                            : "bg-muted/10 border-border/40 opacity-40"
-                        }`}
+                        key={idx}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-primary/30 transition-all mt-3 first:mt-0"
                       >
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2.5">
-                            {/* Status Icon */}
-                            <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold flex-shrink-0 ${
-                              isStepCompleted
-                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                : isStepActive
-                                ? "bg-primary/20 text-primary border border-primary/40 animate-pulse"
-                                : "bg-muted text-muted-foreground border border-border"
-                            }`}>
-                              {isStepCompleted ? (
-                                <Check size={12} className="text-emerald-400" />
-                              ) : isStepActive ? (
-                                <span className="animate-spin text-xs">◓</span>
-                              ) : (
-                                <span>{idx + 1}</span>
-                              )}
-                            </div>
-
-                            <span className={`text-xs font-mono font-bold ${
-                              isStepActive ? "text-primary" : isStepCompleted ? "text-foreground" : "text-muted-foreground"
-                            }`}>
-                              {idx + 1}. {step.title}
-                            </span>
-                          </div>
-
-                          {step.category && (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/60 uppercase">
-                              {step.category}
-                            </span>
-                          )}
+                        <div className="w-6 h-6 rounded-md bg-primary/15 text-primary border border-primary/30 flex items-center justify-center font-mono font-bold text-xs flex-shrink-0">
+                          {block.stepNum}
                         </div>
-
-                        {/* Step details bullets */}
-                        <div className="pl-7 space-y-1 mt-2 text-[11px] font-mono text-muted-foreground">
-                          {step.bullets.map((bullet, bIdx) => (
-                            <div key={bIdx} className="flex items-start gap-2">
-                              <span className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${
-                                isStepCompleted ? "bg-emerald-400" : isStepActive ? "bg-primary animate-ping" : "bg-muted-foreground/50"
-                              }`} />
-                              <span>{renderInlineFormatted(bullet)}</span>
-                            </div>
-                          ))}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-foreground font-mono tracking-wide break-words">
+                            {block.title}
+                          </h4>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
+                  }
 
-              {/* Live Blinking Stream Indicator when Live */}
-              {isLive && (
-                <div className="flex items-center gap-2 pt-2 text-[11px] font-mono text-primary animate-pulse pl-1">
-                  <span className="w-2 h-2 rounded-full bg-primary" />
-                  <span>{reasoning ? "NVIDIA Nemotron live pedagogical cognitive trace... ▌" : "Synthesizing examination questions adhering to autonomous guidelines... ▌"}</span>
-                </div>
-              )}
-              <div ref={scrollEndRef} />
+                  if (block.type === "bullet") {
+                    return (
+                      <div key={idx} className="flex items-start gap-2.5 pl-3 sm:pl-6 text-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/70 mt-1.5 flex-shrink-0" />
+                        <div className="flex-1 leading-relaxed break-words whitespace-pre-wrap">
+                          {renderInlineFormatted(block.content)}
+                        </div>
+                      </div>
+                    );
+                  }
 
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  return (
+                    <p key={idx} className="pl-3 sm:pl-6 text-xs leading-relaxed text-muted-foreground/90 break-words whitespace-pre-wrap">
+                      {renderInlineFormatted(block.content)}
+                    </p>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {defaultSteps.map((step, idx) => {
+                  const isStepActive = isLive && (activeStepIndex === idx);
+                  const isStepCompleted = !isLive || isComplete || (activeStepIndex > idx);
+
+                  return (
+                    <div
+                      key={step.id}
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        isStepActive
+                          ? "bg-primary/[0.07] border-primary/40 shadow-sm shadow-primary/10"
+                          : isStepCompleted
+                          ? "bg-white/[0.02] border-white/10"
+                          : "bg-transparent border-white/5 opacity-55"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold flex-shrink-0 ${
+                            isStepCompleted
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                              : isStepActive
+                              ? "bg-primary/20 text-primary border border-primary/40 animate-pulse"
+                              : "bg-white/5 text-muted-foreground border border-white/10"
+                          }`}>
+                            {isStepCompleted ? (
+                              <Check size={11} className="text-emerald-400" />
+                            ) : isStepActive ? (
+                              <span className="animate-spin text-xs">◓</span>
+                            ) : (
+                              <span>{idx + 1}</span>
+                            )}
+                          </div>
+
+                          <span className={`text-xs font-mono font-bold break-words ${
+                            isStepActive ? "text-primary" : isStepCompleted ? "text-foreground" : "text-muted-foreground"
+                          }`}>
+                            {idx + 1}. {step.title}
+                          </span>
+                        </div>
+
+                        {step.category && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-white/5 text-muted-foreground border border-white/10 uppercase flex-shrink-0">
+                            {step.category}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Step details bullets */}
+                      <div className="pl-6 space-y-1 mt-2 text-[11px] font-mono text-muted-foreground">
+                        {step.bullets.map((bullet, bIdx) => (
+                          <div key={bIdx} className="flex items-start gap-2">
+                            <span className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${
+                              isStepCompleted ? "bg-emerald-400" : isStepActive ? "bg-primary animate-ping" : "bg-muted-foreground/40"
+                            }`} />
+                            <span className="leading-relaxed break-words whitespace-pre-wrap">{renderInlineFormatted(bullet)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Live Blinking Stream Indicator when Live */}
+            {isLive && (
+              <div className="flex items-center gap-2 pt-2 text-[11px] font-mono text-primary animate-pulse pl-1">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                <span>{reasoning ? "NVIDIA Nemotron live pedagogical cognitive trace... ▌" : "Synthesizing examination questions adhering to autonomous guidelines... ▌"}</span>
+              </div>
+            )}
+            <div ref={scrollEndRef} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
