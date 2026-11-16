@@ -8,6 +8,8 @@ import {
   GraduationCap, CheckCircle2, ShieldCheck, Eye, Code
 } from 'lucide-react';
 import { QuestionPaperSheet } from './QuestionPaperSheet';
+import MorphOrb from '@/components/ui/ai-thiking-orb-and-input';
+import { AiReasoningView } from '@/components/ai/AiReasoningView';
 
 const MotionDiv = motion.div as any;
 
@@ -179,7 +181,8 @@ export default function DashboardGeneratorPage() {
     if (sub) setSelectedSubjectName(sub.name);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (customInstruction?: string | React.MouseEvent) => {
+    const validCustomInstruction = typeof customInstruction === 'string' ? customInstruction : undefined;
     setLoading(true);
     setError(null);
     setGeneratedPaper(null);
@@ -254,6 +257,7 @@ QUESTIONS 2 TO 5 (Answer any THREE questions. Each question carries 5 marks)
 `.trim();
 
     const promptText = `
+${validCustomInstruction ? `Specific Faculty Instruction & Custom Directive:\n${validCustomInstruction}\n` : ''}
 You are the official Senior Examination Paper Setter: ${facultyName}
 Department: School of Electronics and Computer Science Engineering
 Academic Target: B.Tech ${semLabel}
@@ -310,6 +314,9 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         .trim();
       setGeneratedPaper(cleanPaper);
       setReasoningContent(data.reasoning || null);
+      if (data.reasoning) {
+        setShowReasoning(true);
+      }
       setGenStats({
         tokens: consumed,
         latency: data.time_taken || 2.4,
@@ -567,7 +574,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
             {/* Generate Action Button */}
             <button
-              onClick={handleGenerate}
+              onClick={() => handleGenerate()}
               disabled={loading}
               className="w-full h-11 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-50"
             >
@@ -726,25 +733,30 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
             {/* Paper Output Container */}
             <div className="flex-1 overflow-y-auto custom-scrollbar leading-relaxed text-foreground select-text">
               {loading ? (
-                <div className="h-[480px] flex flex-col items-center justify-center text-muted-foreground space-y-4">
-                  <div className="relative w-14 h-14">
-                    <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin" />
-                    <Sparkles className="absolute inset-0 m-auto text-primary animate-pulse" size={20} />
-                  </div>
-                  <p className="text-xs uppercase tracking-widest animate-pulse font-mono">
-                    NVIDIA Nemotron 3.5 Bolt Synthesizing KIIT Examination Paper for [{selectedSubjectCode}]...
-                  </p>
+                <div className="min-h-[520px] w-full flex items-center justify-center p-2">
+                  <MorphOrb
+                    autoStartText={`Synthesize official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode} (${selectedSubjectName})`}
+                    labels={[
+                      "Analyzing Syllabus & Historical PYQs",
+                      "Solving Constrained Knapsack Model",
+                      "Querying NVIDIA Nemotron 3.5 Engine",
+                      "Synthesizing KIIT Examination Blueprint",
+                      "Validating CO & Bloom's Taxonomy",
+                    ]}
+                    answerTitle="KIIT Paper Ready"
+                    placeholder={`Instruct NVIDIA Nemotron 3.5 for ${selectedSubjectCode}...`}
+                    onSubmit={async () => {
+                      return "Paper synthesized successfully.";
+                    }}
+                  />
                 </div>
               ) : generatedPaper ? (
                 <div className="space-y-4">
                   {showReasoning && reasoningContent && (
-                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                      <div className="font-bold text-primary mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
-                        <Sparkles size={14} />
-                        <span>NVIDIA Nemotron 3.5 Pedagogical &amp; Examination Blueprint Reasoning</span>
-                      </div>
-                      {reasoningContent}
-                    </div>
+                    <AiReasoningView
+                      reasoning={reasoningContent}
+                      modelName="NVIDIA Nemotron 3.5 Bolt"
+                    />
                   )}
 
                   {paperViewMode === 'sheet' ? (
@@ -764,14 +776,35 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                   )}
                 </div>
               ) : (
-                <div className="h-[480px] flex flex-col items-center justify-center text-muted-foreground text-center p-6 space-y-3">
-                  <BookOpen size={36} className="text-muted-foreground/40 mb-2" />
-                  <h3 className="font-display font-bold text-foreground text-base">
-                    Ready to Generate Examination Paper
-                  </h3>
-                  <p className="text-xs max-w-md text-muted-foreground leading-relaxed">
-                    Select your {semLabel} paper and exam format (Mid or End Sem) on the left, then click Generate.
-                  </p>
+                <div className="min-h-[520px] w-full flex flex-col items-center justify-center p-4">
+                  <div className="text-center mb-3 max-w-lg">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-mono text-primary mb-2 shadow-sm">
+                      <Sparkles size={12} className="text-primary animate-pulse" />
+                      <span>NVIDIA Nemotron 3.5 Generative Microservice</span>
+                    </div>
+                    <h3 className="font-display font-bold text-foreground text-base sm:text-lg">
+                      Autonomous Examination Paper Synthesizer
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      Enter custom pedagogical instructions below or click <span className="text-primary font-semibold">&quot;Generate Paper&quot;</span> to synthesize the official KIIT Autonomous paper for <span className="font-mono text-primary font-bold">[{selectedSubjectCode}]</span>.
+                    </p>
+                  </div>
+                  <div className="w-full flex justify-center">
+                    <MorphOrb
+                      placeholder={`Instruct NVIDIA Nemotron 3.5 for ${selectedSubjectCode} (e.g. Focus on Contracts & Torts)...`}
+                      labels={[
+                        "Analyzing Syllabus & Historical PYQs",
+                        "Solving Constrained Knapsack Model",
+                        "Querying NVIDIA Nemotron 3.5 Engine",
+                        "Synthesizing KIIT Examination Blueprint",
+                      ]}
+                      answerTitle="KIIT Paper Ready"
+                      onSubmit={async (userText) => {
+                        await handleGenerate(userText);
+                        return "Paper synthesized successfully.";
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
