@@ -174,3 +174,38 @@ body.is-scrolling,
 body.is-scrolling * {
   pointer-events: none !important;
 }
+
+/* Assistant-UI Shimmer & Typography Utilities (Kaizen Dark Theme) */
+@keyframes aui-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.aui-shimmer-text {
+  background: linear-gradient(90deg, rgba(204, 255, 0, 0.45) 0%, rgba(204, 255, 0, 1) 50%, rgba(16, 185, 129, 0.45) 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: aui-shimmer 2.4s linear infinite;
+}
+
+.aui-shimmer-border {
+  position: relative;
+}
+
+.aui-shimmer-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(90deg, rgba(204, 255, 0, 0.2), rgba(204, 255, 0, 0.8), rgba(16, 185, 129, 0.3));
+  background-size: 200% 100%;
+  animation: aui-shimmer 2.2s linear infinite;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}

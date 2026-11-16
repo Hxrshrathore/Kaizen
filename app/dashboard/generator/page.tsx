@@ -24,6 +24,7 @@ interface SubjectOption {
 export default function DashboardGeneratorPage() {
   const morphOrbRef = React.useRef<MorphOrbHandle>(null);
   const generationResolverRef = React.useRef<((msg: string) => void) | null>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const [subjects, setSubjects] = useState<SubjectOption[]>([
     {
@@ -187,6 +188,28 @@ export default function DashboardGeneratorPage() {
     if (sub) setSelectedSubjectName(sub.name);
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+  };
+
+  const suggestedPrompts = selectedSubjectCode === 'CS40003'
+    ? [
+        "Synthesize 50-mark End-Sem Paper",
+        "Boundary Value Analysis & CFG",
+        "Enforce Bloom's Taxonomy [CO1-CO5]",
+        "Mid-Sem 20-mark Model (Q1 Compulsory)",
+      ]
+    : [
+        "Synthesize 50-mark End-Sem Paper",
+        "Professional Ethics & NSPE Code",
+        "Engineering Economics & DCF",
+        "IPR & Patent Claims Analysis",
+      ];
+
   const handleGenerate = async (customInstruction?: string | React.MouseEvent) => {
     const validCustomInstruction = typeof customInstruction === 'string' ? customInstruction : undefined;
     setLoading(true);
@@ -198,6 +221,9 @@ export default function DashboardGeneratorPage() {
     setReasoningExpanded(true);
     setIsThinkingComplete(false);
     const startTime = Date.now();
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Launch MorphOrb animation if in idle state
     if (morphOrbRef.current && morphOrbRef.current.getPhase() === 'idle') {
@@ -306,6 +332,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           subject: selectedSubjectName,
           subjectCode: selectedSubjectCode,
@@ -416,9 +443,14 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to generate paper. Please try again.');
+      if (err.name === 'AbortError') {
+        setError('Generation paused by paper setter.');
+      } else {
+        setError(err.message || 'Failed to generate paper. Please try again.');
+      }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -844,7 +876,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                   )}
 
                   {/* MorphOrb is ALWAYS Centered in the stage container */}
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full flex flex-col items-center justify-center relative">
                     <MorphOrb
                       ref={morphOrbRef}
                       placeholder={`Instruct NVIDIA Nemotron for ${selectedSubjectCode}...`}
@@ -864,6 +896,25 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         });
                       }}
                     />
+
+                    {/* assistant-ui Suggested Prompts (Starter chips on idle state) */}
+                    {!loading && (
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl mx-auto mt-2 px-3 z-20 pointer-events-auto">
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mr-1 flex items-center gap-1">
+                          <Sparkles size={11} className="text-primary" /> Suggested:
+                        </div>
+                        {suggestedPrompts.map((pText, pIdx) => (
+                          <button
+                            key={pIdx}
+                            type="button"
+                            onClick={() => handleGenerate(pText)}
+                            className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-white/[0.04] hover:bg-white/[0.09] text-muted-foreground hover:text-foreground border border-white/10 hover:border-primary/40 transition-all hover:scale-105 shadow-sm cursor-pointer"
+                          >
+                            {pText}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -902,6 +953,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         isExpanded={reasoningExpanded}
                         onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
                         isFloatingOverlay={true}
+                        onStop={handleStop}
                       />
                     </motion.div>
                   )}
