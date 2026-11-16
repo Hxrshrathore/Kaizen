@@ -8,7 +8,7 @@ import {
   GraduationCap, CheckCircle2, ShieldCheck, Eye, Code
 } from 'lucide-react';
 import { QuestionPaperSheet } from './QuestionPaperSheet';
-import MorphOrb from '@/components/ui/ai-thiking-orb-and-input';
+import MorphOrb, { MorphOrbHandle } from '@/components/ui/ai-thiking-orb-and-input';
 import { AiReasoningView } from '@/components/ai/AiReasoningView';
 
 const MotionDiv = motion.div as any;
@@ -22,6 +22,9 @@ interface SubjectOption {
 }
 
 export default function DashboardGeneratorPage() {
+  const morphOrbRef = React.useRef<MorphOrbHandle>(null);
+  const generationResolverRef = React.useRef<((msg: string) => void) | null>(null);
+
   const [subjects, setSubjects] = useState<SubjectOption[]>([
     {
       code: 'CS40003',
@@ -195,6 +198,11 @@ export default function DashboardGeneratorPage() {
     setReasoningExpanded(true);
     setIsThinkingComplete(false);
     const startTime = Date.now();
+
+    // Launch MorphOrb animation if in idle state
+    if (morphOrbRef.current && morphOrbRef.current.getPhase() === 'idle') {
+      morphOrbRef.current.start(validCustomInstruction || `Synthesizing official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode}`);
+    }
 
     const examTitle = examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination';
     const fullMarks = examType === 'mid_sem' ? 20 : 50;
@@ -379,6 +387,10 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         latency: latencySec,
         model: 'NVIDIA Nemotron 3.5 Bolt (Live Stream)',
       });
+
+      // Complete MorphOrb thinking phase
+      generationResolverRef.current?.("Paper synthesized successfully.");
+      generationResolverRef.current = null;
 
       // Auto-collapse animation: Give user 850ms to see "Thought for Xs • 5 Steps Verified",
       // then smoothly collapse the reasoning blueprint into the banner and reveal the paper sheet!
@@ -769,48 +781,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
           {/* Paper Output Container - Fits perfectly in viewport without page scroll */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
-            {loading ? (
-              <div className="flex-1 min-h-0 flex flex-col items-center justify-start py-2 px-1 overflow-hidden">
-                {/* Dynamic MorphOrb in Thinking Mode: moves UP with smooth spring */}
-                <motion.div
-                  initial={{ y: 60, scale: 0.95, opacity: 0.8 }}
-                  animate={{ y: 0, scale: 0.75, opacity: 1 }}
-                  transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                  className="shrink-0 -mb-6 pointer-events-none"
-                >
-                  <MorphOrb
-                    autoStartText={`Synthesize official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode}`}
-                    labels={[
-                      "Streaming Live Reasoning Traces",
-                      "NVIDIA Nemotron 3.5 Bolt Inference",
-                      "Synthesizing Examination Blueprint",
-                      "Validating CO & Bloom's Taxonomy",
-                    ]}
-                    answerTitle="Synthesizing Exam Paper..."
-                  />
-                </motion.div>
-
-                {/* Live AI Reasoning Cognitive Trace Ladder - Direct streaming from NVIDIA Nemotron */}
-                <motion.div
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.15 }}
-                  className="w-full max-w-3xl flex-1 min-h-0 flex flex-col overflow-hidden pt-2"
-                >
-                  <AiReasoningView
-                    reasoning={reasoningContent}
-                    isLive={true}
-                    isComplete={isThinkingComplete}
-                    modelName="NVIDIA Nemotron 3.5 Bolt"
-                    subjectCode={selectedSubjectCode}
-                    subjectName={selectedSubjectName}
-                    examType={examType}
-                    isExpanded={reasoningExpanded}
-                    onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
-                  />
-                </motion.div>
-              </div>
-            ) : generatedPaper ? (
+            {generatedPaper ? (
               <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-y-auto custom-scrollbar pr-1">
                 {showReasoning && (
                   <AiReasoningView
@@ -851,25 +822,29 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </motion.div>
               </div>
             ) : (
-              <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4">
-                <motion.div
-                  initial={{ scale: 0.96, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="w-full flex flex-col items-center justify-center max-w-lg text-center"
-                >
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-3 shadow-sm uppercase tracking-[0.16em]">
-                    <Sparkles size={12} className="text-primary animate-pulse" />
-                    <span>Autonomous Examination Generator</span>
-                  </div>
-                  <h3 className="font-mono text-sm sm:text-base font-bold uppercase tracking-[0.16em] text-foreground">
-                    KIIT Paper Synthesizer
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-mono mt-1.5 leading-relaxed tracking-wide mb-6">
-                    Click <span className="text-primary font-bold">&quot;Generate KIIT Question Paper&quot;</span> or instruct the model below to synthesize camera-ready examination questions.
-                  </p>
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+                {/* Dynamic MorphOrb Stage: Seamlessly stays mounted, animates upward when generating */}
+                <div className={`w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col items-center justify-center shrink-0 ${
+                  loading ? 'h-[170px] -mb-1' : 'flex-1'
+                }`}>
+                  {!loading && (
+                    <div className="text-center mb-4 max-w-lg px-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-2.5 shadow-sm uppercase tracking-[0.16em]">
+                        <Sparkles size={12} className="text-primary animate-pulse" />
+                        <span>Autonomous Examination Generator</span>
+                      </div>
+                      <h3 className="font-mono text-sm sm:text-base font-bold uppercase tracking-[0.16em] text-foreground">
+                        KIIT Paper Synthesizer
+                      </h3>
+                      <p className="text-xs text-muted-foreground font-mono mt-1 leading-relaxed tracking-wide">
+                        Click <span className="text-primary font-bold">&quot;Generate KIIT Question Paper&quot;</span> or instruct the model below to synthesize camera-ready examination questions.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="w-full flex justify-center">
                     <MorphOrb
+                      ref={morphOrbRef}
                       placeholder={`Instruct NVIDIA Nemotron for ${selectedSubjectCode}...`}
                       labels={[
                         "Streaming Live Reasoning Traces",
@@ -877,14 +852,43 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         "Synthesizing Examination Blueprint",
                         "Validating CO & Bloom's Taxonomy",
                       ]}
-                      answerTitle="Ready to Synthesize"
+                      answerTitle="KIIT Paper Ready"
                       onSubmit={async (userText) => {
-                        await handleGenerate(userText);
-                        return "Synthesizing official KIIT Examination Paper...";
+                        if (!loading) {
+                          void handleGenerate(userText);
+                        }
+                        return new Promise<string>((resolve) => {
+                          generationResolverRef.current = resolve;
+                        });
                       }}
                     />
                   </div>
-                </motion.div>
+                </div>
+
+                {/* Live Reasoning View: Dynamically fills 100% of the remaining height with no cut off text */}
+                <AnimatePresence>
+                  {loading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                      className="flex-1 min-h-0 w-full flex flex-col overflow-hidden pb-1"
+                    >
+                      <AiReasoningView
+                        reasoning={reasoningContent}
+                        isLive={true}
+                        isComplete={isThinkingComplete}
+                        modelName="NVIDIA Nemotron 3.5 Bolt"
+                        subjectCode={selectedSubjectCode}
+                        subjectName={selectedSubjectName}
+                        examType={examType}
+                        isExpanded={reasoningExpanded}
+                        onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>

@@ -21,6 +21,12 @@ const DEFAULT_COPY = {
 
 type Phase = "idle" | "launch" | "assemble" | "think" | "resolve" | "condense" | "unfold" | "answered" | "reset";
 
+export interface MorphOrbHandle {
+  start: (text?: string) => void;
+  reset: () => void;
+  getPhase: () => Phase;
+}
+
 export interface MorphOrbProps {
   onSubmit?: (text: string) => Promise<string> | string;
   minThinkMs?: number;
@@ -810,7 +816,7 @@ function createRuntime(env: Env, copyLabels: string[], doneLabel: string, defaul
 /* ───────────────────────────── component ───────────────────────────── */
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-export default function MorphOrb(props: MorphOrbProps) {
+export const MorphOrb = React.forwardRef<MorphOrbHandle, MorphOrbProps>(function MorphOrb(props, ref) {
   const activeLabels = props.labels && props.labels.length > 0 ? props.labels : DEFAULT_COPY.labels;
   const activePlaceholder = props.placeholder || DEFAULT_COPY.placeholder;
   const activeAnswerTitle = props.answerTitle || DEFAULT_COPY.answerTitle;
@@ -844,6 +850,23 @@ export default function MorphOrb(props: MorphOrbProps) {
   const rtRef = useRef<Runtime | null>(null);
   const lastTextRef = useRef("");
   const timers = useRef<{ typing?: number; shake?: number; flash?: number }>({});
+
+  React.useImperativeHandle(ref, () => ({
+    start: (customText?: string) => {
+      const rt = rtRef.current;
+      if (!rt) return;
+      const text = customText || value.trim() || lastTextRef.current || "KIIT Autonomous Examination Paper";
+      lastTextRef.current = text;
+      setValue(text);
+      if (!rt.busy()) {
+        rt.start(text, makeCfg());
+      }
+    },
+    reset: () => {
+      rtRef.current?.reset();
+    },
+    getPhase: () => phaseRef.current,
+  }));
 
   useIsoLayoutEffect(() => {
     const root = rootRef.current, mover = moverRef.current, actor = actorRef.current, canvas = canvasRef.current;
@@ -1087,5 +1110,7 @@ export default function MorphOrb(props: MorphOrbProps) {
       )}
     </div>
   );
-}
+});
+
+export default MorphOrb;
 

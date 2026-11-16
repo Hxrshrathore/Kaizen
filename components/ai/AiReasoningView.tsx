@@ -244,23 +244,23 @@ export function AiReasoningView({
 
   useEffect(() => {
     if (isLive && scrollEndRef.current) {
-      scrollEndRef.current.scrollIntoView({ behavior: "smooth" });
+      scrollEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [reasoning, activeStepIndex, isLive]);
 
   return (
     <div 
       ref={containerRef}
-      className={`rounded-2xl border transition-all duration-300 shadow-sm overflow-hidden ${
+      className={`rounded-2xl border transition-all duration-300 shadow-sm overflow-hidden flex flex-col ${
         isLive 
-          ? "border-primary/40 bg-card/90 ring-1 ring-primary/30 shadow-primary/5" 
-          : "border-border bg-card/70 backdrop-blur-md hover:border-primary/30"
+          ? "border-primary/40 bg-card/90 ring-1 ring-primary/30 shadow-primary/5 flex-1 min-h-0 w-full h-full" 
+          : "border-border bg-card/70 backdrop-blur-md hover:border-primary/30 shrink-0"
       }`}
     >
       {/* ────────────────── TOP BANNER / ACCORDION HEADER ────────────────── */}
       <div 
         onClick={toggleExpand}
-        className="flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 cursor-pointer select-none transition-colors border-b border-border/60"
+        className="flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 cursor-pointer select-none transition-colors border-b border-border/60 shrink-0"
       >
         <div className="flex items-center gap-3 min-w-0">
           {/* Animated Brain Icon */}
@@ -336,9 +336,11 @@ export function AiReasoningView({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
+            className={isLive ? "flex-1 min-h-0 flex flex-col overflow-hidden" : "overflow-hidden"}
           >
-            <div className="p-4 sm:p-5 space-y-3.5 max-h-[460px] overflow-y-auto custom-scrollbar text-xs leading-relaxed text-muted-foreground font-sans border-t border-border/40 bg-background/30">
+            <div className={`p-4 sm:p-5 space-y-3.5 overflow-y-auto custom-scrollbar text-xs leading-relaxed text-muted-foreground font-sans border-t border-border/40 bg-background/30 ${
+              isLive ? "flex-1 min-h-0" : "max-h-[380px]"
+            }`}>
               
               {/* Header Note */}
               <div className="flex items-center justify-between pb-2 border-b border-border/40 text-[11px] font-mono">
