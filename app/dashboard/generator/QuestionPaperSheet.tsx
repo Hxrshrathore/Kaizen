@@ -18,8 +18,8 @@ export function QuestionPaperSheet({
   subjectName,
   facultyName,
   examType,
-  fullMarks = 60,
-  duration = '3.0 Hours',
+  fullMarks = 50,
+  duration = '2.5 Hours',
 }: QuestionPaperSheetProps) {
   // Parse lines to detect sections, code blocks, tables, and headers
   const renderFormattedPaper = () => {
@@ -287,7 +287,9 @@ export function QuestionPaperSheet({
 
       {/* Compulsory Instruction Banner */}
       <div className="relative z-10 my-2 border-y border-slate-800 bg-slate-50 py-1.5 px-3 text-center font-serif text-xs sm:text-sm font-semibold italic text-slate-800">
-        Answer ALL questions from SECTION A and any THREE questions from SECTION B.
+        {examType === 'mid_sem'
+          ? 'Answer any FOUR questions including Question No. 1 which is COMPULSORY.'
+          : 'Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.'}
       </div>
 
       {/* Formatted Examination Body */}

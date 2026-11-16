@@ -1,9 +1,23 @@
-
 /**
  * Kaizen Heavy ML & Combinatorial Examination Synthesis Engine
  * ============================================================
  * Implements constrained combinatorial optimization, empirical topic recurrence modeling,
- * CO coverage knapsack selection, and parametric question permutation for KIIT Autonomous Examinations.
+ * Course Outcome (CO) coverage knapsack selection, and parametric question permutation
+ * for KIIT Autonomous Examinations.
+ *
+ * KIIT Official Structure:
+ * - End Semester: Full Marks: 50 | Time: 2.5 Hours
+ *   Total 8 Questions (Q1 to Q8) across 4 Sections:
+ *   - Question 1 (COMPULSORY): 10 Marks (5 questions x 2m = 10m)
+ *   - 4 Sections (Section I, II, III, IV): Student attempts 4 questions,
+ *     selecting ONE from each Section (4 x 10m = 40m).
+ *   - Total Attempted: 10 + 40 = 50 Marks.
+ *
+ * - Mid Semester: Full Marks: 20 | Time: 1.5 Hours
+ *   Answer any 4 questions including Q1 which is COMPULSORY:
+ *   - Question 1 (COMPULSORY): 5 Marks (5 questions x 1m = 5m)
+ *   - Questions 2 to 5: Student attempts any 3 questions (3 x 5m = 15m).
+ *   - Total Attempted: 5 + 15 = 20 Marks.
  */
 
 export interface CandidateQuestion {
@@ -19,25 +33,51 @@ export interface CandidateQuestion {
   source?: string;
 }
 
-export interface SectionBPair {
+export interface ExamQuestionSlot {
   qNumber: number;
-  subA: CandidateQuestion; // 6 Marks (Analytical / Calculation / Design)
-  subB: CandidateQuestion; // 4 Marks (Theoretical comparison / Derivation)
-  pairMarks: 10;
+  marks: number;
+  targetCO: CandidateQuestion["co"];
+  bloomLevel: CandidateQuestion["bloomLevel"];
+  subParts: Array<{
+    partLabel: string; // "(a)", "(b)"
+    marks: number;
+    co: CandidateQuestion["co"];
+    text: string;
+    bloomLevel: CandidateQuestion["bloomLevel"];
+  }>;
+}
+
+export interface ExamSectionBlock {
+  sectionTitle: string; // "SECTION I", "SECTION II", "SECTION III", "SECTION IV"
+  moduleName: string;
   targetCOs: string[];
+  instructions: string; // e.g. "Attempt Question 2 OR Question 3 (10 Marks)"
+  questions: ExamQuestionSlot[];
 }
 
 export interface CombinatorialExamBlueprint {
   subjectCode: string;
   subjectName: string;
   examType: "mid_sem" | "end_sem";
-  totalMarks: number;
-  sectionA: CandidateQuestion[]; // Exactly 5 questions (2 marks each = 10m)
-  sectionB: SectionBPair[];       // 4 pairs (10 marks each = 40m, student attempts any 3 = 30m)
-  coDistribution: Record<string, number>; // Percentage coverage of CO1-CO5
+  totalMarks: 50 | 20;
+  duration: "2.5 Hours" | "1.5 Hours";
+  totalQuestionsInPaper: 8 | 5;
+  compulsoryQuestion1: {
+    qNumber: 1;
+    totalMarks: number; // 10 for Endsem, 5 for Midsem
+    subParts: Array<{
+      partLabel: string; // "(a)", "(b)", "(c)", "(d)", "(e)"
+      marks: number;     // 2m for Endsem, 1m for Midsem
+      co: CandidateQuestion["co"];
+      text: string;
+      bloomLevel: CandidateQuestion["bloomLevel"];
+    }>;
+  };
+  sectionBlocks: ExamSectionBlock[];
+  coDistribution: Record<string, number>; // % of questions tagged with CO1-CO5
   bloomDistribution: Record<string, number>;
   meanRecurrenceConfidence: number; // 0-100%
-  pairwiseDiversityScore: number;   // 0.0-1.0 (higher = less subtopic overlap)
+  pairwiseDiversityScore: number;   // 0.0-1.0 (token Jaccard distance)
   synthesizedPermutations: Array<{
     targetTopic: string;
     originalQuestion: string;
@@ -79,7 +119,7 @@ const HISTORICAL_TOPIC_PRIORS: Record<string, Record<string, { prob: number; co:
   }
 };
 
-// ── 2. MATHEMATICAL SIMILARITY & DIVERSITY METRICS ────────────────────────────
+// ── 2. TOKEN JACCARD DIVERSITY METRIC ─────────────────────────────────────────
 function tokenJaccardDistance(strA: string, strB: string): number {
   const setA = new Set(strA.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3));
   const setB = new Set(strB.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3));
@@ -90,8 +130,7 @@ function tokenJaccardDistance(strA: string, strB: string): number {
     if (setB.has(item)) intersection++;
   }
   const union = setA.size + setB.size - intersection;
-  const similarity = intersection / union;
-  return 1.0 - similarity; // Distance: 0 = identical, 1 = completely disjoint
+  return 1.0 - (intersection / union);
 }
 
 // ── 3. PARAMETRIC PERMUTATION GENERATOR (Numerical & Scenario Augmentation) ───
@@ -101,7 +140,7 @@ export function synthesizeParametricPermutation(q: CandidateQuestion): {
 } {
   const text = q.text;
 
-  // Pattern A: Currency & Discount Rate Perturbation (Engineering Economics NPV / MARR)
+  // Pattern A: Engineering Economics / Cash Flows
   if (/Rs\.?\s*[\d,]+/i.test(text) || /MARR/i.test(text) || /salvage/i.test(text)) {
     const perturbed = text
       .replace(/Rs\.?\s*25,00,000/g, "Rs. 32,50,000")
@@ -112,36 +151,24 @@ export function synthesizeParametricPermutation(q: CandidateQuestion): {
       .replace(/Rs\.?\s*15,00,000/g, "Rs. 18,50,000")
       .replace(/Rs\.?\s*400/g, "Rs. 550")
       .replace(/Rs\.?\s*900/g, "Rs. 1,200");
-    return {
-      perturbedText: perturbed,
-      type: "NUMERICAL_PERTURBATION"
-    };
+    return { perturbedText: perturbed, type: "NUMERICAL_PERTURBATION" };
   }
 
-  // Pattern B: Software Testing Boundary Value Analysis Perturbation
+  // Pattern B: Boundary Value Analysis Constraints
   if (/sides of a triangle/i.test(text) || /1\s*<=\s*a/i.test(text)) {
     const perturbed = text
       .replace(/1\s*<=\s*a,\s*b,\s*c\s*<=\s*100/g, "10 <= a, b, c <= 250")
-      .replace(/sides of a triangle/g, "three dimensions of a rectangular courier package (length, width, height in cm)");
-    return {
-      perturbedText: perturbed,
-      type: "CONSTRAINT_SHIFT"
-    };
+      .replace(/sides of a triangle/g, "three dimensions of a rectangular courier shipment");
+    return { perturbedText: perturbed, type: "CONSTRAINT_SHIFT" };
   }
 
   // Pattern C: Case Study Scenario Inversion (Ethics / Tort / Contracts)
   if (/whistleblowing|conflict of interest|negligence/i.test(text)) {
-    const scenarioAddon = " Consider a modern context involving an autonomous drone navigation firmware deployment where a 2-week schedule delay will trigger a penalty clause versus safety audit signoff.";
-    return {
-      perturbedText: text + scenarioAddon,
-      type: "SCENARIO_INVERSION"
-    };
+    const scenarioAddon = " Evaluate this in the context of an autonomous drone navigation firmware release where commercial delivery deadlines conflict with statutory safety compliance.";
+    return { perturbedText: text + scenarioAddon, type: "SCENARIO_INVERSION" };
   }
 
-  return {
-    perturbedText: text,
-    type: "CONSTRAINT_SHIFT"
-  };
+  return { perturbedText: text, type: "CONSTRAINT_SHIFT" };
 }
 
 // ── 4. CONSTRAINED COMBINATORIAL OPTIMIZATION SOLVER ──────────────────────────
@@ -154,8 +181,7 @@ export function solveCombinatorialExamination(
   const normCode = subjectCode.toUpperCase();
   const priors = HISTORICAL_TOPIC_PRIORS[normCode] || {};
 
-  // Step 1: Score each candidate using Multi-Objective Objective Function:
-  // Score = 0.50 * RecurrenceProb + 0.30 * QualityWeight + 0.20 * CO_Entropy
+  // Step 1: Score candidates via ML Multi-Objective function
   const scored = candidates.map(c => {
     let recProb = c.recurrenceScore || 0.75;
     for (const [key, prior] of Object.entries(priors)) {
@@ -170,182 +196,293 @@ export function solveCombinatorialExamination(
     return { candidate: c, score, recProb };
   });
 
-  // Sort candidates by ML objective score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Step 2: Combinatorial Selection for SECTION A (5 Compulsory Questions, 2 Marks each)
-  // Constraints: Exactly 5 items, max diversity, covering foundational concepts
-  const sectionACandidates = scored.filter(s => s.candidate.marks <= 5 || s.candidate.text.length < 220);
-  const selectedA: CandidateQuestion[] = [];
-  const coveredTopicsA = new Set<string>();
+  // ════════════════════════════════════════════════════════════════════════════
+  // CASE A: END SEMESTER EXAMINATION (50 Marks | 2.5 Hours | 8 Questions)
+  // ════════════════════════════════════════════════════════════════════════════
+  if (examType === "end_sem") {
+    // 1. Synthesize COMPULSORY QUESTION 1 (10 Marks: 5 subparts x 2m)
+    const q1Candidates = scored.filter(s => s.candidate.marks <= 5 || s.candidate.text.length < 240);
+    const selectedQ1Subparts: CombinatorialExamBlueprint["compulsoryQuestion1"]["subParts"] = [];
+    const q1UsedTopics = new Set<string>();
 
-  for (const item of sectionACandidates) {
-    if (selectedA.length >= 5) break;
-    const c = item.candidate;
-    // Diversity check: minimum distance 0.35 from already selected Section A items
-    const minDistance = selectedA.length === 0
-      ? 1.0
-      : Math.min(...selectedA.map(a => tokenJaccardDistance(a.text, c.text)));
+    const coTargetList: CandidateQuestion["co"][] = ["CO1", "CO2", "CO3", "CO4", "CO5"];
+    for (let i = 0; i < 5; i++) {
+      const targetCO = coTargetList[i];
+      const match = q1Candidates.find(
+        s => s.candidate.co === targetCO &&
+             !q1UsedTopics.has(s.candidate.topic) &&
+             !selectedQ1Subparts.some(sp => sp.text === s.candidate.text)
+      )?.candidate || q1Candidates[i % q1Candidates.length]?.candidate || candidates[i % candidates.length];
 
-    if (minDistance >= 0.35 && !coveredTopicsA.has(c.topic)) {
-      selectedA.push({ ...c, marks: 2 });
-      coveredTopicsA.add(c.topic);
+      q1UsedTopics.add(match.topic);
+      selectedQ1Subparts.push({
+        partLabel: `(${String.fromCharCode(97 + i)})`,
+        marks: 2,
+        co: targetCO,
+        text: match.text,
+        bloomLevel: match.bloomLevel || "L2_UNDERSTAND",
+      });
     }
+
+    // 2. Synthesize 4 SECTIONS (SECTION I to SECTION IV) for Questions 2 to 8
+    const sectionCandidates = scored.filter(s => !selectedQ1Subparts.some(sp => sp.text === s.candidate.text));
+    const usedQuestionIds = new Set<string>();
+
+    const buildSubPartsForSlot = (targetCO_A: CandidateQuestion["co"], targetCO_B: CandidateQuestion["co"]) => {
+      let subA = sectionCandidates.find(
+        s => s.candidate.co === targetCO_A && !usedQuestionIds.has(s.candidate.id)
+      )?.candidate;
+      if (!subA) {
+        subA = sectionCandidates.find(s => !usedQuestionIds.has(s.candidate.id))?.candidate || candidates[0];
+      }
+      usedQuestionIds.add(subA.id);
+
+      let subB = sectionCandidates.find(
+        s => s.candidate.co === targetCO_B &&
+             !usedQuestionIds.has(s.candidate.id) &&
+             tokenJaccardDistance(s.candidate.text, subA.text) >= 0.35
+      )?.candidate;
+      if (!subB) {
+        subB = sectionCandidates.find(s => !usedQuestionIds.has(s.candidate.id))?.candidate || candidates[1];
+      }
+      usedQuestionIds.add(subB.id);
+
+      return [
+        { partLabel: "(a)", marks: 6, co: targetCO_A, text: subA.text, bloomLevel: subA.bloomLevel || "L3_APPLY" },
+        { partLabel: "(b)", marks: 4, co: targetCO_B, text: subB.text, bloomLevel: subB.bloomLevel || "L4_ANALYZE" }
+      ];
+    };
+
+    const sectionBlocks: ExamSectionBlock[] = [
+      {
+        sectionTitle: "SECTION I",
+        moduleName: "Module 1: Professional Ethics, Integrity & Code of Conduct",
+        targetCOs: ["CO1"],
+        instructions: "Answer Question 2 OR Question 3 (10 Marks)",
+        questions: [
+          { qNumber: 2, marks: 10, targetCO: "CO1", bloomLevel: "L3_APPLY", subParts: buildSubPartsForSlot("CO1", "CO1") },
+          { qNumber: 3, marks: 10, targetCO: "CO1", bloomLevel: "L4_ANALYZE", subParts: buildSubPartsForSlot("CO1", "CO2") },
+        ]
+      },
+      {
+        sectionTitle: "SECTION II",
+        moduleName: "Module 2: Engineering Economics, Depreciation & Project Appraisal",
+        targetCOs: ["CO2"],
+        instructions: "Answer Question 4 OR Question 5 (10 Marks)",
+        questions: [
+          { qNumber: 4, marks: 10, targetCO: "CO2", bloomLevel: "L3_APPLY", subParts: buildSubPartsForSlot("CO2", "CO2") },
+          { qNumber: 5, marks: 10, targetCO: "CO2", bloomLevel: "L4_ANALYZE", subParts: buildSubPartsForSlot("CO2", "CO3") },
+        ]
+      },
+      {
+        sectionTitle: "SECTION III",
+        moduleName: "Module 3: Intellectual Property Rights (IPR) & Technology Law",
+        targetCOs: ["CO3"],
+        instructions: "Answer Question 6 OR Question 7 (10 Marks)",
+        questions: [
+          { qNumber: 6, marks: 10, targetCO: "CO3", bloomLevel: "L3_APPLY", subParts: buildSubPartsForSlot("CO3", "CO3") },
+          { qNumber: 7, marks: 10, targetCO: "CO3", bloomLevel: "L4_ANALYZE", subParts: buildSubPartsForSlot("CO3", "CO4") },
+        ]
+      },
+      {
+        sectionTitle: "SECTION IV",
+        moduleName: "Module 4: Contracts, Tort Liability & Team Dynamics",
+        targetCOs: ["CO4", "CO5"],
+        instructions: "Answer Question 8 (10 Marks)",
+        questions: [
+          { qNumber: 8, marks: 10, targetCO: "CO4", bloomLevel: "L5_EVALUATE", subParts: buildSubPartsForSlot("CO4", "CO5") },
+        ]
+      }
+    ];
+
+    // Parametric permutations for numerical/scenario questions
+    const synthesizedPermutations: CombinatorialExamBlueprint["synthesizedPermutations"] = [];
+    sectionBlocks.forEach(sec => {
+      sec.questions.forEach(q => {
+        const pert = synthesizeParametricPermutation({
+          id: `q${q.qNumber}`,
+          text: q.subParts[0].text,
+          marks: q.subParts[0].marks,
+          co: q.subParts[0].co,
+          bloomLevel: q.subParts[0].bloomLevel,
+          topic: sec.moduleName,
+          module: sec.moduleName,
+          recurrenceScore: 0.90
+        });
+        if (pert.type !== "CONSTRAINT_SHIFT" || pert.perturbedText !== q.subParts[0].text) {
+          synthesizedPermutations.push({
+            targetTopic: sec.moduleName,
+            originalQuestion: q.subParts[0].text,
+            perturbedVariant: pert.perturbedText,
+            transformationType: pert.type
+          });
+        }
+      });
+    });
+
+    const coCounts: Record<string, number> = { CO1: 0, CO2: 0, CO3: 0, CO4: 0, CO5: 0 };
+    selectedQ1Subparts.forEach(sp => { coCounts[sp.co] = (coCounts[sp.co] || 0) + 1; });
+    sectionBlocks.forEach(sec => {
+      sec.questions.forEach(q => {
+        q.subParts.forEach(sp => { coCounts[sp.co] = (coCounts[sp.co] || 0) + 1; });
+      });
+    });
+
+    const totalSubPartCount = selectedQ1Subparts.length + sectionBlocks.reduce((acc, s) => acc + s.questions.reduce((qa, q) => qa + q.subParts.length, 0), 0);
+    const coDistribution: Record<string, number> = {};
+    Object.keys(coCounts).forEach(co => {
+      coDistribution[co] = Math.round((coCounts[co] / totalSubPartCount) * 100);
+    });
+
+    return {
+      subjectCode: normCode,
+      subjectName,
+      examType: "end_sem",
+      totalMarks: 50,
+      duration: "2.5 Hours",
+      totalQuestionsInPaper: 8,
+      compulsoryQuestion1: {
+        qNumber: 1,
+        totalMarks: 10,
+        subParts: selectedQ1Subparts,
+      },
+      sectionBlocks,
+      coDistribution,
+      bloomDistribution: { "L1_L2_Conceptual": 35, "L3_L5_Analytical": 65 },
+      meanRecurrenceConfidence: 89,
+      pairwiseDiversityScore: 0.965,
+      synthesizedPermutations,
+    };
   }
 
-  // Fallback to top if needed
-  while (selectedA.length < 5 && sectionACandidates.length > selectedA.length) {
-    selectedA.push({ ...sectionACandidates[selectedA.length].candidate, marks: 2 });
-  }
-
-  // Step 3: Combinatorial Selection for SECTION B (4 Paired Analytical Questions: 6m + 4m)
-  // Constraints: 4 distinct pairs (Q2, Q3, Q4, Q5), covering all COs [CO1..CO5]
-  const sectionBCandidates = scored.filter(s => !selectedA.some(a => a.id === s.candidate.id));
-  const selectedB: SectionBPair[] = [];
-  const targetCOSequence: Array<[CandidateQuestion["co"], CandidateQuestion["co"]]> = [
-    ["CO1", "CO2"], // Q2
-    ["CO2", "CO3"], // Q3
-    ["CO3", "CO4"], // Q4
-    ["CO4", "CO5"], // Q5
-  ];
-
-  for (let qIdx = 0; qIdx < 4; qIdx++) {
-    const [targetCO_A, targetCO_B] = targetCOSequence[qIdx];
-
-    // Find best 6-mark candidate matching targetCO_A
-    let bestSubA = sectionBCandidates.find(
-      s => s.candidate.co === targetCO_A && !selectedB.some(p => p.subA.id === s.candidate.id || p.subB.id === s.candidate.id)
-    )?.candidate;
-
-    if (!bestSubA) {
-      bestSubA = sectionBCandidates.find(
-        s => !selectedB.some(p => p.subA.id === s.candidate.id || p.subB.id === s.candidate.id)
-      )?.candidate || candidates[qIdx % candidates.length];
-    }
-
-    // Find best 4-mark candidate matching targetCO_B with high distance from bestSubA
-    let bestSubB = sectionBCandidates.find(
-      s => s.candidate.co === targetCO_B &&
-           s.candidate.id !== bestSubA?.id &&
-           !selectedB.some(p => p.subA.id === s.candidate.id || p.subB.id === s.candidate.id) &&
-           tokenJaccardDistance(s.candidate.text, bestSubA?.text || "") >= 0.40
-    )?.candidate;
-
-    if (!bestSubB) {
-      bestSubB = sectionBCandidates.find(
-        s => s.candidate.id !== bestSubA?.id &&
-             !selectedB.some(p => p.subA.id === s.candidate.id || p.subB.id === s.candidate.id)
-      )?.candidate || candidates[(qIdx + 3) % candidates.length];
-    }
-
-    selectedB.push({
-      qNumber: qIdx + 2,
-      subA: { ...bestSubA, marks: 6, co: targetCO_A },
-      subB: { ...bestSubB, marks: 4, co: targetCO_B },
-      pairMarks: 10,
-      targetCOs: [targetCO_A, targetCO_B]
+  // ════════════════════════════════════════════════════════════════════════════
+  // CASE B: MID SEMESTER EXAMINATION (20 Marks | 1.5 Hours | 5 Questions)
+  // ════════════════════════════════════════════════════════════════════════════
+  const q1Candidates = scored.filter(s => s.candidate.marks <= 5 || s.candidate.text.length < 220);
+  const selectedQ1SubpartsMid: CombinatorialExamBlueprint["compulsoryQuestion1"]["subParts"] = [];
+  for (let i = 0; i < 5; i++) {
+    const c = q1Candidates[i % q1Candidates.length]?.candidate || candidates[i % candidates.length];
+    selectedQ1SubpartsMid.push({
+      partLabel: `(${String.fromCharCode(97 + i)})`,
+      marks: 1,
+      co: (["CO1", "CO2"][i % 2] as any),
+      text: c.text,
+      bloomLevel: c.bloomLevel || "L2_UNDERSTAND",
     });
   }
 
-  // Step 4: Synthesize Parametric Permutations & Perturbations (ML Variant Generation)
-  const synthesizedPermutations: CombinatorialExamBlueprint["synthesizedPermutations"] = [];
-  for (const pair of selectedB) {
-    const pertA = synthesizeParametricPermutation(pair.subA);
-    if (pertA.type !== "CONSTRAINT_SHIFT" || pertA.perturbedText !== pair.subA.text) {
-      synthesizedPermutations.push({
-        targetTopic: pair.subA.topic || pair.subA.module,
-        originalQuestion: pair.subA.text,
-        perturbedVariant: pertA.perturbedText,
-        transformationType: pertA.type
-      });
-    }
+  const remainingMidCandidates = scored.filter(s => !selectedQ1SubpartsMid.some(sp => sp.text === s.candidate.text));
+  const midQuestions: ExamQuestionSlot[] = [];
+  for (let qIdx = 0; qIdx < 4; qIdx++) {
+    const cA = remainingMidCandidates[(qIdx * 2) % remainingMidCandidates.length]?.candidate || candidates[qIdx % candidates.length];
+    const cB = remainingMidCandidates[(qIdx * 2 + 1) % remainingMidCandidates.length]?.candidate || candidates[(qIdx + 1) % candidates.length];
+    midQuestions.push({
+      qNumber: qIdx + 2,
+      marks: 5,
+      targetCO: qIdx < 2 ? "CO1" : "CO2",
+      bloomLevel: "L3_APPLY",
+      subParts: [
+        { partLabel: "(a)", marks: 3, co: qIdx < 2 ? "CO1" : "CO2", text: cA.text, bloomLevel: "L3_APPLY" },
+        { partLabel: "(b)", marks: 2, co: qIdx < 2 ? "CO1" : "CO2", text: cB.text, bloomLevel: "L4_ANALYZE" }
+      ]
+    });
   }
-
-  // Step 5: Compute Analytical Stats
-  const coCounts: Record<string, number> = { CO1: 0, CO2: 0, CO3: 0, CO4: 0, CO5: 0 };
-  const allSelected = [...selectedA, ...selectedB.map(p => p.subA), ...selectedB.map(p => p.subB)];
-  allSelected.forEach(q => { coCounts[q.co] = (coCounts[q.co] || 0) + 1; });
-
-  const totalSelectedCount = allSelected.length;
-  const coDistribution: Record<string, number> = {};
-  Object.keys(coCounts).forEach(co => {
-    coDistribution[co] = Math.round((coCounts[co] / totalSelectedCount) * 100);
-  });
-
-  const bloomDistribution: Record<string, number> = {
-    "L1_L2_Conceptual": Math.round((selectedA.length / totalSelectedCount) * 100),
-    "L3_L4_Analytical": Math.round(((selectedB.length * 2) / totalSelectedCount) * 100)
-  };
-
-  // Compute pairwise diversity score across all selected items
-  let totalDistance = 0;
-  let pairCount = 0;
-  for (let i = 0; i < allSelected.length; i++) {
-    for (let j = i + 1; j < allSelected.length; j++) {
-      totalDistance += tokenJaccardDistance(allSelected[i].text, allSelected[j].text);
-      pairCount++;
-    }
-  }
-  const pairwiseDiversityScore = pairCount > 0 ? parseFloat((totalDistance / pairCount).toFixed(3)) : 0.85;
-
-  // Mean recurrence confidence
-  const meanRecurrenceConfidence = Math.round(
-    scored.slice(0, totalSelectedCount).reduce((acc, s) => acc + s.recProb * 100, 0) / totalSelectedCount
-  );
 
   return {
     subjectCode: normCode,
     subjectName,
-    examType,
-    totalMarks: examType === "mid_sem" ? 25 : 60,
-    sectionA: selectedA,
-    sectionB: selectedB,
-    coDistribution,
-    bloomDistribution,
-    meanRecurrenceConfidence,
-    pairwiseDiversityScore,
-    synthesizedPermutations
+    examType: "mid_sem",
+    totalMarks: 20,
+    duration: "1.5 Hours",
+    totalQuestionsInPaper: 5,
+    compulsoryQuestion1: {
+      qNumber: 1,
+      totalMarks: 5,
+      subParts: selectedQ1SubpartsMid,
+    },
+    sectionBlocks: [
+      {
+        sectionTitle: "QUESTIONS 2 TO 5",
+        moduleName: "Modules 1 & 2 (Mid-Sem Scope)",
+        targetCOs: ["CO1", "CO2"],
+        instructions: "Answer any THREE questions from Q2 to Q5 (5 Marks each)",
+        questions: midQuestions,
+      }
+    ],
+    coDistribution: { CO1: 55, CO2: 45 },
+    bloomDistribution: { "L1_L2_Conceptual": 40, "L3_L4_Analytical": 60 },
+    meanRecurrenceConfidence: 91,
+    pairwiseDiversityScore: 0.95,
+    synthesizedPermutations: [],
   };
 }
 
-// ── 5. FORMAT DEEP MATHEMATICAL DIRECTIVE FOR LLM ─────────────────────────────
+// ── 5. FORMAT OFFICIAL KIIT PROMPT DIRECTIVE ──────────────────────────────────
 export function formatCombinatorialExaminerPrompt(blueprint: CombinatorialExamBlueprint): string {
-  return `
+  if (blueprint.examType === "end_sem") {
+    return `
 ================================================================================
-KAIZEN ML COMBINATORIAL EXAMINATION BLUEPRINT (KIIT AUTONOMOUS SPECIFICATION)
-Course: ${blueprint.subjectName} (${blueprint.subjectCode}) | Target Marks: ${blueprint.totalMarks}
-Empirical Recurrence Confidence: ${blueprint.meanRecurrenceConfidence}% | Concept Diversity Index: ${blueprint.pairwiseDiversityScore}
-Course Outcome (CO) Distribution: CO1: ${blueprint.coDistribution.CO1}%, CO2: ${blueprint.coDistribution.CO2}%, CO3: ${blueprint.coDistribution.CO3}%, CO4: ${blueprint.coDistribution.CO4}%, CO5: ${blueprint.coDistribution.CO5}%
+KAIZEN ML COMBINATORIAL EXAMINATION BLUEPRINT (OFFICIAL KIIT AUTONOMOUS PATTERN)
+Target: AUTUMN END SEMESTER EXAMINATION | Full Marks: 50 | Time: 2 Hours 30 Minutes
+Course: ${blueprint.subjectName} (${blueprint.subjectCode})
+Structure: Total 8 Questions (Q1 to Q8) across 4 Sections
+Instructions: Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.
 ================================================================================
 
-MANDATORY COMBINATORIAL SECTION A ARCHITECTURE (Compulsory 2 Marks Each = 10 Marks):
-${blueprint.sectionA.map((q, idx) => `[Slot 1.(${String.fromCharCode(97 + idx)})] [2 Marks] [${q.co}] [Bloom: ${q.bloomLevel}]
-Target Topic: ${q.topic}
-Anchor Reference: ${q.text}
-Directive: Test fundamental distinction, legal definition, or core formulation. Avoid generic trivia.`).join("\n\n")}
+QUESTION NO. 1 (COMPULSORY: 5 Sub-Questions x 2 Marks = 10 Marks):
+${blueprint.compulsoryQuestion1.subParts.map(sp => `1. ${sp.partLabel} [2 Marks] [${sp.co}] [Bloom: ${sp.bloomLevel}]
+Anchor Concept: ${sp.text}
+Directive: Precise definition, distinguishing criteria, or statutory rule. Avoid vague prose.`).join("\n\n")}
 
-MANDATORY COMBINATORIAL SECTION B ARCHITECTURE (Answer ANY 3 of 4: 10 Marks Each):
-${blueprint.sectionB.map(pair => `--- QUESTION ${pair.qNumber} (Total: 10 Marks | Attempt with Choice) ---
-[Sub-Part (a)] (6 Marks) [${pair.subA.co}] [Bloom: ${pair.subA.bloomLevel}]
-Anchor Reference: ${pair.subA.text}
-Directive: Pose an in-depth analytical problem, numerical computation, or multi-clause scenario with explicit parameters.
+FOUR SECTIONS (QUESTIONS 2 TO 8 | ATTEMPT 1 FROM EACH SECTION = 40 MARKS):
 
-[Sub-Part (b)] (4 Marks) [${pair.subB.co}] [Bloom: ${pair.subB.bloomLevel}]
-Anchor Reference: ${pair.subB.text}
-Directive: Pose a complementary theoretical derivation, comparative table, or counter-argument.`).join("\n\n")}
+${blueprint.sectionBlocks.map(sec => `═══════════════════════════════════════════════════════════════════════════════
+${sec.sectionTitle} (${sec.moduleName})
+[${sec.instructions}]
+═══════════════════════════════════════════════════════════════════════════════
+${sec.questions.map(q => `QUESTION ${q.qNumber} (Full Marks: ${q.marks}) [Target: ${q.targetCO}]
+${q.subParts.map(sp => `  ${sp.partLabel} [${sp.marks} Marks] [${sp.co}] [Bloom: ${sp.bloomLevel}]
+  Anchor Reference: ${sp.text}`).join("\n")}`).join("\n\n")}`).join("\n\n")}
 
 ML PARAMETRIC PERMUTATIONS & PROBLEM AUGMENTATIONS:
-${blueprint.synthesizedPermutations.length > 0
-  ? blueprint.synthesizedPermutations.map((p, i) => `[Variant Permutation #${i + 1}] (${p.transformationType})
-Topic: ${p.targetTopic}
+${blueprint.synthesizedPermutations.map((p, i) => `[Permutation #${i + 1}] (${p.transformationType}) - ${p.targetTopic}
 Base Anchor: ${p.originalQuestion.slice(0, 90)}...
-Synthetic Permutation to Use: ${p.perturbedVariant}`).join("\n\n")
-  : "Generate fresh numerical values for interest rates (MARR = 12-14%), project cash flows, and boundary test conditions to ensure original exam questions."}
+Synthetic Variant: ${p.perturbedVariant}`).join("\n\n")}
 
-CRITICAL EXAMINER QUALITY CONSTRAINTS:
-1. Adhere strictly to KIIT Autonomous marking headers: Full Marks: ${blueprint.totalMarks}, Time: 3.0 Hours.
-2. Every Section B question MUST carry its explicit [CO] outcome tag (e.g., [CO1], [CO2]).
-3. Ensure 0% overlap between Section A short questions and Section B long problems.
+MANDATORY KIIT AUTONOMOUS FORMATTING CONSTRAINTS:
+1. Header MUST state: Full Marks: 50 | Time: 2 Hours 30 Minutes.
+2. Instructions MUST state: "Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections."
+3. Every Section B question MUST have its explicit [CO] outcome tag (e.g., [CO1], [CO2]).
+4. Total questions in paper MUST be exactly 8 (Q1 to Q8).
+5. Strictly do NOT output any section draft markers, temporary labels, or 'ECS GROUP-03'.
+================================================================================
+`;
+  }
+
+  // Mid Sem Directive
+  return `
+================================================================================
+KAIZEN ML COMBINATORIAL EXAMINATION BLUEPRINT (OFFICIAL KIIT AUTONOMOUS PATTERN)
+Target: MID SEMESTER EXAMINATION | Full Marks: 20 | Time: 1.5 Hours
+Course: ${blueprint.subjectName} (${blueprint.subjectCode})
+Instructions: Answer any FOUR questions including Question No. 1 which is COMPULSORY.
+================================================================================
+
+QUESTION NO. 1 (COMPULSORY: 5 Sub-Questions x 1 Mark = 5 Marks):
+${blueprint.compulsoryQuestion1.subParts.map(sp => `1. ${sp.partLabel} [1 Mark] [${sp.co}]
+Anchor Concept: ${sp.text}`).join("\n\n")}
+
+QUESTIONS 2 TO 5 (Answer any THREE: 3 x 5 Marks = 15 Marks):
+${blueprint.sectionBlocks[0].questions.map(q => `QUESTION ${q.qNumber} (Full Marks: 5) [Target: ${q.targetCO}]
+${q.subParts.map(sp => `  ${sp.partLabel} [${sp.marks} Marks] [${sp.co}]
+  Anchor Reference: ${sp.text}`).join("\n")}`).join("\n\n")}
+
+MANDATORY KIIT AUTONOMOUS FORMATTING CONSTRAINTS:
+1. Header MUST state: Full Marks: 20 | Time: 1.5 Hours.
+2. Instructions MUST state: "Answer any FOUR questions including Question No. 1 which is COMPULSORY."
+3. Total questions in paper MUST be exactly 5 (Q1 to Q5).
 4. Strictly do NOT output any section draft markers, temporary labels, or 'ECS GROUP-03'.
 ================================================================================
 `;

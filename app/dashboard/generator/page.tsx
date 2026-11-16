@@ -187,8 +187,8 @@ export default function DashboardGeneratorPage() {
     setGenStats(null);
 
     const examTitle = examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination';
-    const fullMarks = examType === 'mid_sem' ? 25 : 60;
-    const duration = examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours';
+    const fullMarks = examType === 'mid_sem' ? 20 : 50;
+    const duration = examType === 'mid_sem' ? '1.5 Hours' : '2.5 Hours';
 
     const currentSubjectObj = subjects.find(s => s.code === selectedSubjectCode);
     const facultyName = currentSubjectObj?.faculty || 'Faculty In-Charge';
@@ -198,6 +198,60 @@ export default function DashboardGeneratorPage() {
       : (selectedSubjectCode === 'EX40003'
           ? `Google Classroom Coursework Modules for EX40003 (Engineering Professional Practice):\n1. [ASSIGNMENT] Assignment-I: Module 1 Professional Ethics, NSPE Code of Conduct & Integrity\n2. [ASSIGNMENT] Assignment-II: Module 2 Engineering Economics, Discounted Cash Flow & Project Appraisal\n3. [ASSIGNMENT] Assignment-3: Module 3 Intellectual Property Rights (IPR), Patent Filing & Infringement\n4. [ASSIGNMENT] Assignment-IV: Module 4 Environmental Impact Assessment, Sustainable Engineering & Liability\n5. [MODEL_QUESTIONS] Model Questions (Till Mid Semester): Short Answer & Conceptual Questions`
           : `Google Classroom Coursework Modules for CS40003 (Software Testing and Automation):\n1. [ASSIGNMENT] Assignment-1: Black-Box vs White-Box Testing, Boundary Value Analysis, Equivalence Partitioning & Cyclomatic Complexity`);
+
+    const endSemInstructions = `
+Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.
+--------------------------------------------------------------------------------
+
+QUESTION NO. 1 (COMPULSORY)
+[Answer all sub-questions. Each question carries 2 marks]
+1. (a) [Question covering core concept grounded in Module 1] [2 Marks] [CO1]
+   (b) [Question covering principle from Module 2] [2 Marks] [CO2]
+   (c) [Question covering statutory/definition criteria from Module 3] [2 Marks] [CO3]
+   (d) [Question covering design trade-offs / liability from Module 4] [2 Marks] [CO4]
+   (e) [Question testing analytical understanding] [2 Marks] [CO5]
+
+SECTION I (Answer Question 2 OR Question 3)
+2. (a) [Analytical problem with specific parameters] (6 marks) [CO1]
+   (b) [Theoretical derivation or comparison] (4 marks) [CO1]
+3. (a) [Scenario-based case study question] (6 marks) [CO1]
+   (b) [Evaluation or derivation question] (4 marks) [CO1]
+
+SECTION II (Answer Question 4 OR Question 5)
+4. (a) [Numerical computation / DCF / BVA Problem] (6 marks) [CO2]
+   (b) [Concept evaluation / Decision Table] (4 marks) [CO2]
+5. (a) [Method comparison & economic formulation] (6 marks) [CO2]
+   (b) [Application analysis] (4 marks) [CO2]
+
+SECTION III (Answer Question 6 OR Question 7)
+6. (a) [Statutory analysis & patentability criteria] (6 marks) [CO3]
+   (b) [Doctrine application / Basis path testing] (4 marks) [CO3]
+7. (a) [Case law & infringement analysis] (6 marks) [CO3]
+   (b) [Comparative matrix] (4 marks) [CO3]
+
+SECTION IV (Answer Question 8)
+8. (a) [Synthesis / Multi-clause problem / Regression prioritization] (6 marks) [CO4]
+   (b) [Failure mode analysis / Team dynamics] (4 marks) [CO5]
+`.trim();
+
+    const midSemInstructions = `
+Answer any FOUR questions including Question No. 1 which is COMPULSORY.
+--------------------------------------------------------------------------------
+
+QUESTION NO. 1 (COMPULSORY)
+[Answer all sub-questions. Each question carries 1 mark]
+1. (a) [1 Mark] [CO1]
+   (b) [1 Mark] [CO1]
+   (c) [1 Mark] [CO2]
+   (d) [1 Mark] [CO2]
+   (e) [1 Mark] [CO2]
+
+QUESTIONS 2 TO 5 (Answer any THREE questions. Each question carries 5 marks)
+2. (a) [Analytical problem] (3 marks) [CO1]  (b) [Theoretical concept] (2 marks) [CO1]
+3. (a) [Scenario question] (3 marks) [CO1]   (b) [Derivation] (2 marks) [CO2]
+4. (a) [Numerical problem] (3 marks) [CO2]   (b) [Evaluation] (2 marks) [CO2]
+5. (a) [Synthesis problem] (3 marks) [CO2]   (b) [Application] (2 marks) [CO2]
+`.trim();
 
     const promptText = `
 You are the official Senior Examination Paper Setter: ${facultyName}
@@ -225,30 +279,7 @@ Course Code: ${selectedSubjectCode}
 Faculty Examiner: ${facultyName}
 Full Marks: ${fullMarks}                                                    Time: ${duration}
 --------------------------------------------------------------------------------
-Answer ALL questions from SECTION A and any THREE questions from SECTION B.
---------------------------------------------------------------------------------
-
-SECTION A (Compulsory - Short Answer / Conceptual)
-[Answer all questions. Each question carries 2 marks]
-1. (a) [Question covering core concept grounded in Classroom Assignment 1]
-   (b) [Question covering principle from Classroom Module 2]
-   (c) [Question covering edge cases / definitions from Module 3]
-   (d) [Question covering design trade-offs / ethical compliance]
-   (e) [Question testing analytical understanding]
-
-SECTION B (Analytical & Problem Solving)
-[Answer any 3 questions. Each question carries 10 marks with CO mappings]
-2. (a) [Numerical / Problem solving with specific parameters] (6 marks) [CO1]
-   (b) [Theoretical comparison or block diagram explanation] (4 marks) [CO2]
-
-3. (a) [Detailed scenario-based case study question from Classroom Homework] (6 marks) [CO3]
-   (b) [Evaluation or derivation question] (4 marks) [CO2]
-
-4. (a) [Algorithmic / Graph / Design calculation] (6 marks) [CO4]
-   (b) [State machine or verification analysis] (4 marks) [CO4]
-
-5. (a) [Comprehensive synthesis problem] (6 marks) [CO5]
-   (b) [Practical industry application or failure mode analysis] (4 marks) [CO5]
+${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 ================================================================================
 `.trim();
 
@@ -367,14 +398,16 @@ SECTION B (Analytical & Problem Solving)
             </div>
             <div class="meta" style="border-top: 1px solid #ccc; padding-top: 4px;">
               <div><strong>Course:</strong> ${selectedSubjectName} (${selectedSubjectCode})</div>
-              <div><strong>Time:</strong> ${examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours'} &nbsp;|&nbsp; <strong>Full Marks:</strong> ${examType === 'mid_sem' ? 25 : 60}</div>
+              <div><strong>Time:</strong> ${examType === 'mid_sem' ? '1.5 Hours' : '2.5 Hours'} &nbsp;|&nbsp; <strong>Full Marks:</strong> ${examType === 'mid_sem' ? 20 : 50}</div>
             </div>
             <div class="meta">
               <div><strong>Faculty Examiner:</strong> ${currentFaculty}</div>
               <div><strong>Academic Target:</strong> ${semLabel} (${studentSection})</div>
             </div>
             <div class="instruction">
-              Answer ALL questions from SECTION A and any THREE questions from SECTION B.
+              ${examType === 'end_sem'
+                ? 'Answer Question No. 1 which is COMPULSORY and any FOUR questions, selecting ONE question from each of the Four Sections.'
+                : 'Answer any FOUR questions including Question No. 1 which is COMPULSORY.'}
             </div>
             <div style="white-space: pre-wrap; font-size: 10.5pt; line-height: 1.5; margin-top: 12px;">
               ${generatedPaper}
@@ -497,7 +530,7 @@ SECTION B (Analytical & Problem Solving)
                   }`}
                 >
                   <div className="font-bold text-xs font-mono text-foreground">Mid-Semester</div>
-                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">25 Marks • 1.5 Hours</div>
+                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">20 Marks • 1.5 Hours</div>
                 </button>
 
                 <button
@@ -510,7 +543,7 @@ SECTION B (Analytical & Problem Solving)
                   }`}
                 >
                   <div className="font-bold text-xs font-mono text-foreground">End-Semester</div>
-                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">60 Marks • 3.0 Hours</div>
+                  <div className="text-[11px] font-mono text-muted-foreground mt-0.5">50 Marks • 2.5 Hours</div>
                 </button>
               </div>
             </div>
@@ -721,8 +754,8 @@ SECTION B (Analytical & Problem Solving)
                       subjectName={selectedSubjectName}
                       facultyName={subjects.find(s => s.code === selectedSubjectCode)?.faculty || 'Faculty In-Charge'}
                       examType={examType}
-                      fullMarks={examType === 'mid_sem' ? 25 : 60}
-                      duration={examType === 'mid_sem' ? '1.5 Hours' : '3.0 Hours'}
+                      fullMarks={examType === 'mid_sem' ? 20 : 50}
+                      duration={examType === 'mid_sem' ? '1.5 Hours' : '2.5 Hours'}
                     />
                   ) : (
                     <div className="p-4 rounded-xl bg-background border border-border/80 shadow-inner font-mono text-xs sm:text-sm whitespace-pre-wrap">
