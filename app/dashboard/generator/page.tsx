@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Sparkles, Download, Printer, Copy, Check, 
-  Loader2, RefreshCw, BookOpen, BarChart3, AlertCircle, 
-  GraduationCap, CheckCircle2, ShieldCheck, Eye, Code
+  Loader2, BookOpen, AlertCircle, GraduationCap, 
+  CheckCircle2, Eye, Code, Cpu
 } from 'lucide-react';
 import { QuestionPaperSheet } from './QuestionPaperSheet';
-import MorphOrb, { MorphOrbHandle } from '@/components/ui/ai-thiking-orb-and-input';
+import { HueThinkingOrb } from '@/components/ui/hue-thinking-orb';
 import { AiReasoningView } from '@/components/ai/AiReasoningView';
 
-const MotionDiv = motion.div as any;
+const REASONING_STORAGE_KEY = 'kaizen_reasoning_expanded';
 
 interface SubjectOption {
   code: string;
@@ -21,10 +21,35 @@ interface SubjectOption {
   type?: string;
 }
 
+interface CurricularTopic {
+  id: string;
+  name: string;
+  unit: string;
+  recurrence: number;
+  bloom: string;
+}
+
+const SYLLABUS_TOPICS: Record<string, CurricularTopic[]> = {
+  CS40003: [
+    { id: 'bva', name: 'Boundary Value Analysis & Robustness Testing', unit: 'Unit 1', recurrence: 95, bloom: 'L3 Apply' },
+    { id: 'cfg', name: 'Control Flow Graph & Cyclomatic Complexity V(G)', unit: 'Unit 2', recurrence: 92, bloom: 'L3 Apply' },
+    { id: 'ecp', name: 'Equivalence Class Partitioning & Decision Tables', unit: 'Unit 1', recurrence: 86, bloom: 'L2 Understand' },
+    { id: 'mut', name: 'Integration, System & Mutation Testing Strategies', unit: 'Unit 3', recurrence: 80, bloom: 'L4 Analyze' },
+    { id: 'auto', name: 'Test Case Prioritization & Automation Frameworks', unit: 'Unit 4', recurrence: 78, bloom: 'L5 Evaluate' },
+    { id: 'dataflow', name: 'Data Flow Testing & DU-Chain Path Criteria', unit: 'Unit 2', recurrence: 74, bloom: 'L3 Apply' },
+  ],
+  EX40003: [
+    { id: 'ethics', name: 'Professional Ethics, Whistleblowing & NSPE Code', unit: 'Unit 1', recurrence: 96, bloom: 'L2 Understand' },
+    { id: 'ipr', name: 'Intellectual Property Rights (IPR) & Patent Claims', unit: 'Unit 3', recurrence: 92, bloom: 'L3 Apply' },
+    { id: 'contracts', name: 'Engineering Contracts, Tenders & Tort Liability', unit: 'Unit 4', recurrence: 88, bloom: 'L4 Analyze' },
+    { id: 'dcf', name: 'Discounted Cash Flow (DCF), NPV & Depreciation', unit: 'Unit 2', recurrence: 85, bloom: 'L3 Apply' },
+    { id: 'env', name: 'Environmental Impact Assessment & Industrial Safety', unit: 'Unit 4', recurrence: 79, bloom: 'L5 Evaluate' },
+    { id: 'costbenefit', name: 'Cost-Benefit Ratio & Project Appraisal Models', unit: 'Unit 2', recurrence: 75, bloom: 'L3 Apply' },
+  ]
+};
+
 export default function DashboardGeneratorPage() {
-  const morphOrbRef = React.useRef<MorphOrbHandle>(null);
-  const generationResolverRef = React.useRef<((msg: string) => void) | null>(null);
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [subjects, setSubjects] = useState<SubjectOption[]>([
     {
@@ -44,6 +69,7 @@ export default function DashboardGeneratorPage() {
   ]);
   const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>('CS40003');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string>('Software Testing and Automation');
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(['bva', 'cfg', 'ecp', 'mut']);
   const [examType, setExamType] = useState<'mid_sem' | 'end_sem'>('end_sem');
   const [studentSection, setStudentSection] = useState<string>('');
   const [studentSemester, setStudentSemester] = useState<number>(7);
@@ -52,8 +78,7 @@ export default function DashboardGeneratorPage() {
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [generatedPaper, setGeneratedPaper] = useState<string | null>(null);
   const [reasoningContent, setReasoningContent] = useState<string | null>(null);
-  const [showReasoning, setShowReasoning] = useState(true);
-  const [reasoningExpanded, setReasoningExpanded] = useState<boolean>(true);
+  const [reasoningExpanded, setReasoningExpanded] = useState<boolean>(false);
   const [isThinkingComplete, setIsThinkingComplete] = useState<boolean>(false);
   const [thinkingDuration, setThinkingDuration] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -63,15 +88,32 @@ export default function DashboardGeneratorPage() {
 
   const semSuffix = studentSemester === 1 ? 'st' : studentSemester === 2 ? 'nd' : studentSemester === 3 ? 'rd' : 'th';
   const semLabel = `${studentSemester}${semSuffix} Semester`;
-  const semShort = `${studentSemester}${semSuffix} Sem`;
 
-  const [pyqStats, setPyqStats] = useState<{
-    sampleCount: number;
-    recurrenceRate: number;
-    topTopics: Array<{ topic: string; prob: number }>;
-  } | null>(null);
+  // Restore reasoning expanded/collapsed preference from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(REASONING_STORAGE_KEY);
+        if (saved !== null) {
+          setReasoningExpanded(saved === 'true');
+        } else {
+          setReasoningExpanded(false); // default collapsed
+        }
+      } catch {}
+    }
+  }, []);
 
-  // Fetch student enrolled subjects on mount: dynamically resolve subjects and professors for current semester
+  const handleToggleReasoning = () => {
+    setReasoningExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(REASONING_STORAGE_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Fetch student enrolled subjects on mount
   useEffect(() => {
     async function loadSubjects() {
       try {
@@ -90,8 +132,6 @@ export default function DashboardGeneratorPage() {
           }
 
           const currentSubs = data.currentSemesterSubjects || [];
-
-          // Separate Elective vs Core subjects for this semester
           const electiveItem = currentSubs.find((s: any) => s.isElective);
           const coreItems = currentSubs.filter((s: any) => !s.isElective);
           
@@ -140,52 +180,33 @@ export default function DashboardGeneratorPage() {
     loadSubjects();
   }, []);
 
-  // Compute statistical recurrence whenever selected subject changes
-  useEffect(() => {
-    if (!selectedSubjectCode) return;
-
-    const isTesting = selectedSubjectCode.toUpperCase() === 'CS40003';
-    const isEpp = /ex40003|hs40001/i.test(selectedSubjectCode);
-
-    if (isTesting) {
-      setPyqStats({
-        sampleCount: 16,
-        recurrenceRate: 91,
-        topTopics: [
-          { topic: 'Boundary Value Analysis & Robustness Testing', prob: 95 },
-          { topic: 'Control Flow Graph & Cyclomatic Complexity V(G)', prob: 92 },
-          { topic: 'Equivalence Class Partitioning & Decision Tables', prob: 86 },
-          { topic: 'Integration, System & Regression Testing Strategies', prob: 80 },
-        ]
-      });
-    } else if (isEpp) {
-      setPyqStats({
-        sampleCount: 15,
-        recurrenceRate: 89,
-        topTopics: [
-          { topic: 'Professional Ethics & Code of Conduct (NSPE/IEEE)', prob: 94 },
-          { topic: 'Engineering Economics, Depreciation & Project Appraisal', prob: 89 },
-          { topic: 'Intellectual Property Rights (IPR) & Patent Claims', prob: 85 },
-          { topic: 'Contracts, Tendering & Dispute Arbitration Norms', prob: 79 },
-        ]
-      });
-    } else {
-      setPyqStats({
-        sampleCount: 12,
-        recurrenceRate: 80,
-        topTopics: [
-          { topic: 'Core Theoretical & Analytical Problems', prob: 88 },
-          { topic: 'Design Patterns & Real-World Implementations', prob: 82 },
-          { topic: 'Comparative Evaluations & Trade-offs', prob: 75 },
-        ]
-      });
-    }
-  }, [selectedSubjectCode]);
+  // Update default selected topics when active subject changes
+  const activeSyllabusTopics = SYLLABUS_TOPICS[selectedSubjectCode] || SYLLABUS_TOPICS['CS40003'];
 
   const handleSubjectChange = (code: string) => {
     setSelectedSubjectCode(code);
     const sub = subjects.find(s => s.code === code);
     if (sub) setSelectedSubjectName(sub.name);
+
+    const newTopics = SYLLABUS_TOPICS[code] || SYLLABUS_TOPICS['CS40003'];
+    // Default to top 4 topics
+    setSelectedTopicIds(newTopics.slice(0, 4).map(t => t.id));
+  };
+
+  const toggleTopic = (id: string) => {
+    setSelectedTopicIds(prev => 
+      prev.includes(id) 
+        ? (prev.length > 1 ? prev.filter(t => t !== id) : prev) 
+        : [...prev, id]
+    );
+  };
+
+  const selectAllTopics = () => {
+    setSelectedTopicIds(activeSyllabusTopics.map(t => t.id));
+  };
+
+  const resetRecommendedTopics = () => {
+    setSelectedTopicIds(activeSyllabusTopics.slice(0, 4).map(t => t.id));
   };
 
   const handleStop = () => {
@@ -196,39 +217,17 @@ export default function DashboardGeneratorPage() {
     setLoading(false);
   };
 
-  const suggestedPrompts = selectedSubjectCode === 'CS40003'
-    ? [
-        "Synthesize 50-mark End-Sem Paper",
-        "Boundary Value Analysis & CFG",
-        "Enforce Bloom's Taxonomy [CO1-CO5]",
-        "Mid-Sem 20-mark Model (Q1 Compulsory)",
-      ]
-    : [
-        "Synthesize 50-mark End-Sem Paper",
-        "Professional Ethics & NSPE Code",
-        "Engineering Economics & DCF",
-        "IPR & Patent Claims Analysis",
-      ];
-
-  const handleGenerate = async (customInstruction?: string | React.MouseEvent) => {
-    const validCustomInstruction = typeof customInstruction === 'string' ? customInstruction : undefined;
+  const handleGenerate = async () => {
     setLoading(true);
     setError(null);
     setGeneratedPaper(null);
     setReasoningContent(null);
     setGenStats(null);
-    setShowReasoning(true);
-    setReasoningExpanded(true);
     setIsThinkingComplete(false);
     const startTime = Date.now();
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
-
-    // Launch MorphOrb animation if in idle state
-    if (morphOrbRef.current && morphOrbRef.current.getPhase() === 'idle') {
-      morphOrbRef.current.start(validCustomInstruction || `Synthesizing official KIIT ${examType === 'mid_sem' ? 'Mid' : 'End'} Sem Examination Paper for ${selectedSubjectCode}`);
-    }
 
     const examTitle = examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination';
     const fullMarks = examType === 'mid_sem' ? 20 : 50;
@@ -242,6 +241,11 @@ export default function DashboardGeneratorPage() {
       : (selectedSubjectCode === 'EX40003'
           ? `Google Classroom Coursework Modules for EX40003 (Engineering Professional Practice):\n1. [ASSIGNMENT] Assignment-I: Module 1 Professional Ethics, NSPE Code of Conduct & Integrity\n2. [ASSIGNMENT] Assignment-II: Module 2 Engineering Economics, Discounted Cash Flow & Project Appraisal\n3. [ASSIGNMENT] Assignment-3: Module 3 Intellectual Property Rights (IPR), Patent Filing & Infringement\n4. [ASSIGNMENT] Assignment-IV: Module 4 Environmental Impact Assessment, Sustainable Engineering & Liability\n5. [MODEL_QUESTIONS] Model Questions (Till Mid Semester): Short Answer & Conceptual Questions`
           : `Google Classroom Coursework Modules for CS40003 (Software Testing and Automation):\n1. [ASSIGNMENT] Assignment-1: Black-Box vs White-Box Testing, Boundary Value Analysis, Equivalence Partitioning & Cyclomatic Complexity`);
+
+    const selectedTopicsDetails = activeSyllabusTopics
+      .filter(t => selectedTopicIds.includes(t.id))
+      .map(t => `- [${t.unit}] ${t.name} (Bloom: ${t.bloom}, PYQ Recurrence: ${t.recurrence}%)`)
+      .join('\n');
 
     const endSemInstructions = `
 Answer any 5 questions including Question No. 1 which is COMPULSORY.
@@ -298,19 +302,22 @@ QUESTIONS 2 TO 5 (Answer any THREE questions. Each question carries 5 marks)
 `.trim();
 
     const promptText = `
-${validCustomInstruction ? `Specific Faculty Instruction & Custom Directive:\n${validCustomInstruction}\n` : ''}
 You are the official Senior Examination Paper Setter: ${facultyName}
 Department: School of Electronics and Computer Science Engineering
 Academic Target: B.Tech ${semLabel}
 Exam Type: ${examTitle} | Full Marks: ${fullMarks} | Duration: ${duration}
 Subject: ${selectedSubjectName} (${selectedSubjectCode})
 
+Curricular Topics Selected by Faculty Examiner:
+${selectedTopicsDetails}
+
 Grounding Data from Google Classroom Assignments & Modules:
 ${cwContextText}
 
-Historical PYQ Pattern Analysis:
-- High recurrence topics: ${pyqStats?.topTopics?.map(t => t.topic).join(', ') || 'Core analytical topics'}
-- Recurrence confidence rate: ${pyqStats?.recurrenceRate || 90}%
+Mandatory KIIT Autonomous Instructions:
+- Total Marks strictly match ${fullMarks}.
+- Every question must have explicit [CO] outcome tags and marks allocation.
+- Questions must specifically assess the selected curricular topics with authentic numerical problems, code/case-study logic, and analytical rigor.
 
 Format strictly as follows:
 ================================================================================
@@ -407,7 +414,6 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
       setThinkingDuration(latencySec);
       setGeneratedPaper(accumulatedPaper);
       setReasoningContent(accumulatedReasoning || null);
-      setShowReasoning(true);
       setIsThinkingComplete(true);
       setGenStats({
         tokens: consumed,
@@ -415,24 +421,13 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         model: 'NVIDIA Nemotron 3.5 Bolt (Live Stream)',
       });
 
-      // Complete MorphOrb thinking phase
-      generationResolverRef.current?.("Paper synthesized successfully.");
-      generationResolverRef.current = null;
-
-      // Auto-collapse animation: Give user 850ms to see "Thought for Xs • 5 Steps Verified",
-      // then smoothly collapse the reasoning blueprint into the banner and reveal the paper sheet!
-      setTimeout(() => {
-        setReasoningExpanded(false);
-      }, 850);
-
-      // Synchronize consumed tokens with Header Quota Bar and LocalStorage
+      // Synchronize consumed tokens with Header Quota Bar
       if (typeof window !== 'undefined') {
         try {
           const current = parseInt(localStorage.getItem('kaizen_extra_tokens_consumed') || '0', 10);
           localStorage.setItem('kaizen_extra_tokens_consumed', String(current + consumed));
           window.dispatchEvent(new CustomEvent('ai-token-consumed', { detail: { tokens: consumed } }));
           window.dispatchEvent(new CustomEvent('kaizen:tokens-consumed', { detail: { tokens: consumed } }));
-          // Notify server quota endpoint asynchronously
           fetch('/api/ai/quota', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -555,7 +550,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
               </span>
             </div>
 
-            {/* Subject Selector: Exactly TWO subjects (Allotted Elective & EPP) */}
+            {/* Subject Selector */}
             <div>
               <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-[0.12em] mb-1.5 font-bold">
                 Active {semLabel} Subjects
@@ -574,7 +569,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         key={s.code}
                         type="button"
                         onClick={() => handleSubjectChange(s.code)}
-                        className={`p-3 rounded-xl border text-left transition-all ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
                             : 'bg-background/80 border-border text-muted-foreground hover:text-foreground hover:border-input'
@@ -615,7 +610,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 <button
                   type="button"
                   onClick={() => setExamType('mid_sem')}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     examType === 'mid_sem'
                       ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
                       : 'bg-background/80 border-border text-muted-foreground hover:text-foreground'
@@ -628,7 +623,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 <button
                   type="button"
                   onClick={() => setExamType('end_sem')}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     examType === 'end_sem'
                       ? 'bg-primary/10 border-primary text-foreground shadow-sm shadow-primary/10'
                       : 'bg-background/80 border-border text-muted-foreground hover:text-foreground'
@@ -640,8 +635,8 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
               </div>
             </div>
 
-            {/* Google Classroom & PYQ Grounding Indicator */}
-            <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1.5 text-xs font-mono">
+            {/* Google Classroom Ingestion Indicator */}
+            <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1 text-xs font-mono">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground font-bold flex items-center gap-1.5 text-[11px]">
                   <CheckCircle2 size={13} className="text-emerald-400" />
@@ -657,24 +652,42 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
               </div>
             </div>
 
-            {/* Generate Action Button */}
-            <button
-              onClick={() => handleGenerate()}
-              disabled={loading}
-              className="w-full h-11 rounded-xl bg-primary text-black font-mono text-xs font-bold uppercase tracking-[0.16em] hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" size={15} />
-                  <span>Synthesizing Exam Paper...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={15} />
-                  <span>Generate KIIT Question Paper</span>
-                </>
-              )}
-            </button>
+            {/* High-End Apple/MorphOrb Glowing Generate Button */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => handleGenerate()}
+                disabled={loading}
+                className="relative group w-full h-12 rounded-full transition-all duration-300 transform active:scale-[0.98] disabled:opacity-60 cursor-pointer overflow-hidden p-[1px]"
+              >
+                {/* Luminous Pulsing Underglow */}
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-[#ccff00] via-[#84cc16] to-[#10b981] opacity-75 blur-md group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+
+                {/* Ambient Radial Flare */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#ccff00]/25 via-[#10b981]/25 to-transparent blur-sm" />
+
+                {/* Obsidian Liquid Glass Surface */}
+                <div className="relative w-full h-full rounded-full bg-[#0a0b10] hover:bg-[#0e1017] border border-white/20 group-hover:border-[#ccff00]/60 px-5 flex items-center justify-center gap-2.5 transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
+
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin text-[#ccff00]" size={16} />
+                      <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-foreground">
+                        Synthesizing Exam Paper...
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} className="text-[#ccff00] animate-pulse" />
+                      <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#ccff00] drop-shadow-[0_0_10px_rgba(204,255,0,0.4)]">
+                        Generate KIIT Question Paper
+                      </span>
+                    </>
+                  )}
+                </div>
+              </button>
+            </div>
 
             {error && (
               <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center gap-2">
@@ -684,37 +697,70 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
             )}
           </div>
 
-          {/* Card: Statistical Recurrence & PYQ Intelligence */}
-          {pyqStats && (
-            <div className="p-4 rounded-2xl bg-card border border-border shadow-sm space-y-2.5 shrink-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-2">
-                  <BarChart3 size={13} className="text-emerald-400" />
-                  Statistical PYQ Recurrence
+          {/* Interactive Curricular Topic Selector */}
+          <div className="p-4 rounded-2xl bg-card border border-border shadow-sm space-y-3 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cpu size={14} className="text-primary" />
+                <h3 className="text-xs font-mono font-bold uppercase tracking-[0.14em] text-foreground">
+                  Curricular Neural Topics
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  {pyqStats.recurrenceRate}% Pattern Match
-                </span>
               </div>
-
-              <div className="space-y-2 pt-1">
-                {pyqStats.topTopics.map((top, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-mono">
-                      <span className="text-foreground truncate max-w-[200px]">{top.topic}</span>
-                      <span className="text-emerald-400 font-bold">{top.prob}% Recurrence</span>
-                    </div>
-                    <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-500" 
-                        style={{ width: `${top.prob}%` }} 
-                      />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={resetRecommendedTopics}
+                  className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                >
+                  PYQ Default
+                </button>
+                <button
+                  type="button"
+                  onClick={selectAllTopics}
+                  className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground border border-white/10 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Select All
+                </button>
               </div>
             </div>
-          )}
+
+            <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
+              Fine-tune NVIDIA Nemotron 3.5 Bolt by selecting verified syllabus units to prioritize in the examination paper:
+            </p>
+
+            <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+              {activeSyllabusTopics.map((topic) => {
+                const isSelected = selectedTopicIds.includes(topic.id);
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    onClick={() => toggleTopic(topic.id)}
+                    className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary/10 border-primary/40 text-foreground shadow-sm shadow-primary/10'
+                        : 'bg-background/60 border-border/70 text-muted-foreground hover:border-input hover:text-foreground'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center flex-shrink-0 border transition-all ${
+                      isSelected ? 'bg-primary border-primary text-black' : 'border-border bg-background'
+                    }`}>
+                      {isSelected && <Check size={11} className="stroke-[3]" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-mono font-bold text-primary">{topic.unit}</span>
+                        <span className="text-[9px] font-mono text-emerald-400 font-semibold">{topic.recurrence}% PYQ</span>
+                      </div>
+                      <div className="text-xs font-medium text-foreground tracking-tight line-clamp-1 mt-0.5">
+                        {topic.name}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
         </div>
 
@@ -740,7 +786,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                   <button
                     type="button"
                     onClick={() => setPaperViewMode('sheet')}
-                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
                       paperViewMode === 'sheet'
                         ? 'bg-primary text-black font-bold shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
@@ -753,7 +799,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                   <button
                     type="button"
                     onClick={() => setPaperViewMode('raw')}
-                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
                       paperViewMode === 'raw'
                         ? 'bg-primary text-black font-bold shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
@@ -766,24 +812,9 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </div>
 
                 <button
-                  onClick={() => {
-                    setShowReasoning(true);
-                    setReasoningExpanded(!reasoningExpanded);
-                  }}
-                  className={`p-2 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
-                    reasoningExpanded 
-                      ? 'bg-primary/20 border-primary text-primary' 
-                      : 'border-border text-muted-foreground hover:text-foreground'
-                  }`}
-                  title="Inspect pedagogical reasoning"
-                >
-                  <Sparkles size={13} className="text-primary" />
-                  <span className="hidden sm:inline">{reasoningExpanded ? 'Hide AI Reasoning' : 'AI Reasoning'}</span>
-                </button>
-
-                <button
+                  type="button"
                   onClick={handleCopy}
-                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Copy to clipboard"
                 >
                   {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
@@ -791,8 +822,9 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleDownload}
-                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Download as text"
                 >
                   <Download size={13} />
@@ -800,8 +832,9 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 </button>
 
                 <button
+                  type="button"
                   onClick={handlePrint}
-                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5"
+                  className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Print question paper"
                 >
                   <Printer size={13} />
@@ -814,29 +847,28 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
           {/* Paper Output Container - Fits perfectly in viewport without page scroll */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
             {generatedPaper ? (
-              <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-y-auto custom-scrollbar pr-1">
-                {showReasoning && (
-                  <div className="w-full shrink-0">
-                    <AiReasoningView
-                      reasoning={reasoningContent}
-                      modelName="NVIDIA Nemotron 3.5 Bolt"
-                      isLive={false}
-                      isComplete={true}
-                      durationSeconds={thinkingDuration || genStats?.latency || 11.4}
-                      subjectCode={selectedSubjectCode}
-                      subjectName={selectedSubjectName}
-                      examType={examType}
-                      isExpanded={reasoningExpanded}
-                      onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
-                      isFloatingOverlay={false}
-                    />
-                  </div>
-                )}
+              <div className="flex-1 min-h-0 flex flex-col space-y-2.5 overflow-y-auto custom-scrollbar pr-1">
+                {/* Collapsible Reasoning Disclosure Bar (Default collapsed) */}
+                <div className="w-full shrink-0">
+                  <AiReasoningView
+                    reasoning={reasoningContent}
+                    modelName="NVIDIA Nemotron 3.5 Bolt"
+                    isLive={false}
+                    isComplete={true}
+                    durationSeconds={thinkingDuration || genStats?.latency || 11.4}
+                    subjectCode={selectedSubjectCode}
+                    subjectName={selectedSubjectName}
+                    examType={examType}
+                    isExpanded={reasoningExpanded}
+                    onToggleExpand={handleToggleReasoning}
+                    isFloatingOverlay={false}
+                  />
+                </div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 16 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
                   className="flex-1"
                 >
                   {paperViewMode === 'sheet' ? (
@@ -858,89 +890,53 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
               </div>
             ) : (
               <div className="flex-1 min-h-0 w-full h-full relative overflow-hidden flex items-center justify-center">
-                {/* Background Layer: Centered MorphOrb & Ambient Stage */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto">
+                {/* Clean Stage: Centered 3D Hue Thinking Orb */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   {!loading && (
-                    <div className="text-center mb-4 max-w-lg px-2 z-10">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-2.5 shadow-sm uppercase tracking-[0.16em]">
-                        <Sparkles size={12} className="text-primary animate-pulse" />
-                        <span>Autonomous Examination Generator</span>
+                    <div className="text-center mb-6 max-w-md px-3 z-10 pointer-events-auto">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-3 shadow-sm uppercase tracking-[0.16em]">
+                        <Sparkles size={11} className="text-primary animate-pulse" />
+                        <span>Autonomous Question Synthesizer</span>
                       </div>
                       <h3 className="font-mono text-sm sm:text-base font-bold uppercase tracking-[0.16em] text-foreground">
-                        KIIT Paper Synthesizer
+                        KIIT Examination Generator
                       </h3>
-                      <p className="text-xs text-muted-foreground font-mono mt-1 leading-relaxed tracking-wide">
-                        Click <span className="text-primary font-bold">&quot;Generate KIIT Question Paper&quot;</span> or instruct the model below to synthesize camera-ready examination questions.
+                      <p className="text-xs text-muted-foreground font-mono mt-1.5 leading-relaxed">
+                        Configure syllabus units on the left and click <span className="text-primary font-bold">&quot;Generate KIIT Question Paper&quot;</span> to synthesize camera-ready questions.
                       </p>
                     </div>
                   )}
 
-                  {/* MorphOrb is ALWAYS Centered in the stage container */}
-                  <div className="w-full h-full flex flex-col items-center justify-center relative">
-                    <MorphOrb
-                      ref={morphOrbRef}
-                      placeholder={`Instruct NVIDIA Nemotron for ${selectedSubjectCode}...`}
-                      labels={[
-                        "Streaming Live Reasoning Traces",
-                        "NVIDIA Nemotron 3.5 Bolt Inference",
-                        "Synthesizing Examination Blueprint",
-                        "Validating CO & Bloom's Taxonomy",
-                      ]}
-                      answerTitle="KIIT Paper Ready"
-                      onSubmit={async (userText) => {
-                        if (!loading) {
-                          void handleGenerate(userText);
-                        }
-                        return new Promise<string>((resolve) => {
-                          generationResolverRef.current = resolve;
-                        });
-                      }}
-                    />
-
-                    {/* assistant-ui Suggested Prompts (Starter chips on idle state) */}
-                    {!loading && (
-                      <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl mx-auto mt-2 px-3 z-20 pointer-events-auto">
-                        <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mr-1 flex items-center gap-1">
-                          <Sparkles size={11} className="text-primary" /> Suggested:
-                        </div>
-                        {suggestedPrompts.map((pText, pIdx) => (
-                          <button
-                            key={pIdx}
-                            type="button"
-                            onClick={() => handleGenerate(pText)}
-                            className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-white/[0.04] hover:bg-white/[0.09] text-muted-foreground hover:text-foreground border border-white/10 hover:border-primary/40 transition-all hover:scale-105 shadow-sm cursor-pointer"
-                          >
-                            {pText}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {/* 3D Particle Orb Floating in Center */}
+                  <HueThinkingOrb 
+                    isThinking={loading} 
+                    size={280} 
+                  />
                 </div>
 
-                {/* Foreground Floating Layer: iOS 26 Liquid Glass Reasoning Window */}
+                {/* Floating Liquid Glass Reasoning Window during Generation */}
                 <AnimatePresence>
                   {loading && (
                     <motion.div
                       key="live-reasoning-window"
                       layout
-                      initial={{ opacity: 0, y: 36, scale: 0.98 }}
+                      initial={{ opacity: 0, y: 30, scale: 0.98 }}
                       animate={{
                         opacity: 1,
                         y: 0,
                         scale: 1,
                         top: reasoningExpanded ? 10 : "auto",
-                        bottom: 10,
-                        height: reasoningExpanded ? "calc(100% - 20px)" : 52,
+                        bottom: 12,
+                        height: reasoningExpanded ? "calc(100% - 24px)" : 48,
                       }}
                       exit={{ opacity: 0, y: 20, scale: 0.98 }}
                       transition={{
                         type: "spring",
-                        stiffness: 300,
-                        damping: 30,
+                        stiffness: 320,
+                        damping: 32,
                         mass: 0.85,
                       }}
-                      className="absolute inset-x-2 sm:inset-x-3.5 z-30 flex flex-col"
+                      className="absolute inset-x-2 sm:inset-x-4 z-30 flex flex-col"
                     >
                       <AiReasoningView
                         reasoning={reasoningContent}
@@ -951,7 +947,7 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                         subjectName={selectedSubjectName}
                         examType={examType}
                         isExpanded={reasoningExpanded}
-                        onToggleExpand={() => setReasoningExpanded(!reasoningExpanded)}
+                        onToggleExpand={handleToggleReasoning}
                         isFloatingOverlay={true}
                         onStop={handleStop}
                       />
