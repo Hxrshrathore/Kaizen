@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, JetBrains_Mono, Nunito_Sans, Manrope } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono, Nunito_Sans, Manrope, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const manropeHeading = Manrope({subsets:['latin'],variable:'--font-heading'});
 
-const nunitoSans = Nunito_Sans({subsets:['latin'],variable:'--font-sans'});
+const sourceSans3 = Source_Sans_3({subsets:['latin'],variable:'--font-sans'});
 
 // 1. Configure Fonts with CSS variables
 const spaceGrotesk = Space_Grotesk({
@@ -55,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", nunitoSans.variable, manropeHeading.variable)} suppressHydrationWarning>
+    <html lang="en" className={cn("font-sans", sourceSans3.variable, manropeHeading.variable)} suppressHydrationWarning>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} ${handwritten.variable} antialiased bg-background text-foreground`}
         suppressHydrationWarning
@@ -66,7 +67,9 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {children}
+          <TooltipProvider delayDuration={150}>
+            {children}
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>
