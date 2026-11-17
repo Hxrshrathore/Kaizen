@@ -35,15 +35,27 @@ export async function POST(req: Request) {
       ]
     `.trim();
 
-    // 2. Use the EXACT model from your Vite code
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-09-2025",
-      contents: { role: 'user', parts: [{ text: prompt }] },
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-      },
-    });
+    // 2. Use high-throughput Gemini model with fallback
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-flash-lite-latest",
+        contents: { role: 'user', parts: [{ text: prompt }] },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
+        },
+      });
+    } catch {
+      response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: { role: 'user', parts: [{ text: prompt }] },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
+        },
+      });
+    }
 
     // 3. 🔥 CRITICAL FIX: Access text as a PROPERTY, not a function
     const text = response.text; 

@@ -37,16 +37,27 @@ export async function POST(req: Request) {
       4. **Wellness**: If the user seems stressed, offer brief, stoic advice on academic resilience.
     `;
 
-    // 2. Use the EXACT model from your working code
-    // 3. Pass systemInstruction in config
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-09-2025", 
-      contents: { role: 'user', parts: [{ text: message }] },
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.7,
-      },
-    });
+    // 2. Generate with current available Gemini models
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-flash-lite-latest", 
+        contents: { role: 'user', parts: [{ text: message }] },
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        },
+      });
+    } catch {
+      response = await ai.models.generateContent({
+        model: "gemini-flash-latest", 
+        contents: { role: 'user', parts: [{ text: message }] },
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        },
+      });
+    }
 
     // 4. 🔥 CRITICAL FIX: Access text as a PROPERTY, not a function
     // The @google/genai SDK returns text as a getter property

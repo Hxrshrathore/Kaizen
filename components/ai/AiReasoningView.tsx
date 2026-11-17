@@ -376,14 +376,6 @@ export function AiReasoningView({
               </div>
             )}
 
-            {/* Live Streaming Indicator */}
-            {isLive && (
-              <div className="flex items-center gap-2 pt-2 text-[11px] font-mono text-primary animate-pulse pl-1">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                <span>Streaming live generative cognitive trace... ▌</span>
-              </div>
-            )}
-
             {/* Jump to Latest Floating Pill */}
             {showJumpToBottom && (
               <button
