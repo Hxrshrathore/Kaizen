@@ -199,8 +199,8 @@ export function HueThinkingOrb({
       <div 
         className={`absolute rounded-full pointer-events-none transition-all duration-700 blur-3xl ${
           isThinking 
-            ? "w-80 h-80 bg-[radial-gradient(circle,rgba(204,255,0,0.22)_0%,rgba(16,185,129,0.14)_45%,transparent_70%)] animate-pulse" 
-            : "w-64 h-64 bg-[radial-gradient(circle,rgba(204,255,0,0.12)_0%,rgba(16,185,129,0.06)_50%,transparent_70%)]"
+            ? "w-80 h-80 bg-[radial-gradient(circle,rgba(68,122,0,0.18)_0%,rgba(16,185,129,0.12)_45%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(204,255,0,0.22)_0%,rgba(16,185,129,0.14)_45%,transparent_70%)] animate-pulse" 
+            : "w-64 h-64 bg-[radial-gradient(circle,rgba(68,122,0,0.1)_0%,rgba(16,185,129,0.06)_50%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(204,255,0,0.12)_0%,rgba(16,185,129,0.06)_50%,transparent_70%)]"
         }`} 
       />
 
@@ -208,8 +208,8 @@ export function HueThinkingOrb({
       <div 
         className={`absolute rounded-full pointer-events-none blur-xl transition-all duration-500 ${
           isThinking 
-            ? "w-48 h-48 bg-[radial-gradient(circle,rgba(204,255,0,0.3)_0%,transparent_65%)]" 
-            : "w-36 h-36 bg-[radial-gradient(circle,rgba(204,255,0,0.18)_0%,transparent_65%)]"
+            ? "w-48 h-48 bg-[radial-gradient(circle,rgba(68,122,0,0.22)_0%,transparent_65%)] dark:bg-[radial-gradient(circle,rgba(204,255,0,0.3)_0%,transparent_65%)]" 
+            : "w-36 h-36 bg-[radial-gradient(circle,rgba(68,122,0,0.14)_0%,transparent_65%)] dark:bg-[radial-gradient(circle,rgba(204,255,0,0.18)_0%,transparent_65%)]"
         }`} 
       />
 
@@ -221,7 +221,7 @@ export function HueThinkingOrb({
         <canvas
           ref={canvasRef}
           style={{ width: size, height: size }}
-          className="relative z-10 pointer-events-none drop-shadow-[0_0_18px_rgba(204,255,0,0.35)]"
+          className="relative z-10 pointer-events-none drop-shadow-[0_0_18px_rgba(68,122,0,0.25)] dark:drop-shadow-[0_0_18px_rgba(204,255,0,0.35)]"
         />
       </div>
 
