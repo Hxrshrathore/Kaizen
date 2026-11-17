@@ -850,19 +850,21 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 ml-auto">
-                {/* Smart AI Verification Trigger Badge */}
+                {/* Smart AI Verification Trigger Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsVerificationModalOpen(true)}
-                  className="h-8 gap-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
-                  title="Inspect 70%-90% PYQ Pattern Verification Audit"
+                  className="h-8 gap-1.5 px-2.5 rounded-lg border border-border bg-card/80 hover:bg-muted text-xs font-mono font-semibold transition-all cursor-pointer shadow-xs"
+                  title="Inspect Autonomous Verification Audit & PYQ Match"
                 >
-                  <ShieldCheck size={13} className="text-emerald-500 dark:text-emerald-400" />
-                  <span>{verificationReport?.pyqMatchRate || 88.4}% PYQ Match</span>
-                  <Badge variant="secondary" className="hidden md:inline-flex text-[9px] px-1 py-0 h-4 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 uppercase font-mono">
-                    Verified
-                  </Badge>
+                  <ShieldCheck size={13} className="text-primary" />
+                  <span>Generated & Verified</span>
+                  {verificationReport?.pyqMatchRate && (
+                    <span className="text-[11px] text-muted-foreground font-mono font-normal ml-0.5">
+                      ({verificationReport.pyqMatchRate}%)
+                    </span>
+                  )}
                 </Button>
 
                 {/* View Mode Toggle: Official Sheet vs Raw Markdown */}

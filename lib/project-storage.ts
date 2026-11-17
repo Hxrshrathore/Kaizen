@@ -580,14 +580,17 @@ export async function addTeammateToGroup(
     throw new Error("Maximum team size reached (4 members).");
   }
 
-  // 3. Check if already member
-  if (existingMembers.some((m) => m.rollNo === student.rollNo)) {
-    throw new Error("Student is already in this project group.");
+  // 3. Check if already member of this group
+  const inThisGroup = await db.$queryRaw<any[]>`
+    SELECT id FROM "ProjectMember" WHERE "groupId" = ${groupId} AND "rollNo" = ${student.rollNo} LIMIT 1;
+  `;
+  if (inThisGroup.length > 0) {
+    return { success: true, memberId: inThisGroup[0].id, alreadyMember: true };
   }
 
-  // 4. Check if student already in another group
+  // 4. Check if student already in ANOTHER group
   const inOther = await db.$queryRaw<any[]>`
-    SELECT "groupId" FROM "ProjectMember" WHERE "rollNo" = ${student.rollNo} LIMIT 1;
+    SELECT "groupId" FROM "ProjectMember" WHERE "rollNo" = ${student.rollNo} AND "groupId" != ${groupId} LIMIT 1;
   `;
   if (inOther.length > 0) {
     throw new Error(`Student ${student.rollNo} is already enrolled in another project group.`);

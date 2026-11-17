@@ -40,25 +40,18 @@ function LoginInterface() {
     e.preventDefault();
     setIsAuthenticating(true);
     
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1004531439680-v0f130hcs9kbl182jp7ie43m1dkgkcft.apps.googleusercontent.com';
     
-    if (!clientId) {
-      setTimeout(() => {
-        if (!consentData) {
-          alert("Please complete the consent flow first by going to /consent");
-          setIsAuthenticating(false);
-          return;
-        }
-        console.log("Authentication successful! Submitting with consent payload:", consentData);
-        router.push('/dashboard');
-      }, 1500);
-      return;
-    }
+    // Dynamically resolve redirect URI to match the current browser origin (Production or Localhost)
+    const origin = typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const redirectUri = `${origin}/api/auth/callback/google`;
 
     // Actual Google Auth URL redirect
     const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     googleAuthUrl.searchParams.set('client_id', clientId);
-    googleAuthUrl.searchParams.set('redirect_uri', 'http://localhost:3000/api/auth/callback/google');
+    googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
     googleAuthUrl.searchParams.set('response_type', 'code');
     googleAuthUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/fitness.activity.read');
     googleAuthUrl.searchParams.set('access_type', 'offline');
@@ -112,7 +105,7 @@ function LoginInterface() {
         />
       </div>
 
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-15 pointer-events-none mix-blend-overlay" />
+      <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-15 pointer-events-none mix-blend-overlay" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-primary/15 blur-[140px] rounded-full pointer-events-none opacity-50" />
 
       <motion.div 
@@ -171,8 +164,8 @@ function LoginInterface() {
           <form onSubmit={handleLogin} className="space-y-6">
             <button 
               type="submit"
-              disabled={isAuthenticating || !consentData}
-              className={`relative w-full py-4 px-5 rounded-xl font-medium flex flex-col sm:flex-row items-center justify-between gap-3 transition-all duration-300 border bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm hover:shadow-md ${(isAuthenticating || !consentData) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+              disabled={isAuthenticating}
+              className={`relative w-full py-4 px-5 rounded-xl font-medium flex flex-col sm:flex-row items-center justify-between gap-3 transition-all duration-300 border bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm hover:shadow-md ${isAuthenticating ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/10 px-2.5 py-1.5 rounded-lg border border-slate-200/60 dark:border-white/10">
@@ -195,26 +188,15 @@ function LoginInterface() {
               )}
             </button>
             
-            {consentData ? (
-               <div className="mt-6">
-                 <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl text-foreground text-sm leading-relaxed text-left mb-6">
-                   <strong className="text-primary font-bold">Notice:</strong> Beta is currently only open to Students & Faculty members of Electronics & Computer Science Students Batch 2023-2027 (current 7th Sem Students).
-                 </div>
-                 <div className="flex items-start gap-2 text-muted-foreground font-handwritten text-lg -rotate-1 opacity-80 text-left">
-                   <Frown size={20} className="shrink-0 mt-1" />
-                   <p>IK it Sucks, but We don't have your data from your School.</p>
-                 </div>
-               </div>
-            ) : (
-               <div className="text-center mt-4">
-                 <p className="text-xs text-amber-500 font-medium mb-1">
-                   ⚠️ Missing consent declarations
-                 </p>
-                 <button type="button" onClick={() => router.push('/consent')} className="text-xs text-primary hover:underline">
-                   Go back and complete consent
-                 </button>
-               </div>
-            )}
+            <div className="mt-4">
+              <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl text-foreground text-sm leading-relaxed text-left mb-4">
+                <strong className="text-primary font-bold">Notice:</strong> Beta is currently only open to Students & Faculty members of Electronics & Computer Science Students Batch 2023-2027 (current 7th Sem Students).
+              </div>
+              <div className="flex items-start gap-2 text-muted-foreground font-handwritten text-lg -rotate-1 opacity-80 text-left">
+                <Frown size={20} className="shrink-0 mt-1" />
+                <p>IK it Sucks, but We don't have your data from your School.</p>
+              </div>
+            </div>
           </form>
         </div>
       </motion.div>

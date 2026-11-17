@@ -12,23 +12,35 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Determine the exact redirect URI matching what the browser requested
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const proto = req.headers.get('x-forwarded-proto') || (req.url.startsWith('https') ? 'https' : 'http');
+    const requestOrigin = host ? `${proto}://${host}` : req.nextUrl.origin;
+
+    const redirectUri = (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost') && !process.env.NEXT_PUBLIC_APP_URL.includes('your-production-domain'))
+      ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/auth/callback/google`
+      : `${requestOrigin}/api/auth/callback/google`;
+
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1004531439680-v0f130hcs9kbl182jp7ie43m1dkgkcft.apps.googleusercontent.com';
+
     // 1. Exchange 'code' for 'access_token'
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_id: clientId,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/google`,
+        redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),
     });
 
     const tokenData = await tokenResponse.json();
     if (!tokenResponse.ok) {
-      console.error("Token Error:", tokenData);
-      throw new Error('Failed to get tokens');
+      console.error("Token Exchange Error:", tokenData, "Used redirect_uri:", redirectUri);
+      const errReason = tokenData.error || 'TokenExchangeFailed';
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errReason)}`, req.url));
     }
 
     // 2. Get User Profile using 'access_token'

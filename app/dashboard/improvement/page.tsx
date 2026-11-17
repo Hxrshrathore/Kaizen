@@ -224,7 +224,7 @@ export default function ImprovementPage() {
           </h3>
           
           <div className="p-6 bg-muted border border-border rounded-sm relative">
-             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none" />
+             <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-5 pointer-events-none" />
             
             <ul className="space-y-6 text-sm text-muted-foreground relative z-10">
               <li className="flex gap-4">

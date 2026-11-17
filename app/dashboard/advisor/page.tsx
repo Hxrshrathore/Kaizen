@@ -136,7 +136,7 @@ export default function AIAdvisorPage() {
       {/* Chat Area */}
       <div className="flex-1 min-h-0 bg-card border border-border rounded-2xl overflow-hidden flex flex-col relative shadow-sm">
         {/* Background Noise */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] pointer-events-none" />
         
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 scroll-smooth custom-scrollbar">
           {messages.map((msg) => (

@@ -52,7 +52,7 @@ export default function JoinBetaPage() {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 md:p-10 bg-background text-foreground overflow-hidden">
       {/* Background Ambience */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay" />
+      <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-primary/15 blur-[140px] rounded-full pointer-events-none" />
 
       <motion.div 

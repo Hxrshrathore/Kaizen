@@ -290,8 +290,12 @@ export default function ProjectsDashboardPage() {
   };
 
   // Add Teammate
+  const [isAddingMember, setIsAddingMember] = useState(false);
   const handleAddTeammate = async (rollNo: string) => {
-    if (!currentGroup) return;
+    if (!currentGroup || isAddingMember) return;
+    setIsAddingMember(true);
+    setSearchQuery('');
+    setSearchResults([]);
     try {
       const res = await fetch('/api/projects/teammates', {
         method: 'POST',
@@ -303,8 +307,6 @@ export default function ProjectsDashboardPage() {
         }),
       });
       if (res.ok) {
-        setSearchQuery('');
-        setSearchResults([]);
         await fetchProjectData();
       } else {
         const err = await res.json();
@@ -312,6 +314,8 @@ export default function ProjectsDashboardPage() {
       }
     } catch (e: any) {
       alert(e.message);
+    } finally {
+      setIsAddingMember(false);
     }
   };
 

@@ -282,7 +282,7 @@ export default function DashboardLayout({
         {/* Dynamic Page Content */}
         <main className="flex-1 overflow-y-auto p-0 relative scroll-smooth">
           {/* Noise Texture Overlay */}
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none fixed z-0" />
+          <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] pointer-events-none fixed z-0" />
           
           <div className="relative z-10 w-full h-full">
             {children}

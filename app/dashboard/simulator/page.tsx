@@ -354,7 +354,7 @@ export default function SimulatorPage() {
                <MotionDiv initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                  
                  <div className="bg-muted border border-border p-6 rounded-sm text-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none" />
+                    <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-5 pointer-events-none" />
                     <div className="text-sm text-muted-foreground mb-1">Projected SGPA</div>
                     <div className={`text-6xl font-display font-bold mb-2 ${parseFloat(result.sgpa) >= parseFloat(targetSGPA) ? 'text-primary' : 'text-foreground'}`}>
                        {result.sgpa}
