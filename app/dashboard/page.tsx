@@ -7,6 +7,8 @@ import {
   Upload, Activity, ArrowUpRight, ShieldAlert, CheckCircle, 
   AlertTriangle, Calendar, Clock, Plus, Trash2, X, Sparkles, ChevronRight, Lock, Loader2, BookOpen, Mail, FileText
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 // --- TYPES ---
 interface UserProfile {
@@ -366,14 +368,14 @@ export default function Dashboard() {
           <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium font-display flex items-center gap-2">
             <Calendar size={14} className="text-primary" /> Upcoming Events
           </h3>
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <Button 
+            variant={isAddingEvent ? "outline" : "default"}
+            size="sm"
             onClick={() => setIsAddingEvent(!isAddingEvent)}
-            className={`text-xs uppercase tracking-wider font-bold px-4 py-2 rounded-sm border transition-all flex items-center gap-2 shadow-lg ${isAddingEvent ? 'bg-muted border-input text-muted-foreground' : 'bg-primary border-primary text-black hover:bg-[#b3e600] hover:shadow-[0_0_15px_rgba(204,255,0,0.4)]'}`}
+            className="text-xs font-mono font-bold uppercase tracking-wider cursor-pointer"
           >
-            {isAddingEvent ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Event</>}
-          </motion.button>
+            {isAddingEvent ? <><X size={14} className="mr-1.5" /> Cancel</> : <><Plus size={14} className="mr-1.5" /> Add Event</>}
+          </Button>
         </div>
 
         {/* Add Event Form */}

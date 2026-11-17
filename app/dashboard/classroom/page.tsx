@@ -9,6 +9,8 @@ import {
   Sparkles, CheckCircle2, AlertTriangle, Check, X, Filter,
   Layers, RefreshCw, GraduationCap, Edit3, Link2, Unlink
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 // --- TYPES ---
 
@@ -961,37 +963,37 @@ export default function ClassroomPage() {
                     <h3 className="text-sm uppercase tracking-wider text-foreground font-bold font-display leading-none">
                       Coursework &amp; Submissions
                     </h3>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-muted text-muted-foreground border border-border">
+                    <Badge variant="outline" className="text-[10px] font-mono">
                       {selectedCourse.assignments.length} Total
-                    </span>
+                    </Badge>
                   </div>
 
                   {/* Submission Filter Tabs */}
                   <div className="flex items-center gap-1.5 text-xs font-mono">
-                    <button
+                    <Button
+                      variant={filterTab === 'ALL_ACTIVE' ? 'default' : 'ghost'}
+                      size="xs"
                       onClick={() => setFilterTab('ALL_ACTIVE')}
-                      className={`px-2.5 py-1 rounded-lg transition-colors ${
-                        filterTab === 'ALL_ACTIVE' ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      className="font-mono text-xs cursor-pointer"
                     >
                       All
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant={filterTab === 'PENDING' ? 'default' : 'ghost'}
+                      size="xs"
                       onClick={() => setFilterTab('PENDING')}
-                      className={`px-2.5 py-1 rounded-lg transition-colors ${
-                        filterTab === 'PENDING' ? 'bg-amber-400 text-black font-bold' : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={`font-mono text-xs cursor-pointer ${filterTab === 'PENDING' ? 'bg-amber-400 text-black hover:bg-amber-300' : ''}`}
                     >
                       Pending ({selectedCourse.stats?.pending || 0})
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant={filterTab === 'TURNED_IN' ? 'default' : 'ghost'}
+                      size="xs"
                       onClick={() => setFilterTab('TURNED_IN')}
-                      className={`px-2.5 py-1 rounded-lg transition-colors ${
-                        filterTab === 'TURNED_IN' ? 'bg-emerald-400 text-black font-bold' : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={`font-mono text-xs cursor-pointer ${filterTab === 'TURNED_IN' ? 'bg-emerald-400 text-black hover:bg-emerald-300' : ''}`}
                     >
                       Turned In ({selectedCourse.stats?.submitted || 0})
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 

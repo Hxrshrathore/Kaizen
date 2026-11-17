@@ -8,6 +8,8 @@ import {
   GraduationCap, Award, BookOpen, AlertCircle, CheckCircle2, 
   Upload, X, ChevronRight, Layers, ArrowUpRight
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface GradeEntry {
   id: string;
@@ -384,10 +386,10 @@ export default function AcademicRecordsPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+            <Badge variant="outline" className="font-mono text-[10px] text-primary border-primary/30 flex items-center gap-1.5">
               <Database size={11} />
               Neon Serverless PostgreSQL
-            </span>
+            </Badge>
             <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Live Persistent
@@ -402,31 +404,38 @@ export default function AcademicRecordsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRecalculateAll}
             disabled={savingAction === 'recalculateAll'}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-mono font-bold text-foreground transition-all disabled:opacity-50"
+            className="flex items-center gap-2 font-mono text-xs cursor-pointer"
             title="Recalculate weighted SGPA and CGPA from course credits"
           >
             <RefreshCw size={13} className={savingAction === 'recalculateAll' ? 'animate-spin' : ''} />
-            <span>Sync & Recalculate</span>
-          </button>
+            <span>Sync &amp; Recalculate</span>
+          </Button>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setIsAddSemesterOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-mono font-bold text-foreground transition-all"
+            className="flex items-center gap-2 font-mono text-xs cursor-pointer"
           >
             <Plus size={13} className="text-primary" />
             <span>Add Semester</span>
-          </button>
+          </Button>
 
-          <Link
-            href="/dashboard/upload"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-black text-xs font-bold font-mono uppercase tracking-wider hover:bg-primary/90 transition-all shadow-sm"
+          <Button
+            asChild
+            size="sm"
+            className="bg-primary text-black text-xs font-bold font-mono uppercase tracking-wider hover:bg-primary/90 transition-all shadow-sm cursor-pointer"
           >
-            <Upload size={13} />
-            <span>Upload SGR PDF</span>
-          </Link>
+            <Link href="/dashboard/upload" className="flex items-center gap-2">
+              <Upload size={13} />
+              <span>Upload SGR PDF</span>
+            </Link>
+          </Button>
         </div>
       </div>
 

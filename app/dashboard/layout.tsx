@@ -2,11 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import { Menu, Bell, Loader2 } from 'lucide-react';
+import { 
+  Menu, Bell, User as UserIcon, LogOut, Settings, 
+  FileText, BrainCircuit, Sparkles, BookOpen, GraduationCap,
+  Calendar, Layers, Shield
+} from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ModelQuotaBar } from '@/components/ui/model-quota-bar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 // --- TYPES ---
 interface UserProfile {
@@ -27,26 +41,79 @@ interface UserProfile {
   };
 }
 
+interface PageMeta {
+  title: string;
+  tagline: string;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [user, setUser] = useState<UserProfile | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  const getPageTitle = (path: string) => {
-    if (path.includes('/dashboard/generator')) return 'AI Question Paper Generator';
-    if (path.includes('/dashboard/advisor')) return 'Academic Co-Pilot & Advisor';
-    if (path.includes('/dashboard/pyq')) return 'Autonomous PYQ Intelligence';
-    if (path.includes('/dashboard/classroom')) return 'Google Classroom Coursework';
-    if (path.includes('/dashboard/profile')) return 'Academic Profile';
-    if (path.includes('/dashboard/evaluator')) return 'Paper Evaluator & Grading';
-    return 'Kaizen Academic Suite';
+  const getPageInfo = (path: string): PageMeta => {
+    if (path.includes('/dashboard/generator')) {
+      return { title: 'AI QUESTION PAPER GENERATOR', tagline: '// KIIT Autonomous Regs' };
+    }
+    if (path.includes('/dashboard/archives')) {
+      return { title: 'NEURAL ARCHIVES & RECALL', tagline: '// Active Flashcards & Leitner' };
+    }
+    if (path.includes('/dashboard/advisor')) {
+      return { title: 'ACADEMIC CO-PILOT & ADVISOR', tagline: '// Autonomous Consultation Engine' };
+    }
+    if (path.includes('/dashboard/classroom')) {
+      return { title: 'GOOGLE CLASSROOM MODULES', tagline: '// Coursework Knowledge Base' };
+    }
+    if (path.includes('/dashboard/records')) {
+      return { title: 'ACADEMIC RECORDS & SGPA', tagline: '// Autonomous Curricular Gradebook' };
+    }
+    if (path.includes('/dashboard/scheduler')) {
+      return { title: 'TIMETABLE SCHEDULER', tagline: '// Autonomous Course Matrix' };
+    }
+    if (path.includes('/dashboard/improvement')) {
+      return { title: 'CONTINUOUS IMPROVEMENT', tagline: '// Kaizen Diagnostics Radar' };
+    }
+    if (path.includes('/dashboard/simulator')) {
+      return { title: 'CGPA & GRADE SIMULATOR', tagline: '// Predictive Performance Engine' };
+    }
+    if (path.includes('/dashboard/focus')) {
+      return { title: 'COGNITIVE FOCUS & FLOW', tagline: '// Neural Study Timer' };
+    }
+    if (path.includes('/dashboard/checkin')) {
+      return { title: 'ATTENDANCE & CHECK-IN', tagline: '// Autonomous Biometrics' };
+    }
+    if (path.includes('/dashboard/data-ingestion')) {
+      return { title: 'DATA INGESTION PIPELINE', tagline: '// Multi-Modal OCR Ingestion' };
+    }
+    if (path.includes('/dashboard/upload')) {
+      return { title: 'SYLLABUS & MATERIAL UPLOAD', tagline: '// OCR Knowledge Pipeline' };
+    }
+    if (path.includes('/dashboard/mock-exams')) {
+      return { title: 'MOCK EXAMINATION SANDBOX', tagline: '// Autonomous Testing Engine' };
+    }
+    if (path.includes('/dashboard/insights')) {
+      return { title: 'ACADEMIC ANALYTICS & INSIGHTS', tagline: '// Performance Metrics' };
+    }
+    if (path.includes('/dashboard/mail-sync')) {
+      return { title: 'UNIVERSITY MAIL SYNC', tagline: '// Circulars & Notice OCR' };
+    }
+    if (path.includes('/dashboard/profile')) {
+      return { title: 'ACADEMIC PROFILE & CREDENTIALS', tagline: '// KIIT Student Identity' };
+    }
+    if (path === '/dashboard') {
+      return { title: 'ACADEMIC COMMAND CENTER', tagline: '// Autonomous Neural Overview' };
+    }
+    return { title: 'KAIZEN ACADEMIC SUITE', tagline: '// KIIT Autonomous System' };
   };
+
+  const pageInfo = getPageInfo(pathname);
 
   // Restore sidebar pinned preference
   useEffect(() => {
@@ -87,6 +154,15 @@ export default function DashboardLayout({
     fetchUser();
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden font-sans">
       
@@ -107,8 +183,8 @@ export default function DashboardLayout({
         } h-screen overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]`}
       >
         
-        {/* Header */}
-        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-3 md:px-6 z-20 sticky top-0 shrink-0">
+        {/* Header - Identical clean autonomous header with page title on every page */}
+        <header className="h-16 border-b border-border bg-background/85 backdrop-blur-md flex items-center justify-between px-3 md:px-6 z-20 sticky top-0 shrink-0">
           {/* Left: Mobile Menu & Dynamic Page Title */}
           <div className="flex items-center gap-3 min-w-0">
             <button 
@@ -119,12 +195,12 @@ export default function DashboardLayout({
             </button>
             
             <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse shadow-[0_0_8px_rgba(204,255,0,0.6)]" />
               <h1 className="text-xs sm:text-sm font-mono font-bold uppercase tracking-[0.16em] text-foreground truncate">
-                {getPageTitle(pathname)}
+                {pageInfo.title}
               </h1>
               <span className="hidden xl:inline-block text-[10px] font-mono text-muted-foreground/60 tracking-wider">
-                // KIIT Autonomous
+                {pageInfo.tagline}
               </span>
             </div>
           </div>
@@ -134,42 +210,105 @@ export default function DashboardLayout({
             <ModelQuotaBar />
           </div>
 
-          {/* Right: Controls & User Profile */}
+          {/* Right: Controls & User Profile Dropdown */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="md:hidden">
               <ModelQuotaBar />
             </div>
+
             <ThemeToggle variant="square" className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl" />
-            <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors group">
+
+            <button 
+              className="relative p-2 text-muted-foreground hover:text-primary transition-colors group cursor-pointer"
+              title="Notifications"
+            >
               <Bell size={18} />
               <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full ring-2 ring-background group-hover:scale-110 transition-transform" />
             </button>
+
             {user && (
-              <Link
-                href="/dashboard/profile"
-                className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border bg-muted/40 hover:bg-muted/80 hover:border-primary/40 transition-all text-xs group"
-                title="View Academic Profile"
-              >
-                <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                  {user.image ? (
-                    <img
-                      src={user.image}
-                      alt={user.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <span className="text-xs font-mono font-bold text-primary">
-                      {user.name?.charAt(0).toUpperCase() || 'U'}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 pl-1.5 pr-3 py-1 h-9 rounded-full border border-border bg-muted/40 hover:bg-muted/80 hover:border-primary/40 transition-all text-xs cursor-pointer group"
+                  >
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                      {user.image ? (
+                        <img
+                          src={user.image}
+                          alt={user.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[11px] font-mono font-bold text-primary">
+                          {user.name?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-medium text-foreground max-w-[100px] truncate hidden sm:inline group-hover:text-primary transition-colors font-mono">
+                      {user.name.split(' ')[0]}
                     </span>
-                  )}
-                </div>
-                <span className="font-medium text-foreground max-w-[120px] truncate hidden sm:inline group-hover:text-primary transition-colors">
-                  {user.name.split(' ')[0]}
-                </span>
-              </Link>
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-56 font-mono text-xs">
+                  <DropdownMenuLabel className="font-normal py-2">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-xs font-bold leading-none text-foreground">{user.name}</p>
+                      <p className="text-[10px] leading-none text-muted-foreground truncate">{user.email}</p>
+                      {user.department && (
+                        <Badge variant="outline" className="text-[9px] mt-1.5 w-fit border-primary/30 text-primary">
+                          {user.department}
+                        </Badge>
+                      )}
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/profile" className="flex items-center gap-2 cursor-pointer">
+                      <UserIcon size={14} className="text-primary" />
+                      <span>Academic Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/generator" className="flex items-center gap-2 cursor-pointer">
+                      <FileText size={14} className="text-primary" />
+                      <span>Paper Generator</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/archives" className="flex items-center gap-2 cursor-pointer">
+                      <BrainCircuit size={14} className="text-primary" />
+                      <span>Neural Archives</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/records" className="flex items-center gap-2 cursor-pointer">
+                      <GraduationCap size={14} className="text-primary" />
+                      <span>Curricular Records</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem 
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 text-rose-400 focus:text-rose-400 focus:bg-rose-500/10 cursor-pointer"
+                  >
+                    <LogOut size={14} />
+                    <span>Log Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </header>

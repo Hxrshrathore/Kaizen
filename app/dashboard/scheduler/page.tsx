@@ -9,6 +9,8 @@ import {
   Loader2, ExternalLink, RefreshCw, FileText, GraduationCap, 
   ShieldCheck, Info, Search, Tag, Inbox, BellRing, Database
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface ClassSlot {
   id: string;

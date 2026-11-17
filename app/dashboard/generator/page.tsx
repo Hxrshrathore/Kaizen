@@ -12,6 +12,14 @@ import { HueThinkingOrb } from '@/components/ui/hue-thinking-orb';
 import { AiReasoningView } from '@/components/ai/AiReasoningView';
 import { SmartVerificationModal } from '@/components/ai/SmartVerificationModal';
 import { SavedPapersDrawer } from '@/components/ai/SavedPapersDrawer';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { PaperVerificationReport } from '@/lib/paper-verification-engine';
 import type { StoredPaper } from '@/lib/paper-storage';
 
@@ -609,9 +617,26 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                 <BookOpen size={14} className="text-primary" />
                 Curricular Parameters
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/60 uppercase tracking-wider">
-                Autonomous
-              </span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => setIsSavedDrawerOpen(true)}
+                  className="h-6 gap-1 px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground border-border hover:border-primary/40 cursor-pointer"
+                  title="Open Saved Papers Library"
+                >
+                  <FolderOpen size={11} className="text-primary" />
+                  <span>Library</span>
+                  {savedCount > 0 && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/20 text-primary border-primary/30 font-bold">
+                      {savedCount}
+                    </Badge>
+                  )}
+                </Button>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/60 uppercase tracking-wider">
+                  Autonomous
+                </span>
+              </div>
             </div>
 
             {/* Subject Selector */}
@@ -845,36 +870,38 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Saved Papers Repository Drawer Trigger */}
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsSavedDrawerOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground border border-white/10 text-[11px] font-mono font-bold transition-all cursor-pointer"
+                className="h-8 gap-1.5 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-foreground border border-primary/30 hover:border-primary/60 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-primary/10"
                 title="View saved examination papers"
               >
-                <FolderOpen size={13} className="text-primary" />
-                <span>Library</span>
+                <FolderOpen size={14} className="text-primary" />
+                <span>Saved Library</span>
                 {savedCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-primary/20 text-primary text-[9px] font-bold">
+                  <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-bold bg-primary text-black">
                     {savedCount}
-                  </span>
+                  </Badge>
                 )}
-              </button>
+              </Button>
 
               {generatedPaper && (
                 <>
                   {/* Smart AI Verification Trigger Badge */}
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setIsVerificationModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-bold transition-all cursor-pointer shadow-sm shadow-emerald-500/10 hover:scale-105"
+                    className="h-8 gap-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
                     title="Inspect 70%-90% PYQ Pattern Verification Audit"
                   >
                     <ShieldCheck size={13} className="text-emerald-400" />
                     <span>{verificationReport?.pyqMatchRate || 88.4}% PYQ Match</span>
-                    <span className="hidden md:inline text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 uppercase">
+                    <Badge variant="secondary" className="hidden md:inline-flex text-[9px] px-1 py-0 h-4 bg-emerald-500/20 text-emerald-300 uppercase font-mono">
                       Verified
-                    </span>
-                  </button>
+                    </Badge>
+                  </Button>
 
                   {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
                   <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
@@ -906,35 +933,44 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
                     </button>
                   </div>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleCopy}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-xs font-mono cursor-pointer"
                     title="Copy to clipboard"
                   >
                     {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                     <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
+                  </Button>
 
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
-                    title="Download as text"
-                  >
-                    <Download size={13} />
-                    <span className="hidden sm:inline">Export</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handlePrint}
-                    className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
-                    title="Print question paper"
-                  >
-                    <Printer size={13} />
-                    <span className="hidden sm:inline">Print</span>
-                  </button>
+                  {/* Dropdown Menu for Export and Print */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-foreground hover:border-primary/40 text-xs font-mono cursor-pointer"
+                      >
+                        <Download size={13} className="text-primary" />
+                        <span>Export</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="font-mono text-xs">
+                      <DropdownMenuItem onClick={handlePrint} className="cursor-pointer gap-2">
+                        <Printer size={13} className="text-primary" />
+                        <span>Print KIIT Sheet (A4)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleDownload} className="cursor-pointer gap-2">
+                        <Download size={13} className="text-primary" />
+                        <span>Download Plain Text (.txt)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCopy} className="cursor-pointer gap-2">
+                        <Copy size={13} className="text-primary" />
+                        <span>Copy Markdown Text</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>

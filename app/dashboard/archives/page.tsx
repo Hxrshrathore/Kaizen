@@ -4,25 +4,45 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BrainCircuit, Sparkles, RotateCw, Layers, Loader2, 
-  Search, CheckCircle2, BookOpen, AlertCircle
+  Search, CheckCircle2, BookOpen, AlertCircle, ChevronDown, Check
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Flashcard {
   question: string;
   answer: string;
 }
 
-const PRESET_TOPICS = [
-  "Boundary Value Analysis & Robustness",
-  "Control Flow Graph & Cyclomatic Complexity",
-  "Equivalence Partitioning & Decision Tables",
-  "Professional Ethics & NSPE Code",
-  "Intellectual Property Rights & Patents",
-  "Discounted Cash Flow & Depreciation",
+const PRESET_TOPICS_BY_SUBJECT: Record<string, string[]> = {
+  CS40003: [
+    "Boundary Value Analysis & Robustness",
+    "Control Flow Graph & Cyclomatic Complexity",
+    "Equivalence Partitioning & Decision Tables",
+    "Integration & System Regression Testing",
+  ],
+  EX40003: [
+    "Professional Ethics & NSPE Fundamental Canons",
+    "Intellectual Property Rights & Patent Infringement",
+    "Engineering Contracts, Tort & Strict Liability",
+    "Whistleblowing Legal Protection & Case Studies",
+  ],
+};
+
+const ALL_PRESET_TOPICS = [
+  ...PRESET_TOPICS_BY_SUBJECT.CS40003,
+  ...PRESET_TOPICS_BY_SUBJECT.EX40003,
 ];
 
 export default function ArchivesPage() {
   const [topic, setTopic] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
   const [cards, setCards] = useState<Flashcard[]>([
     {
       question: "What is Boundary Value Analysis (BVA)?",
@@ -35,11 +55,19 @@ export default function ArchivesPage() {
     {
       question: "What is the primary canon of the NSPE Code of Ethics?",
       answer: "Engineers shall hold paramount the safety, health, and welfare of the public in the performance of their professional duties."
+    },
+    {
+      question: "What defines Strict Liability in Engineering Tort Law?",
+      answer: "Liability that does not depend on actual negligence or intent to harm, but that is based on the breach of an absolute duty to make something safe (e.g., inherently dangerous products)."
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [flippedIndex, setFlippedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const activePresets = selectedSubject === 'ALL' 
+    ? ALL_PRESET_TOPICS 
+    : PRESET_TOPICS_BY_SUBJECT[selectedSubject] || ALL_PRESET_TOPICS;
 
   const generateCards = async (customTopic?: string) => {
     const queryTopic = customTopic || topic;
@@ -98,9 +126,11 @@ export default function ArchivesPage() {
         </div>
 
         {cards.length > 0 && (
-          <div className="text-xs font-mono text-muted-foreground flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span>{cards.length} Memory Artifacts Ready</span>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block mr-1.5" />
+              {cards.length} Memory Cards Active
+            </Badge>
           </div>
         )}
       </div>
@@ -111,41 +141,66 @@ export default function ArchivesPage() {
           <div className="p-2.5 text-muted-foreground">
             <Search size={18} />
           </div>
+
+          {/* Subject Dropdown Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="xs" 
+                className="h-7 px-2 font-mono text-[10px] rounded-lg border-border text-foreground hover:border-primary/40 shrink-0 cursor-pointer"
+              >
+                <span>{selectedSubject === 'ALL' ? 'All Subjects' : selectedSubject}</span>
+                <ChevronDown size={11} className="ml-1 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="font-mono text-xs">
+              <DropdownMenuItem onClick={() => setSelectedSubject('ALL')} className="cursor-pointer">
+                All Subjects {selectedSubject === 'ALL' && <Check size={12} className="ml-auto text-primary" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSelectedSubject('CS40003')} className="cursor-pointer">
+                [CS40003] Software Testing {selectedSubject === 'CS40003' && <Check size={12} className="ml-auto text-primary" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSelectedSubject('EX40003')} className="cursor-pointer">
+                [EX40003] Engineering Ethics (EPP) {selectedSubject === 'EX40003' && <Check size={12} className="ml-auto text-primary" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <input 
             type="text" 
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && generateCards()}
-            placeholder="Enter syllabus topic (e.g. 'Boundary Value Analysis', 'Whistleblowing NSPE', 'Cyclomatic Complexity')"
-            className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground/60 text-xs sm:text-sm font-mono"
+            placeholder="Enter syllabus concept (e.g. 'Cyclomatic Complexity', 'NSPE Code of Ethics')"
+            className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground/60 text-xs sm:text-sm font-mono min-w-0"
           />
-          <motion.button 
+
+          <Button 
             onClick={() => generateCards()}
             disabled={isLoading || !topic.trim()}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="bg-primary text-black px-5 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm shadow-primary/20 cursor-pointer"
+            className="bg-primary text-black px-4 py-2 h-9 rounded-xl font-mono text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-primary/20 cursor-pointer shrink-0"
           >
             {isLoading ? (
               <>
-                <Loader2 className="animate-spin" size={15} />
-                <span>Generating...</span>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Synthesizing...</span>
               </>
             ) : (
               <>
-                <Sparkles size={15} />
+                <Sparkles size={14} />
                 <span>Synthesize</span>
               </>
             )}
-          </motion.button>
+          </Button>
         </div>
 
         {/* Suggestion Chips */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <span className="text-[10px] font-mono text-muted-foreground mr-1 uppercase tracking-wider flex items-center gap-1">
-            <BookOpen size={11} className="text-primary" /> Recommended:
+            <BookOpen size={11} className="text-primary" /> Curricular Topics:
           </span>
-          {PRESET_TOPICS.map((preset, idx) => (
+          {activePresets.map((preset, idx) => (
             <button
               key={idx}
               type="button"
@@ -200,7 +255,7 @@ export default function ArchivesPage() {
 const FlashCard: React.FC<{ data: Flashcard, index: number, isFlipped: boolean, onFlip: () => void }> = ({ data, index, isFlipped, onFlip }) => {
   return (
     <div 
-      className="h-64 cursor-pointer group perspective-1000 select-none" 
+      className="h-64 cursor-pointer group select-none" 
       onClick={onFlip} 
       style={{ perspective: "1000px" }}
     >
@@ -248,21 +303,24 @@ const FlashCard: React.FC<{ data: Flashcard, index: number, isFlipped: boolean, 
           }}
         >
           <div className="flex justify-between items-start">
-            <span className="text-primary font-mono text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-primary/15 border border-primary/30">
-              Verified Solution
+            <span className="text-emerald-400 font-mono text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+              Solution &amp; Explanation
             </span>
-            <Layers size={13} className="text-primary" />
+            <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+              <CheckCircle2 size={12} className="text-emerald-400" />
+              <span>Grounded</span>
+            </div>
           </div>
 
-          <p className="text-xs sm:text-sm font-mono text-foreground leading-relaxed">
+          <p className="text-xs sm:text-sm font-mono text-foreground/90 leading-relaxed overflow-y-auto custom-scrollbar pr-1">
             {data.answer}
           </p>
 
-          <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground pt-2 border-t border-white/10">
-            <span className="flex items-center gap-1 text-emerald-400 font-bold">
-              <CheckCircle2 size={11} /> Autonomous Syllabus Verified
-            </span>
-            <span className="text-primary font-bold">Click to Revert</span>
+          <div className="w-full space-y-1.5 pt-2 border-t border-border/60">
+            <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+              <span>Autonomous Curriculum</span>
+              <span className="text-emerald-400 font-bold">Verified</span>
+            </div>
           </div>
         </div>
       </motion.div>
