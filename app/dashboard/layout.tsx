@@ -12,6 +12,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ModelQuotaBar } from '@/components/ui/model-quota-bar';
 import { UniversalLibraryDrawer } from '@/components/ai/UniversalLibraryDrawer';
+import { HeaderProfileCard } from '@/components/profile/HeaderProfileCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,13 @@ interface UserProfile {
   officialTags?: string[];
   department?: string | null;
   designation?: string | null;
+  rollNumber?: string;
+  program?: string;
+  branch?: string;
+  section?: string;
+  currentCGPA?: number;
+  totalCredits?: number;
+  semestersLogged?: number;
   badge?: {
     label: string;
     description: string;
@@ -62,6 +70,9 @@ export default function DashboardLayout({
   const [libraryCount, setLibraryCount] = useState(0);
 
   const getPageInfo = (path: string): PageMeta => {
+    if (path.includes('/dashboard/projects')) {
+      return { title: 'MAJOR & MINOR PROJECT PORTAL', tagline: '// Semesters 6, 7 & 8 Autonomous System' };
+    }
     if (path.includes('/dashboard/generator')) {
       return { title: 'AI QUESTION PAPER GENERATOR', tagline: '// KIIT Autonomous Regs' };
     }
@@ -259,96 +270,11 @@ export default function DashboardLayout({
             </button>
 
             {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2 pl-1.5 pr-3 py-1 h-9 rounded-full border border-border bg-muted/40 hover:bg-muted/80 hover:border-primary/40 transition-all text-xs cursor-pointer group"
-                  >
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                      {user.image ? (
-                        <img
-                          src={user.image}
-                          alt={user.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span className="text-[11px] font-mono font-bold text-primary">
-                          {user.name?.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      )}
-                    </div>
-                    <span className="font-medium text-foreground max-w-[100px] truncate hidden sm:inline group-hover:text-primary transition-colors font-mono">
-                      {user.name.split(' ')[0]}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="end" className="w-56 font-mono text-xs">
-                  <DropdownMenuLabel className="font-normal py-2">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-xs font-bold leading-none text-foreground">{user.name}</p>
-                      <p className="text-[10px] leading-none text-muted-foreground truncate">{user.email}</p>
-                      {user.department && (
-                        <Badge variant="outline" className="text-[9px] mt-1.5 w-fit border-primary/30 text-primary">
-                          {user.department}
-                        </Badge>
-                      )}
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/profile" className="flex items-center gap-2 cursor-pointer">
-                      <UserIcon size={14} className="text-primary" />
-                      <span>Academic Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/generator" className="flex items-center gap-2 cursor-pointer">
-                      <FileText size={14} className="text-primary" />
-                      <span>Paper Generator</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/archives" className="flex items-center gap-2 cursor-pointer">
-                      <BrainCircuit size={14} className="text-primary" />
-                      <span>Neural Archives</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/records" className="flex items-center gap-2 cursor-pointer">
-                      <GraduationCap size={14} className="text-primary" />
-                      <span>Curricular Records</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem 
-                    onClick={() => setIsLibraryOpen(true)}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <FolderArchive size={14} className="text-primary" />
-                    <span>AI Generated Library</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem 
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 text-rose-400 focus:text-rose-400 focus:bg-rose-500/10 cursor-pointer"
-                  >
-                    <LogOut size={14} />
-                    <span>Log Out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <HeaderProfileCard
+                user={user}
+                onOpenLibrary={() => setIsLibraryOpen(true)}
+                onLogout={handleLogout}
+              />
             )}
           </div>
         </header>

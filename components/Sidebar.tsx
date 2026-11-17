@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Upload, Play, TrendingUp, Activity, LogOut, 
   User, PieChart, Sparkles, Zap, BrainCircuit, FileQuestion, 
   CalendarClock, Mail, ChevronRight, DatabaseZap, Shield,
-  Pin, PinOff, GraduationCap, School, FileText, BookOpen
+  Pin, PinOff, GraduationCap, School, FileText, BookOpen,
+  FolderKanban
 } from 'lucide-react';
 import { getOfficialBadge } from '@/lib/rbac';
 
@@ -60,15 +61,15 @@ export default function Sidebar({
       items: [
         { path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
         { path: '/dashboard/insights', label: 'Insights', icon: <PieChart size={19} /> },
-        { path: '/dashboard/profile', label: 'Student Profile', icon: <User size={19} /> },
       ]
     },
     { 
       section: 'ACADEMIC ENGINE', 
       items: [
-        { path: '/dashboard/upload', label: 'Ingest Grades', icon: <Upload size={19} /> },
+        { path: '/dashboard/projects', label: 'Minor/Major Project', icon: <FolderKanban size={19} /> },
         { path: '/dashboard/records', label: 'Academic Ledger', icon: <GraduationCap size={19} /> },
         { path: '/dashboard/generator', label: 'Paper Generator', icon: <FileText size={19} /> },
+        { path: '/dashboard/upload', label: 'Ingest Grades', icon: <Upload size={19} /> },
         { path: '/dashboard/simulator', label: 'SGPA Simulator', icon: <Play size={19} /> },
         { path: '/dashboard/improvement', label: 'Optimizer', icon: <TrendingUp size={19} /> },
         { path: '/dashboard/mock-exams', label: 'Exo-Sim', icon: <FileQuestion size={19} /> },
@@ -203,79 +204,25 @@ export default function Sidebar({
         ))}
       </div>
 
-      {/* User Profile & Logout Footer */}
-      <div className="p-3 border-t border-border bg-muted/30 shrink-0 overflow-hidden transition-all duration-300">
+      {/* Logout Footer - Replaced Profile Link with dedicated End Session Action */}
+      <div className="p-3 border-t border-border bg-muted/20 shrink-0 overflow-hidden transition-all duration-300">
         {expanded ? (
-          <div className="space-y-2.5 animate-in fade-in duration-200">
-            <Link 
-              href="/dashboard/profile"
-              className="flex items-center gap-2.5 p-1 -m-1 rounded-lg hover:bg-muted/50 transition-colors group"
-            >
-              <div className="relative w-8 h-8 rounded-full overflow-hidden bg-primary/10 border border-primary/20 shrink-0 flex items-center justify-center">
-                {displayUser.image ? (
-                  <img
-                    src={displayUser.image}
-                    alt={displayUser.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <span className="text-xs font-bold font-mono text-primary">
-                    {displayUser.name?.charAt(0).toUpperCase() || 'U'}
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-foreground font-bold truncate group-hover:text-primary transition-colors">
-                  {displayUser.name}
-                </div>
-                <div className="text-[10px] text-muted-foreground truncate font-mono" title={displayUser.email}>
-                  {displayUser.email}
-                </div>
-              </div>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 tracking-wider uppercase ${badge.badgeClasses}`}
-                title={badge.description}
-              >
-                {badge.label}
-              </span>
-            </Link>
-            <button 
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-destructive hover:bg-destructive/10 transition-colors text-[10px] uppercase tracking-widest font-bold shadow-sm"
-            >
-              <LogOut size={12} />
-              <span>End Session</span>
-            </button>
-          </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl border border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive hover:text-white transition-all text-xs font-mono uppercase tracking-wider font-bold shadow-sm group cursor-pointer"
+            title="Terminate Active Session"
+          >
+            <LogOut size={15} className="group-hover:-translate-x-0.5 transition-transform" />
+            <span>End Session</span>
+          </button>
         ) : (
-          <div className="flex flex-col items-center gap-2">
-            <Link
-              href="/dashboard/profile"
-              className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold font-mono text-primary cursor-pointer hover:scale-105 transition-transform shrink-0"
-              title={`${displayUser.name} (${badge.label})`}
-            >
-              {displayUser.image ? (
-                <img
-                  src={displayUser.image}
-                  alt={displayUser.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                displayUser.name?.charAt(0).toUpperCase() || 'U'
-              )}
-            </Link>
+          <div className="flex flex-col items-center">
             <button 
               onClick={handleLogout}
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10 transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-xl border border-destructive/20 text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
               title="End Session"
             >
-              <LogOut size={14} />
+              <LogOut size={16} />
             </button>
           </div>
         )}
