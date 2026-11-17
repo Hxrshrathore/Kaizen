@@ -11,7 +11,6 @@ import { QuestionPaperSheet } from './QuestionPaperSheet';
 import { HueThinkingOrb } from '@/components/ui/hue-thinking-orb';
 import { AiReasoningView } from '@/components/ai/AiReasoningView';
 import { SmartVerificationModal } from '@/components/ai/SmartVerificationModal';
-import { SavedPapersDrawer } from '@/components/ai/SavedPapersDrawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -259,6 +258,16 @@ export default function DashboardGeneratorPage() {
       setVerificationReport(paper.verificationReport);
     }
   };
+
+  useEffect(() => {
+    const handleLoadPaper = (e: any) => {
+      if (e.detail) {
+        handleSelectSavedPaper(e.detail);
+      }
+    };
+    window.addEventListener('load_saved_paper', handleLoadPaper);
+    return () => window.removeEventListener('load_saved_paper', handleLoadPaper);
+  }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -612,33 +621,6 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
           
           {/* Card: Configuration */}
           <div className="p-4 rounded-2xl bg-card border border-border shadow-sm space-y-3.5 shrink-0">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-mono font-bold uppercase tracking-[0.16em] text-foreground flex items-center gap-2">
-                <BookOpen size={14} className="text-primary" />
-                Curricular Parameters
-              </h2>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={() => setIsSavedDrawerOpen(true)}
-                  className="h-6 gap-1 px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground border-border hover:border-primary/40 cursor-pointer"
-                  title="Open Saved Papers Library"
-                >
-                  <FolderOpen size={11} className="text-primary" />
-                  <span>Library</span>
-                  {savedCount > 0 && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/20 text-primary border-primary/30 font-bold">
-                      {savedCount}
-                    </Badge>
-                  )}
-                </Button>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/60 uppercase tracking-wider">
-                  Autonomous
-                </span>
-              </div>
-            </div>
-
             {/* Subject Selector */}
             <div>
               <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-[0.12em] mb-1.5 font-bold">
@@ -856,125 +838,104 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         {/* Right Column: Generated Paper Preview & Live Generative Stage (8 cols) */}
         <div className="lg:col-span-8 flex flex-col h-full min-h-0 bg-card border border-border shadow-sm rounded-2xl p-3.5 sm:p-4 overflow-hidden">
           
-          {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border mb-3 shrink-0">
-            <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-              <FileText size={15} className="text-primary" />
-              <span className="font-bold text-foreground uppercase tracking-[0.14em]">Official Examination Paper</span>
-              {genStats && (
-                <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px] font-mono">
-                  {genStats.tokens} tokens • {genStats.latency}s
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Saved Papers Repository Drawer Trigger */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSavedDrawerOpen(true)}
-                className="h-8 gap-1.5 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-foreground border border-primary/30 hover:border-primary/60 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-primary/10"
-                title="View saved examination papers"
-              >
-                <FolderOpen size={14} className="text-primary" />
-                <span>Saved Library</span>
-                {savedCount > 0 && (
-                  <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-bold bg-primary text-black">
-                    {savedCount}
-                  </Badge>
+          {/* Action Bar - Rendered when generated paper exists */}
+          {generatedPaper && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border mb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                {genStats && (
+                  <span className="text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 text-[10px] font-mono">
+                    {genStats.tokens} tokens • {genStats.latency}s
+                  </span>
                 )}
-              </Button>
+              </div>
 
-              {generatedPaper && (
-                <>
-                  {/* Smart AI Verification Trigger Badge */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsVerificationModalOpen(true)}
-                    className="h-8 gap-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
-                    title="Inspect 70%-90% PYQ Pattern Verification Audit"
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                {/* Smart AI Verification Trigger Badge */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsVerificationModalOpen(true)}
+                  className="h-8 gap-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
+                  title="Inspect 70%-90% PYQ Pattern Verification Audit"
+                >
+                  <ShieldCheck size={13} className="text-emerald-500 dark:text-emerald-400" />
+                  <span>{verificationReport?.pyqMatchRate || 88.4}% PYQ Match</span>
+                  <Badge variant="secondary" className="hidden md:inline-flex text-[9px] px-1 py-0 h-4 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 uppercase font-mono">
+                    Verified
+                  </Badge>
+                </Button>
+
+                {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
+                <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setPaperViewMode('sheet')}
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                      paperViewMode === 'sheet'
+                        ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Official KIIT Examination Paper View"
                   >
-                    <ShieldCheck size={13} className="text-emerald-400" />
-                    <span>{verificationReport?.pyqMatchRate || 88.4}% PYQ Match</span>
-                    <Badge variant="secondary" className="hidden md:inline-flex text-[9px] px-1 py-0 h-4 bg-emerald-500/20 text-emerald-300 uppercase font-mono">
-                      Verified
-                    </Badge>
-                  </Button>
-
-                  {/* View Mode Toggle: Official Sheet vs Raw Markdown */}
-                  <div className="inline-flex rounded-lg bg-muted/60 p-0.5 border border-border text-[11px] font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setPaperViewMode('sheet')}
-                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                        paperViewMode === 'sheet'
-                          ? 'bg-primary text-black font-bold shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Official KIIT Examination Paper View"
-                    >
-                      <Eye size={12} />
-                      <span className="hidden sm:inline">Paper Sheet</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaperViewMode('raw')}
-                      className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                        paperViewMode === 'raw'
-                          ? 'bg-primary text-black font-bold shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Raw text view"
-                    >
-                      <Code size={12} />
-                      <span className="hidden sm:inline">Raw Text</span>
-                    </button>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-xs font-mono cursor-pointer"
-                    title="Copy to clipboard"
+                    <Eye size={12} />
+                    <span className="hidden sm:inline">Paper Sheet</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaperViewMode('raw')}
+                    className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                      paperViewMode === 'raw'
+                        ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Raw text view"
                   >
-                    {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                    <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-                  </Button>
+                    <Code size={12} />
+                    <span className="hidden sm:inline">Raw Text</span>
+                  </button>
+                </div>
 
-                  {/* Dropdown Menu for Export and Print */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-foreground hover:border-primary/40 text-xs font-mono cursor-pointer"
-                      >
-                        <Download size={13} className="text-primary" />
-                        <span>Export</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="font-mono text-xs">
-                      <DropdownMenuItem onClick={handlePrint} className="cursor-pointer gap-2">
-                        <Printer size={13} className="text-primary" />
-                        <span>Print KIIT Sheet (A4)</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleDownload} className="cursor-pointer gap-2">
-                        <Download size={13} className="text-primary" />
-                        <span>Download Plain Text (.txt)</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCopy} className="cursor-pointer gap-2">
-                        <Copy size={13} className="text-primary" />
-                        <span>Copy Markdown Text</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-xs font-mono cursor-pointer"
+                  title="Copy to clipboard"
+                >
+                  {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                  <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+                </Button>
+
+                {/* Dropdown Menu for Export and Print */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2.5 rounded-lg border-border text-foreground hover:border-primary/40 text-xs font-mono cursor-pointer"
+                    >
+                      <Download size={13} className="text-primary" />
+                      <span>Export</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="font-mono text-xs">
+                    <DropdownMenuItem onClick={handlePrint} className="cursor-pointer gap-2">
+                      <Printer size={13} className="text-primary" />
+                      <span>Print KIIT Sheet (A4)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDownload} className="cursor-pointer gap-2">
+                      <Download size={13} className="text-primary" />
+                      <span>Download Plain Text (.txt)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCopy} className="cursor-pointer gap-2">
+                      <Copy size={13} className="text-primary" />
+                      <span>Copy Markdown Text</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Paper Output Container - Fits perfectly in viewport without page scroll */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
@@ -1099,14 +1060,6 @@ ${examType === 'end_sem' ? endSemInstructions : midSemInstructions}
         isOpen={isVerificationModalOpen}
         onClose={() => setIsVerificationModalOpen(false)}
         report={verificationReport}
-      />
-
-      {/* Saved Papers Drawer */}
-      <SavedPapersDrawer
-        isOpen={isSavedDrawerOpen}
-        onClose={() => setIsSavedDrawerOpen(false)}
-        onSelectPaper={handleSelectSavedPaper}
-        activeSubjectCode={selectedSubjectCode}
       />
 
     </div>

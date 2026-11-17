@@ -23,7 +23,18 @@ export interface StoredPaper {
   updatedAt?: string | Date;
 }
 
+export interface StoredFlashcardSet {
+  id: string;
+  userId?: string | null;
+  topic: string;
+  subjectCode?: string | null;
+  cardsCount: number;
+  cards: Array<{ question: string; answer: string }>;
+  createdAt: string | Date;
+}
+
 let isTableInitialized = false;
+let isFlashcardTableInitialized = false;
 
 /**
  * Ensures the GeneratedPaper table exists in PostgreSQL / NeonDB
@@ -69,6 +80,35 @@ export async function ensureGeneratedPaperTable() {
     isTableInitialized = true;
   } catch (error) {
     console.warn("Failed to ensure GeneratedPaper table:", error);
+  }
+}
+
+/**
+ * Ensures the GeneratedFlashcardSet table exists in PostgreSQL / NeonDB
+ */
+export async function ensureGeneratedFlashcardTable() {
+  if (isFlashcardTableInitialized) return;
+  try {
+    await db.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "GeneratedFlashcardSet" (
+        "id" TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "topic" TEXT NOT NULL,
+        "subjectCode" TEXT,
+        "cardsCount" INTEGER NOT NULL DEFAULT 6,
+        "cards" JSONB NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "idx_flashcard_set_created_at" 
+      ON "GeneratedFlashcardSet" ("createdAt" DESC);
+    `);
+
+    isFlashcardTableInitialized = true;
+  } catch (error) {
+    console.warn("Failed to ensure GeneratedFlashcardSet table:", error);
   }
 }
 
@@ -154,7 +194,7 @@ export async function saveGeneratedPaper(data: {
 /**
  * Retrieves saved papers for a subject or student
  */
-export async function getSavedPapers(subjectCode?: string, limit = 20): Promise<StoredPaper[]> {
+export async function getSavedPapers(subjectCode?: string, limit = 30): Promise<StoredPaper[]> {
   await ensureGeneratedPaperTable();
 
   try {
@@ -192,6 +232,79 @@ export async function deleteSavedPaper(id: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error(`Failed to delete GeneratedPaper ${id}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Saves a newly synthesized flashcard set
+ */
+export async function saveGeneratedFlashcards(data: {
+  userId?: string | null;
+  topic: string;
+  cards: Array<{ question: string; answer: string }>;
+  subjectCode?: string | null;
+}): Promise<StoredFlashcardSet> {
+  await ensureGeneratedFlashcardTable();
+
+  const id = `fc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const cardsCount = data.cards.length;
+  const cardsJson = JSON.stringify(data.cards);
+
+  try {
+    const rows = await db.$queryRaw<StoredFlashcardSet[]>`
+      INSERT INTO "GeneratedFlashcardSet" (
+        "id", "userId", "topic", "subjectCode", "cardsCount", "cards", "createdAt"
+      ) VALUES (
+        ${id}, ${data.userId || null}, ${data.topic}, ${data.subjectCode || null}, ${cardsCount}, ${cardsJson}::jsonb, NOW()
+      )
+      RETURNING *;
+    `;
+    return rows[0];
+  } catch (err) {
+    console.error("Database save failed for GeneratedFlashcardSet, returning local fallback:", err);
+    return {
+      id,
+      userId: data.userId || null,
+      topic: data.topic,
+      subjectCode: data.subjectCode || null,
+      cardsCount,
+      cards: data.cards,
+      createdAt: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Retrieves saved flashcard sets
+ */
+export async function getSavedFlashcards(limit = 30): Promise<StoredFlashcardSet[]> {
+  await ensureGeneratedFlashcardTable();
+
+  try {
+    const rows = await db.$queryRaw<StoredFlashcardSet[]>`
+      SELECT * FROM "GeneratedFlashcardSet"
+      ORDER BY "createdAt" DESC
+      LIMIT ${limit};
+    `;
+    return rows;
+  } catch (err) {
+    console.error("Failed to query GeneratedFlashcardSet table:", err);
+    return [];
+  }
+}
+
+/**
+ * Deletes a saved flashcard set by ID
+ */
+export async function deleteSavedFlashcard(id: string): Promise<boolean> {
+  await ensureGeneratedFlashcardTable();
+
+  try {
+    await db.$executeRawUnsafe(`DELETE FROM "GeneratedFlashcardSet" WHERE "id" = $1`, id);
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete GeneratedFlashcardSet ${id}:`, err);
     return false;
   }
 }

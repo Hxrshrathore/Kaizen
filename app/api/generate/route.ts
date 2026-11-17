@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 // Ensure you have: npm install @google/genai
 import { GoogleGenAI } from "@google/genai";
+import { saveGeneratedFlashcards } from "@/lib/paper-storage";
 
 export async function POST(req: Request) {
   try {
@@ -72,6 +73,14 @@ export async function POST(req: Request) {
       // Clean potential markdown blocks
       const cleanText = text.replace(/```json|```/g, '').trim();
       cards = JSON.parse(cleanText);
+
+      // Auto-save generated flashcard set to user's AI library
+      if (Array.isArray(cards) && cards.length > 0) {
+        saveGeneratedFlashcards({
+          topic,
+          cards,
+        }).catch(err => console.error("Failed to auto-save flashcards:", err));
+      }
     } catch (err) {
       console.error("JSON parse failed:", text);
       return NextResponse.json(

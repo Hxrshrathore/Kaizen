@@ -7,10 +7,11 @@ import Sidebar from '@/components/Sidebar';
 import { 
   Menu, Bell, User as UserIcon, LogOut, Settings, 
   FileText, BrainCircuit, Sparkles, BookOpen, GraduationCap,
-  Calendar, Layers, Shield
+  Calendar, Layers, Shield, FolderArchive
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ModelQuotaBar } from '@/components/ui/model-quota-bar';
+import { UniversalLibraryDrawer } from '@/components/ai/UniversalLibraryDrawer';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,8 @@ export default function DashboardLayout({
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [user, setUser] = useState<UserProfile | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [libraryCount, setLibraryCount] = useState(0);
 
   const getPageInfo = (path: string): PageMeta => {
     if (path.includes('/dashboard/generator')) {
@@ -151,8 +154,20 @@ export default function DashboardLayout({
         setLoading(false);
       }
     };
+
+    const fetchLibraryCount = async () => {
+      try {
+        const res = await fetch('/api/ai/library');
+        if (res.ok) {
+          const data = await res.json();
+          setLibraryCount(data.totalCount || 0);
+        }
+      } catch {}
+    };
+
     fetchUser();
-  }, []);
+    fetchLibraryCount();
+  }, [pathname]);
 
   const handleLogout = async () => {
     try {
@@ -215,6 +230,23 @@ export default function DashboardLayout({
             <div className="md:hidden">
               <ModelQuotaBar />
             </div>
+
+            {/* Universal AI Generated Library Trigger - Near Theme Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLibraryOpen(true)}
+              className="h-9 sm:h-10 px-2.5 sm:px-3 gap-1.5 rounded-xl border border-border bg-card/60 hover:bg-card hover:border-primary/50 text-xs font-mono transition-all cursor-pointer shadow-xs"
+              title="Universal AI Generated Library (Question Papers, Flashcards & Study Materials)"
+            >
+              <FolderArchive size={15} className="text-primary" />
+              <span className="hidden sm:inline font-bold">Library</span>
+              {libraryCount > 0 && (
+                <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-bold bg-primary text-primary-foreground ml-0.5">
+                  {libraryCount}
+                </Badge>
+              )}
+            </Button>
 
             <ThemeToggle variant="square" className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl" />
 
@@ -298,6 +330,14 @@ export default function DashboardLayout({
                     </Link>
                   </DropdownMenuItem>
 
+                  <DropdownMenuItem 
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <FolderArchive size={14} className="text-primary" />
+                    <span>AI Generated Library</span>
+                  </DropdownMenuItem>
+
                   <DropdownMenuSeparator />
 
                   <DropdownMenuItem 
@@ -324,6 +364,24 @@ export default function DashboardLayout({
         </main>
 
       </div>
+
+      {/* Universal AI Generated Library Drawer */}
+      <UniversalLibraryDrawer
+        isOpen={isLibraryOpen}
+        onClose={() => {
+          setIsLibraryOpen(false);
+          const fetchCount = async () => {
+            try {
+              const res = await fetch('/api/ai/library');
+              if (res.ok) {
+                const data = await res.json();
+                setLibraryCount(data.totalCount || 0);
+              }
+            } catch {}
+          };
+          fetchCount();
+        }}
+      />
     </div>
   );
 }
