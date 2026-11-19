@@ -14,7 +14,6 @@ import {
   Apple, HeartPulse, Activity, TrendingUp, GitBranch, ShieldAlert, Network, Download,
   School, Lock, FolderKanban, Users, CheckCheck, Landmark
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 // --- TYPES ---
 interface SlideData {
@@ -522,9 +521,9 @@ export default function PitchDeckPage() {
                       <strong>The Kaizen Paradigm:</strong> A unified autonomous neural layer bridging Student Coursework, Examination Intelligence, and Biometric Circadian Recovery into one cohesive copilot.
                     </span>
                   </div>
-                  <Badge variant="outline" className="text-primary border-primary/30 shrink-0 hidden sm:inline">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold text-primary border border-primary/30 shrink-0 hidden sm:inline">
                     100% OPERATIONAL
-                  </Badge>
+                  </span>
                 </div>
               </div>
             )}
@@ -634,7 +633,7 @@ export default function PitchDeckPage() {
                       <span className="text-xs font-mono font-bold text-primary flex items-center gap-1.5">
                         <Zap size={14} /> INNOVATION 01: COMBINATORIAL OPTIMIZER
                       </span>
-                      <Badge className="bg-primary/20 text-primary text-[9px] font-mono">70%–90% PYQ Match</Badge>
+                      <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[9px] font-mono font-semibold">70%–90% PYQ Match</span>
                     </div>
                     <h3 className="text-base font-bold text-foreground font-mono">
                       Knapsack Examination Blueprint &amp; Self-Reflective Verification
@@ -654,7 +653,7 @@ export default function PitchDeckPage() {
                       <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1.5">
                         <HeartPulse size={14} /> INNOVATION 02: CIRCADIAN HEALTH RADAR
                       </span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 text-[9px] font-mono">Apple Health + Google Fit</Badge>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-mono font-semibold">Apple Health + Google Fit</span>
                     </div>
                     <h3 className="text-base font-bold text-foreground font-mono">
                       Autonomic Nervous System Sync &amp; Burnout Prediction
@@ -674,7 +673,7 @@ export default function PitchDeckPage() {
                       <span className="text-xs font-mono font-bold text-cyan-400 flex items-center gap-1.5">
                         <Cpu size={14} /> INNOVATION 03: HETEROGENEOUS AI CASCADE
                       </span>
-                      <Badge className="bg-cyan-500/20 text-cyan-400 text-[9px] font-mono">On-Device GGUF + Cloud NIM</Badge>
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[9px] font-mono font-semibold">On-Device GGUF + Cloud NIM</span>
                     </div>
                     <h3 className="text-base font-bold text-foreground font-mono">
                       Local 4-bit Quantized SLM + NVIDIA Nemotron 3.5 Bolt
@@ -694,7 +693,7 @@ export default function PitchDeckPage() {
                       <span className="text-xs font-mono font-bold text-purple-400 flex items-center gap-1.5">
                         <FolderKanban size={14} /> INNOVATION 04: PROJECT GOVERNANCE HUB
                       </span>
-                      <Badge className="bg-purple-500/20 text-purple-400 text-[9px] font-mono">Semesters 6, 7 &amp; 8</Badge>
+                      <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-[9px] font-mono font-semibold">Semesters 6, 7 &amp; 8</span>
                     </div>
                     <h3 className="text-base font-bold text-foreground font-mono">
                       Immutable Team Locks &amp; 3-Day Request Auto-Rejection
@@ -1062,9 +1061,9 @@ export default function PitchDeckPage() {
                       Under full university-wide deployment, serverless compute scales to only ₹0.37 per student/month—a 98.4% cost reduction over traditional enterprise LMS solutions.
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 shrink-0">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold text-emerald-400 border border-emerald-500/30 shrink-0">
                     98.4% Cost Reduction
-                  </Badge>
+                  </span>
                 </div>
               </div>
             )}
